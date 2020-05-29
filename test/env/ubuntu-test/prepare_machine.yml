@@ -1,0 +1,19 @@
+---
+-   hosts: all
+    become: yes
+    remote_user: vagrant
+
+    tasks:
+    -   name: Test task
+        file:
+            state: touch
+            path: /tmp/helloworld
+
+    -   name: Update mahcine
+        become: yes
+        apt:
+            force: yes
+            install_recommends: yes
+            upgrade: full
+
+

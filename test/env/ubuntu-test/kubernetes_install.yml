@@ -1,0 +1,64 @@
+---
+# https://github.com/kubernetes-retired/contrib/tree/master/ansible
+- hosts: all
+  become: yes
+  tasks:
+   - name: Docker Installation
+     apt:
+       name: docker.io
+       state: present
+       update_cache: true
+
+   - name: install APT Transport HTTPS
+     apt:
+       name: apt-transport-https
+       state: present
+
+   - name: add Kubernetes apt-key for APT repository
+     apt_key:
+       url: https://packages.cloud.google.com/apt/doc/apt-key.gpg
+       state: present
+
+   - name: add Kubernetes APT repository
+     apt_repository:
+      repo: deb http://apt.kubernetes.io/ kubernetes-xenial main
+      state: present
+      filename: 'kubernetes'
+
+   - name: install kubelet
+     apt:
+       name: kubelet=1.14.3-00
+       state: present
+       force: yes
+       #update_cache: true
+
+   - name: install kubeadm
+     apt:
+       name: kubeadm=1.14.3-00
+       state: present
+       force: yes
+
+   - name: install kubectl
+     apt:
+       name: kubectl=1.14.3-00
+       state: present
+       force: yes
+
+   - name: install pip
+     apt:
+       name: python3-pip
+       state: present
+       force: yes
+
+   - name: install yamlpath
+     pip:
+       name: yamlpath
+    
+   - name: install iptables
+     apt:
+       pkg: 
+        - iptables 
+        - arptables 
+        - ebtables
+       state: present
+       force: yes

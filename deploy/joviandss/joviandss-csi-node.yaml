@@ -1,0 +1,120 @@
+
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: joviandss-csi-node-service-account
+  namespace: default 
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-node-cluster-role
+rules:
+  - apiGroups: ['']
+    resources: ['events']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch']
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-node-cluster-role-binding
+subjects:
+  - kind: ServiceAccount
+    name: joviandss-csi-node-service-account
+    namespace: default
+roleRef:
+  kind: ClusterRole
+  name: joviandss-csi-node-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+---
+
+
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: joviandss-csi-node
+spec:
+  selector:
+    matchLabels:
+      app: joviandss-csi-node
+  template:
+    metadata:
+      labels:
+        app: joviandss-csi-node
+    spec:
+      serviceAccount: joviandss-csi-node-service-account
+      hostNetwork: true
+      containers:
+        - name: csi-registrar
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.1
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -rf /registration/com.open-e.joviandss.csi"]
+          args:
+            - --v=5
+            - --csi-address=/csi/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins_registry/com.open-e.joviandss.csi/csi.sock
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+        - name: csi-node
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ['SYS_ADMIN']
+            allowPrivilegeEscalation: true
+          image: opene/joviandss-csi:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --csi-address=/csi/csi.sock
+            - --soc-type=unix
+            - --config=/config/node.yaml
+            - --nodeid=$(KUBE_NODE_NAME)
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: dev-dir
+              mountPath: /dev
+            - name: config
+              mountPath: /config
+            - name: mount-dir
+              mountPath: /mnt/pods
+              mountPropagation: Bidirectional
+
+      volumes:
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/com.open-e.joviandss.csi
+            type: DirectoryOrCreate
+        - name: dev-dir
+          hostPath:
+            path: /dev
+            type: Directory
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: DirectoryOrCreate
+        - name: mount-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: config
+          secret:
+            secretName: jdss-node-cfg 
+

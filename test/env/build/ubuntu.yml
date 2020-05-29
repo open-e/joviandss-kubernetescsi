@@ -1,0 +1,72 @@
+---
+# https://github.com/kubernetes-retired/contrib/tree/master/ansible
+- hosts: all
+  become: yes
+  vars:
+    ubuntu_release: some_text
+  tasks:
+
+    - name: Install aptitude using apt
+      apt:
+        name: aptitude
+        state: latest
+        update_cache: yes
+        force_apt_get: yes
+
+    - name: Create variable from command
+      command: "lsb_release -cs"
+      register: ubuntu_release
+      ignore_errors: True
+
+    - name: Remove unwanted packages
+      apt:
+        pkg:
+          - docker
+          - docker-engine
+          - docker.io
+          - containerd
+          - runc
+        state: absent
+
+    - name: Install required system packages
+      apt: name={{ item }} state=latest update_cache=yes
+      loop: [ 'apt-transport-https', 'ca-certificates', 'curl', 'software-properties-common', 'gnupg-agent']
+
+    - name: Add Docker GPG apt Key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - debug:
+        msg: "deb https://download.docker.com/linux/ubuntu {{ ubuntu_release.stdout }} stable"
+
+    - name: Add Docker Repository
+      become: true
+      apt_repository:
+        repo: "deb https://download.docker.com/linux/ubuntu {{ ubuntu_release.stdout }} stable"
+        state: present
+
+    - name: Run the equivalent of "apt-get update" as a separate step
+      apt:
+        update_cache: yes
+
+    - name: Update all packages to the latest version
+      apt:
+        upgrade: dist
+
+    - name: Update apt and install docker-ce
+      apt:
+        pkg:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+        state: latest
+
+    -   name: Change permission for src dir
+        become: yes
+        file:
+            path: /home/vagrant/go
+            state: directory
+            owner: vagrant
+            group: vagrant
+            recurse: yes

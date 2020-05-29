@@ -1,0 +1,194 @@
+---
+# https://github.com/kubernetes-retired/contrib/tree/master/ansible
+- hosts: all
+  become: yes
+  vars:
+    kubernetes_user: vagrant
+  tasks:
+    - name: Update mahcine
+      become: yes
+      dnf:
+        name: "*"
+        state: latest
+
+    - name: install necessary files
+      become: yes
+      dnf:
+        name:
+          - python3
+          - git
+          - python3-yaml
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+          - iscsi-initiator-utils
+        state: present
+
+    - name: Remove docker
+      become: yes
+      dnf:
+        name:
+          - docker
+          - docker-client
+          - docker-client-latest
+          - docker-common
+          - docker-latest
+          - docker-latest-logrotate
+          - docker-logrotate
+          - docker-selinux
+          - docker-engine-selinux
+          - docker-engine
+        state: absent
+
+
+    - name: Add centos repo
+      become: yes
+      command:
+        argv:
+          - yum
+          - config-manager
+          - -y
+          - --add-repo
+          - https://download.docker.com/linux/centos/docker-ce.repo
+
+    - name: Install container.io
+      become: yes
+      yum:
+        enablerepo: https://download.docker.com/linux/centos/docker-ce.repo
+        name:
+          - https://download.docker.com/linux/centos/7/x86_64/stable/Packages/containerd.io-1.2.6-3.3.el7.x86_64.rpm
+        state: present
+
+    - name: Install docker
+      become: yes
+      yum:
+        enablerepo: https://download.docker.com/linux/centos/docker-ce.repo
+        name:
+          - docker-ce
+          - docker-ce-cli
+        state: present
+
+    - name: Enable docker service
+      become: yes
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Disable firewall service
+      become: yes
+      systemd:
+        name: firewalld
+        enabled: yes
+        state: started
+
+    - name: Enable iscsid service
+      become: yes
+      systemd:
+        name: iscsid
+        enabled: yes
+        state: started
+
+    - name: Disable swap
+      become: yes
+      command:
+        argv:
+          - swapoff
+          - -a
+
+    - name: Disable swappiness
+      become: yes
+      command:
+        argv:
+          - sysctl
+          - -w
+          - vm.swappiness=0
+
+    - name: Insert/Update "Match User" configuration block in /etc/ssh/sshd_config
+      blockinfile:
+        path: /etc/yum.repos.d/kubernetes.repo
+        block: |
+          [kubernetes]
+          name=Kubernetes
+          baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+          enabled=1
+          gpgcheck=1
+          repo_gpgcheck=1
+          gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+          exclude=kube*
+        marker: "# {mark} Enable kubernetes repo"
+        create: yes
+
+    - name: Install kubeadm
+      become: yes
+      dnf:
+        enablerepo: https://download.docker.com/linux/centos/docker-ce.repo
+        name:
+          - kubelet-1.14.3
+          - kubectl-1.14.3
+          - kubeadm-1.14.3
+        state: present
+        disable_excludes: kubernetes
+
+    - name: Kubeadm init
+      become: true
+      #become_user: vagrant
+      command:
+        argv:
+          - kubeadm
+          - init
+          - --kubernetes-version
+          - v1.14.3
+          - --pod-network-cidr=10.244.0.0/16
+          - --ignore-preflight-errors=SystemVerification
+
+    - name: Setup Kubernetes credentials
+      become: yes
+      file:
+        path: /home/{{ kubernetes_user }}/.kube
+        state: directory
+        owner: "{{ kubernetes_user }}"
+        group: "{{ kubernetes_user }}"
+        recurse: yes
+
+    - name: Copy Kubernetes config
+      become: yes
+      #become_user: "{{ kubernetes_user }}"
+      command:
+        cmd: cp /etc/kubernetes/admin.conf /home/{{ kubernetes_user }}/.kube/config
+      args:
+        creates: /home/{{ kubernetes_user }}/.kube/config
+
+    - name: Set permisions for kube config
+      become: true
+      file:
+        path: /home/{{ kubernetes_user }}/.kube/config
+        state: file
+        owner: "{{ kubernetes_user }}"
+        group: "{{ kubernetes_user }}"
+        mode: '0640'
+
+    - name: Set permisions for kub user
+      become: true
+      file:
+        path: /home/{{ kubernetes_user }}/
+        state: directory
+        owner: "{{ kubernetes_user }}"
+        group: "{{ kubernetes_user }}"
+        recurse: true
+
+    - name: Untain master node
+      become: yes
+      become_user: "{{ kubernetes_user }}"
+      command:
+        cmd: kubectl taint nodes --all node-role.kubernetes.io/master-
+
+    - name: Install flanel
+      become: yes
+      become_user: "{{ kubernetes_user }}"
+      command:
+        argv:
+          - kubectl
+          - apply
+          - -f
+          - https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml

@@ -1,0 +1,78 @@
+---
+# https://github.com/kubernetes-retired/contrib/tree/master/ansible
+- hosts: all
+  vars:
+    kubernetes_user: vagrant
+  tasks:
+    -   name: Get git version
+        become: true
+        become_user: vagrant
+        command: git -C /src/ describe --long --tags
+        register: git_version
+        ignore_errors: True
+
+    -   name: Upload cis driver
+        become: yes
+        command:
+            argv:
+                - docker
+                - load
+                - -i
+                - "/src/_output/joviandss-csi-c:{{ git_version.stdout }}"
+
+    -   name: Load iscsi module
+        become: yes
+        modprobe:
+            name: iscsi_tcp
+            state: present
+
+
+    -   name: Make config directory
+        become: yes
+        become_user: "{{ kubernetes_user }}"
+        file:
+            path: /home/{{ kubernetes_user }}/configs
+            state: directory
+            owner: "{{ kubernetes_user }}"
+            group: "{{ kubernetes_user }}"
+            recurse: yes
+
+    -   name: Copy config files
+        become: yes
+        become_user: "{{ kubernetes_user }}"
+        copy:
+            src: /configs/
+            dest: /home/{{ kubernetes_user }}/configs/
+            remote_src: yes
+
+    -   name: Load controller config as secret
+        become: yes
+        become_user: "{{ kubernetes_user }}"
+        command:
+            argv:
+                - kubectl
+                - create
+                - secret
+                - generic
+                - jdss-controller-cfg
+                - --from-file=/configs/controller-cfg.yaml
+
+    -   name: Load node config as secret
+        become: yes
+        become_user: "{{ kubernetes_user }}"
+        command:
+            argv:
+                - kubectl
+                - create
+                - secret
+                - generic
+                - jdss-node-cfg
+                - --from-file=/configs/node-cfg.yaml
+
+    -   name: Run plugin test
+        become: yes
+        become_user: "{{ kubernetes_user }}"
+        command:
+            argv:
+                - /src/test/env/centos-test/plugin_test.py
+

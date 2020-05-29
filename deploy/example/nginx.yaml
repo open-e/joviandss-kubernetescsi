@@ -1,0 +1,22 @@
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx
+spec:
+  containers:
+    - image: nginx
+      imagePullPolicy: IfNotPresent
+      name: nginx
+      ports:
+        - containerPort: 80
+          protocol: TCP
+      volumeMounts:
+        - mountPath: /usr/share/nginx/html
+          name: persistent-volume
+  volumes:
+    - name: persistent-volume
+      persistentVolumeClaim:
+        claimName: joviandss-csi-driver-pvc-dynamic
+        readOnly: false
+

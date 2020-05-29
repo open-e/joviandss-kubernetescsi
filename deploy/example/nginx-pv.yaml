@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-nginx
+  labels:
+    name: pv-nginx
+spec:
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  csi:
+    driver: com.open-e.joviandss.csi
+    volumeHandle: <volume-id>

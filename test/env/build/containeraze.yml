@@ -1,0 +1,52 @@
+---
+# https://github.com/kubernetes-retired/contrib/tree/master/ansible
+- hosts: all
+  become: yes
+  vars:
+    ubuntu_release: some_text
+
+  environment:
+    GOROOT: /usr/local/go
+    PATH:   /usr/local/go/bin:{{ ansible_env.PATH }}
+
+  tasks:
+    - name: Go get related code
+      become: true
+      become_user: vagrant
+      command: go get ./...
+      args:
+        chdir: /home/vagrant/go/src/github.com/open-e/JovianDSS-KubernetesCSI/
+
+    - name: Build code
+      become: true
+      become_user: vagrant
+      command: make joviandss-container
+      args:
+        chdir: /home/vagrant/go/src/github.com/open-e/JovianDSS-KubernetesCSI/
+
+    - name: Get git version
+      become: true
+      become_user: vagrant
+      command: git -C /home/vagrant/go/src/github.com/open-e/JovianDSS-KubernetesCSI/ describe --long --tags
+      register: git_version
+      ignore_errors: True
+
+    - name: Save centos docker container to a local file
+      become: true
+      command:
+        argv:
+          - docker
+          - save
+          - -o
+          - "/home/vagrant/go/src/github.com/open-e/JovianDSS-KubernetesCSI/_output/joviandss-csi-c:{{ git_version.stdout }}"
+          - "opene/joviandss-csi-c:{{ git_version.stdout }}"
+
+    - name: Save ubuntu docker container to a local file
+      become: true
+      command:
+        argv:
+          - docker
+          - save
+          - -o
+          - "/home/vagrant/go/src/github.com/open-e/JovianDSS-KubernetesCSI/_output/joviandss-csi-u:{{ git_version.stdout }}"
+          - "opene/joviandss-csi-u:{{ git_version.stdout }}"

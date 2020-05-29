@@ -1,0 +1,5 @@
+---
+- import_playbook: prepare_machine.yml
+- import_playbook: kubernetes_install.yml  
+- import_playbook: kubernetes_setup.yml  
+- import_playbook: csi_setup.yml
