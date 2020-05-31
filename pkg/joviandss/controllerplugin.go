@@ -1812,6 +1812,11 @@ func (cp *ControllerPlugin) ControllerExpandVolume(ctx context.Context, in *csi.
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+// ControllerGetVolume provides current information about the volume
+func (cp *ControllerPlugin) ControllerGetVolume(ctx context.Context, in *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
 // GetCapacity gets storage capacity
 func (cp *ControllerPlugin) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
 	pool, rErr := (*cp.endpoints[0]).GetPool()

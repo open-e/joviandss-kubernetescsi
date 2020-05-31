@@ -70,3 +70,17 @@
             owner: vagrant
             group: vagrant
             recurse: yes
+
+    -   name: Create a link for go
+        become: yes
+        file:
+            src: /usr/local/go/bin/go
+            dest: /usr/bin/go
+            state: link
+
+    -   name: Create a link for go
+        become: yes
+        file:
+            src: /usr/local/go/bin/gofmt
+            dest: /usr/bin/gofmt
+            state: link
