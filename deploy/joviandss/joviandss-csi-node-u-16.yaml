@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: joviandss-csi-node-service-account
-  namespace: default 
+  namespace: default
 ---
 
 kind: ClusterRole
@@ -74,13 +74,13 @@ spec:
             capabilities:
               add: ['SYS_ADMIN']
             allowPrivilegeEscalation: true
-          image: opene/joviandss-csi-u:latest
+          image: opene/joviandss-csi-u-16:latest
           imagePullPolicy: IfNotPresent
           args:
             - --csi-address=/csi/csi.sock
             - --soc-type=unix
             - --config=/config/node-cfg.yaml
-            - --nodeid=$(KUBE_NODE_NAME)
+            - --nodeid=$(KUBE_NODE_NAME)/
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -117,3 +117,4 @@ spec:
         - name: config
           secret:
             secretName: jdss-node-cfg
+

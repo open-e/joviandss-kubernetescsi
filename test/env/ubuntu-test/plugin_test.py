@@ -34,7 +34,7 @@ def divide_yaml(f):
 
         Takes file stream as an input and returns
         complete yaml data chunk or None if EOF found"""
-    yaml_document_start = re.compile(r'^---$') 
+    yaml_document_start = re.compile(r'^---$')
     data = """"""
     for l in f.readline():
         if len(l) == 0:
@@ -43,7 +43,7 @@ def divide_yaml(f):
             if len(data) > 0:
                 yield data
                 data = """"""
-        
+
         yield "abc"
 
 def specify_plugin_version(version, home):
@@ -52,16 +52,23 @@ def specify_plugin_version(version, home):
 
     y_ctrl = yaml.load(open(home + ctrl))
     #y_ctrl = subprocess.check_output(['ls', '~/'], shell=True)
-    print(y_ctrl) 
+    print(y_ctrl)
 
-def start_plugin(version):
+def start_plugin(os, os_release, version):
     """Start controller and node plugins"""
 
     print(" - Starting plugin.")
 
-    ctrl = "/src/deploy/joviandss/joviandss-csi-controller-u.yaml"
+    ctrl = ""
+    node = ""
 
-    node = "/src/deploy/joviandss/joviandss-csi-node-u.yaml"
+    if os == 'Ubuntu':
+        if os_release == '16':
+            ctrl = "/src/deploy/joviandss/joviandss-csi-controller-u-16.yaml"
+            node = "/src/deploy/joviandss/joviandss-csi-node-u-16.yaml"
+        if os_release == '18':
+            ctrl = "/src/deploy/joviandss/joviandss-csi-controller-u.yaml"
+            node = "/src/deploy/joviandss/joviandss-csi-node-u.yaml"
 
     sc = "/home/kub/configs/joviandss-csi-sc.yaml"
 
@@ -83,7 +90,12 @@ def start_plugin(version):
     if subprocess.call(never_load_plugin + [lnode]):
         raise Exception("Unable to omit node plugin download from internet")
 
-    specify_plugin_version = [ "sed", "-i", "s/opene\/joviandss-csi-u:latest/opene\/joviandss-csi-u:"+  version + "/g"]
+    if os == 'Ubuntu':
+        if os_release == '16':
+            specify_plugin_version = [ "sed", "-i", "s/opene\/joviandss-csi-u-16:latest/opene\/joviandss-csi-u-16:"+  version + "/g"]
+        if os_release == '18':
+            specify_plugin_version = [ "sed", "-i", "s/opene\/joviandss-csi-u:latest/opene\/joviandss-csi-u:"+  version + "/g"]
+
     if subprocess.call(specify_plugin_version + [lctrl]):
         raise Exception("Unable to specify controller plugin version")
 
@@ -176,7 +188,7 @@ def wait_for_plugin_started(sec):
             break
 
         identified_statuses = len([i for i in [ctrl_creating,
-                                               ctrl_running, 
+                                               ctrl_running,
                                                node_creating,
                                                node_running] if i != None])
         if identified_statuses != 2:
@@ -249,12 +261,19 @@ def main():
     root -- folder to run test in
     csi_test_vm -- name of vagrant VM to run test in
     """
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--os', dest='os', type=str, default='Ubuntu',
+            help='Name of operating system.')
+    parser.add_argument('--os-release', dest='os_release', type=str, default='18',
+            help='Release of operating system.')
+    args = parser.parse_args()
+
     version = get_version("/src")
 
     # Run tests section
     try:
 #        specify_plugin_version('111', '/home/kub')
-        start_plugin(version)
+        start_plugin(args.os, args.os_release, version)
         wait_for_plugin_started(220)
         start_nginx()
         wait_for_nginx_started(120)

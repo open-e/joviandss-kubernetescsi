@@ -4,16 +4,24 @@
     remote_user: vagrant
 
     tasks:
-    -   name: Test task
-        file:
-            state: touch
-            path: /tmp/helloworld
-
-    -   name: Update mahcine
+      - name: Update mahcine
         become: yes
         apt:
             force: yes
             install_recommends: yes
             upgrade: full
+            update_cache: yes
 
+      - name: Update
+        become: yes
+        command: apt-get update
 
+      - name: Upgrade
+        become: yes
+        command: apt-get upgrade
+
+      - name: install iscsitarget
+        apt:
+            name: iscsitarget
+            state: present
+        when: ansible_facts['distribution'] == 'Ubuntu' and ansible_facts['distribution_major_version'] == '16'

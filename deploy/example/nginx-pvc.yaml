@@ -4,7 +4,7 @@ metadata:
   name: joviandss-csi-driver-pvc-dynamic
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi

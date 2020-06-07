@@ -185,9 +185,15 @@ func (np *NodePlugin) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	if !block {
 		err = t.UnMountVolume()
+                if err != nil {
+		    msg = fmt.Sprintf("Unable to clean up on volume unmounting: %s", err.Error())
+		    return nil, status.Error(codes.Aborted, msg)
+                }
 	} else {
 		return nil, status.Error(codes.Unimplemented, "Block detaching is not supported")
 	}
+
+	np.l.Tracef("Node Unpublish Volume %s Done.", req.GetVolumeId())
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }

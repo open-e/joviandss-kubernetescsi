@@ -50,3 +50,13 @@
           - -o
           - "/home/vagrant/go/src/github.com/open-e/JovianDSS-KubernetesCSI/_output/joviandss-csi-u:{{ git_version.stdout }}"
           - "opene/joviandss-csi-u:{{ git_version.stdout }}"
+
+    - name: Save ubuntu-16 docker container to a local file
+      become: true
+      command:
+        argv:
+          - docker
+          - save
+          - -o
+          - "/home/vagrant/go/src/github.com/open-e/JovianDSS-KubernetesCSI/_output/joviandss-csi-u-16:{{ git_version.stdout }}"
+          - "opene/joviandss-csi-u-16:{{ git_version.stdout }}"

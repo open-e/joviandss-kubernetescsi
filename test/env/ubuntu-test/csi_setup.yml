@@ -11,14 +11,25 @@
         register: git_version
         ignore_errors: True
 
-    -   name: Upload cis driver
+    -   name: Upload Ubuntu-16 cis driver
         become: yes
         command:
             argv:
                 - docker
                 - load
                 - -i 
+                - "/src/_output/joviandss-csi-u-16:{{ git_version.stdout }}"
+        when: ansible_facts['distribution'] == 'Ubuntu' and ansible_facts['distribution_major_version'] == '16'
+
+    -   name: Upload Ubuntu-18 cis driver
+        become: yes
+        command:
+            argv:
+                - docker
+                - load
+                - -i
                 - "/src/_output/joviandss-csi-u:{{ git_version.stdout }}"
+        when: ansible_facts['distribution'] == 'Ubuntu' and ansible_facts['distribution_major_version'] == '18'
 
     -   name: Load iscsi module
         become: yes
@@ -73,4 +84,8 @@
         become_user: kub
         command:
             argv:
-                - /src/test/env/ubuntu-test/plugin_test.py 
+                - /src/test/env/ubuntu-test/plugin_test.py
+                - --os
+                - "{{ ansible_facts['distribution'] }}"
+                - --os-release
+                - "{{ ansible_facts['distribution_major_version'] }}"

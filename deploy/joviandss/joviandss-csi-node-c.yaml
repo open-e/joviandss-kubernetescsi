@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: joviandss-csi-node-service-account
-  namespace: default 
+  namespace: default
 ---
 
 kind: ClusterRole
@@ -94,7 +94,7 @@ spec:
             - name: config
               mountPath: /config
             - name: mount-dir
-              mountPath: /mnt/pods
+              mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
 
       volumes:
@@ -116,5 +116,4 @@ spec:
             type: Directory
         - name: config
           secret:
-            secretName: jdss-node-cfg 
-
+            secretName: jdss-node-cfg

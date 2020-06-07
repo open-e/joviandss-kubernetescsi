@@ -398,6 +398,7 @@ func (t *Target) UnMountVolume() error {
 	}
 
 	if mCount == 0 && exists == false {
+	        t.l.Trace("Target %s already umounted", t.TPath)
 		return nil
 	}
 
@@ -410,9 +411,7 @@ func (t *Target) UnMountVolume() error {
 		}
 	}
 
-	mount.CleanupMountPoint(t.TPath, m, false)
-
-	return nil
+	return mount.CleanupMountPoint(t.TPath, m, false)
 }
 
 // GetStageStatus check if specified dir exists
@@ -437,7 +436,7 @@ func (t *Target) StageVolume() error {
 
 	devicePath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", tname, "lun", t.Lun}, "-")
 
-	out, err := exec.Command("iscsiadm", "-m", "node", "-T", tname, "-p", t.Portal, "-o", "new").Output()
+	out, err := exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "new").Output()
 	if err != nil {
 		msg := fmt.Sprintf("Unable to add targetation %s error: %s", tname, err.Error())
 		return errors.New(msg)
