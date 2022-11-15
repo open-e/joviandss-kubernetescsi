@@ -36,9 +36,9 @@ Plugin has 2 config files. Controller and node configs. Controller is responsibl
 Add config files as secrets:
 
 ``` bash
-kubectl create secret generic jdss-controller-cfg --from-file=./deploy/cfg/controller.yaml
+kubectl create secret generic jdss-controller-cfg --from-file=./deploy/cfg/controller-cfg.yaml
 
-kubectl create secret generic jdss-node-cfg --from-file=./deploy/cfg/node.yaml
+kubectl create secret generic jdss-node-cfg --from-file=./deploy/cfg/node-cfg.yaml
 ```
 Node config do not provides nothing but storage address and request to create proper services.
 

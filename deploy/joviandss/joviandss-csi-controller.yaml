@@ -1,4 +1,4 @@
-apiVersion: storage.k8s.io/v1beta1
+apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: com.open-e.joviandss.csi
@@ -82,7 +82,7 @@ roleRef:
 
 ---
 kind: StatefulSet
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
   name: joviandss-csi-controller
 spec:
@@ -128,7 +128,7 @@ spec:
             - --config=$(JOVIANDSS_CONFIG)
           env:
             - name: JOVIANDSS_CONFIG
-              value: /config/controller.yaml
+              value: /config/controller-cfg.yaml
           imagePullPolicy: IfNotPresent
           securityContext:
             privileged: true
