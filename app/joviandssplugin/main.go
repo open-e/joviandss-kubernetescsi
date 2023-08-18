@@ -31,7 +31,7 @@ var (
 func main() {
 
 	cfg := handleArgs()
-	//TODO: check if logging parametrs a properly parse
+	// TODO: check if logging parametrs a properly parse
 	l := initLogging(cfg.LLevel, cfg.LDest)
 
 	routine(cfg, l)
@@ -40,7 +40,6 @@ func main() {
 
 func initLogging(logLevel string, toFile string) *logrus.Entry {
 	log := logrus.New()
-	//log.SetReportCaller(true)
 	formater := logrus.TextFormatter{
 
 		DisableColors: false,
@@ -49,7 +48,7 @@ func initLogging(logLevel string, toFile string) *logrus.Entry {
 	log.SetFormatter(&formater)
 
 	if len(toFile) > 0 {
-		file, err := os.OpenFile(toFile, os.O_CREATE|os.O_WRONLY, 0640)
+		file, err := os.OpenFile(toFile, os.O_CREATE|os.O_WRONLY, 0o640)
 		if err == nil {
 			log.Out = file
 		} else {
@@ -76,7 +75,6 @@ func initLogging(logLevel string, toFile string) *logrus.Entry {
 }
 
 func handleArgs() *joviandss.Config {
-
 	addr = flag.String("csi-address", "/var/lib/kubelet/plugins_registry/joviandss-csi-driver/csi.sock", "CSI endpoint socket address")
 	net = flag.String("soc-type", "tcp", "CSI endpoint socket type")
 
@@ -123,5 +121,4 @@ func routine(cfg *joviandss.Config, l *logrus.Entry) {
 	jdss, _ := joviandss.GetPlugin(cfg, l)
 
 	jdss.Run()
-
 }

@@ -45,17 +45,17 @@ var supportedControllerCapabilities = []csi.ControllerServiceCapability_RPC_Type
 	csi.ControllerServiceCapability_RPC_LIST_SNAPSHOTS,
 	csi.ControllerServiceCapability_RPC_GET_CAPACITY,
 
-	//TODO:
-	//csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
+	// TODO:
+	// csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
 }
 
 var supportedVolumeCapabilities = []csi.VolumeCapability_AccessMode_Mode{
-	//VolumeCapability_AccessMode_UNKNOWN,
+	// VolumeCapability_AccessMode_UNKNOWN,
 	csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 	csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
-	//VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
-	//VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
-	//VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+	// VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+	// VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
+	// VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 
 }
 
@@ -103,7 +103,8 @@ func parseOrigin(or string) (*origin, error) {
 // GetControllerPlugin get plugin information
 func GetControllerPlugin(cfg *ControllerCfg, l *logrus.Entry) (
 	cp *ControllerPlugin,
-	err error) {
+	err error,
+) {
 	cp = &ControllerPlugin{}
 	lFields := logrus.Fields{
 		"node":   "Controller",
@@ -157,7 +158,7 @@ func GetControllerPlugin(cfg *ControllerCfg, l *logrus.Entry) (
 		code := rErr.GetCode()
 		switch code {
 		case rest.RestResourceBusy:
-			//According to specification from
+			// According to specification from
 			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestFailureUnknown:
 			err = status.Errorf(codes.Internal, rErr.Error())
@@ -210,7 +211,6 @@ func (cp *ControllerPlugin) unlockVolume(vID string) error {
 }
 
 func (cp *ControllerPlugin) getStandardId(salt string, name string) string {
-
 	l := cp.l.WithFields(logrus.Fields{
 		"func": "getStandardId",
 	})
@@ -235,7 +235,7 @@ func (cp *ControllerPlugin) getRandomName(l int) (s string) {
 		}
 		out[i] = chars[v&31]
 	}
-	return string(out[:len(out)])
+	return string(out[:])
 }
 
 func (cp *ControllerPlugin) getRandomPassword(l int) (s string) {
@@ -251,7 +251,7 @@ func (cp *ControllerPlugin) getRandomPassword(l int) (s string) {
 		}
 		out[i] = chars[v&63]
 	}
-	return string(out[:len(out)])
+	return string(out[:])
 }
 
 func (cp *ControllerPlugin) getVolume(vID string) (*rest.Volume, error) {
@@ -291,7 +291,6 @@ func (cp *ControllerPlugin) getVolume(vID string) (*rest.Volume, error) {
 		return nil, err
 	}
 	return v, nil
-
 }
 
 func (cp *ControllerPlugin) createVolumeFromSnapshot(sname string, nvname string) error {
@@ -318,7 +317,7 @@ func (cp *ControllerPlugin) createVolumeFromSnapshot(sname string, nvname string
 		case rest.RestRequestMalfunction:
 			// TODO: correctly process error messages
 			err = status.Error(codes.NotFound, rErr.Error())
-			//return nil, status.Error(codes.Internal, rErr.Error())
+			// return nil, status.Error(codes.Internal, rErr.Error())
 		case rest.RestObjectExists:
 			err = status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestRPM:
@@ -332,7 +331,6 @@ func (cp *ControllerPlugin) createVolumeFromSnapshot(sname string, nvname string
 	}
 
 	return nil
-
 }
 
 func (cp *ControllerPlugin) createVolumeFromVolume(srcVol string, newVol string) error {
@@ -357,7 +355,6 @@ func (cp *ControllerPlugin) getVolumeSize(vname string) (int64, error) {
 	})
 
 	v, err := cp.getVolume(vname)
-
 	if err != nil {
 
 		msg := fmt.Sprintf("Internal error %s", err.Error())
@@ -376,7 +373,6 @@ func (cp *ControllerPlugin) getVolumeSize(vname string) (int64, error) {
 	}
 
 	return vSize, nil
-
 }
 
 // CreateVolume create volume with properties
@@ -408,7 +404,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Error(codes.InvalidArgument, "Name missing in request")
 	}
 
-	//TODO: process volume capabilities
+	// TODO: process volume capabilities
 	caps := req.GetVolumeCapabilities()
 	if caps == nil {
 		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
@@ -439,9 +435,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	volumeID := cp.getStandardId(cp.cfg.Salt, vName)
 
 	v, err := cp.getVolume(volumeID)
-
 	if err != nil {
-
 		if codes.NotFound != grpc.Code(err) {
 			msg := fmt.Sprintf("Internal error %s", err.Error())
 			err = status.Errorf(codes.Internal, msg)
@@ -547,7 +541,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		code := rErr.GetCode()
 		switch code {
 		case rest.RestResourceBusy:
-			//According to specification from
+			// According to specification from
 			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestFailureUnknown:
 			err = status.Errorf(codes.Internal, rErr.Error())
@@ -566,7 +560,6 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	out.Volume.CapacityBytes = volumeSize
 
 	return &out, nil
-
 }
 
 // getVolumeSnapshots return array of public volume snapshots
@@ -599,7 +592,6 @@ func (cp *ControllerPlugin) getVolumeSnapshots(vname string) ([]rest.SnapshotSho
 		err = status.Errorf(codes.Internal, "Unknown internal error")
 	}
 	return nil, err
-
 }
 
 // getVolumeConcealedSnapshots return array of concealed volume snapshots
@@ -761,7 +753,6 @@ func (cp *ControllerPlugin) concealVolume(vID string) error {
 
 // DeleteVolume deletes volume or hides it for later deletion
 func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-
 	l := cp.l.WithFields(logrus.Fields{
 		"func": "DeleteVolume",
 	})
@@ -801,7 +792,7 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	lErr = (*cp.endpoints[0]).DeleteVolume(vID, false)
 
 	if lErr == nil {
-		//If volume is a clone, GC concealed parents
+		// If volume is a clone, GC concealed parents
 		cp.unlockVolume(vID)
 		if dvol.IsClone {
 			or, err := parseOrigin(dvol.Origin)
@@ -870,12 +861,10 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		return nil, lErr
 	}
 	return &csi.DeleteVolumeResponse{}, nil
-
 }
 
 // ListVolumes return the list of volumes
 func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-
 	maxEnt := int64(req.GetMaxEntries())
 	sToken := req.GetStartingToken()
 	////////////////////////////////////////////////////////////////////////////////////////
@@ -883,7 +872,6 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	if maxEnt < 0 {
 		return nil, status.Errorf(codes.Internal, "Number of Entries must not ne negative.")
-
 	}
 
 	if len(sToken) > 0 {
@@ -897,7 +885,6 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 	//////////////////////////////////////////////////////////////////////////////
 
 	volumes, err := (*cp.endpoints[0]).ListVolumes()
-
 	if err != nil {
 		switch err.GetCode() {
 		case rest.RestUnableToConnect:
@@ -930,7 +917,7 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 		}
 	}
 
-	var nextToken = ""
+	nextToken := ""
 
 	if int64(len(volumes)) > iToken+maxEnt {
 		nextToken = strconv.FormatInt(iToken+maxEnt, 10)
@@ -953,7 +940,6 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 		Entries:   entries,
 		NextToken: nextToken,
 	}, nil
-
 }
 
 func (cp *ControllerPlugin) putSnapshotRecord(sID string) error {
@@ -963,7 +949,7 @@ func (cp *ControllerPlugin) putSnapshotRecord(sID string) error {
 		code := rErr.GetCode()
 		switch code {
 		case rest.RestResourceBusy:
-			//According to specification from
+			// According to specification from
 			return status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestFailureUnknown:
 			err := status.Errorf(codes.Internal, rErr.Error())
@@ -993,14 +979,13 @@ func (cp *ControllerPlugin) getSnapshotRecordExists(sID string) bool {
 }
 
 func (cp *ControllerPlugin) delSnapshotRecord(sID string) error {
-
 	rErr := (*cp.endpoints[0]).DeleteSnapshot(cp.snapReg, sID)
 
 	if rErr != nil {
 		code := rErr.GetCode()
 		switch code {
 		case rest.RestResourceBusy:
-			//According to specification from
+			// According to specification from
 			return status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestFailureUnknown:
 			err := status.Errorf(codes.Internal, rErr.Error())
@@ -1169,7 +1154,6 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	if err != nil {
 		err = status.Errorf(codes.Internal, "Unable to extract volume size.")
-
 	}
 
 	rErr := (*cp.endpoints[0]).CreateSnapshot(vname, sname)
@@ -1202,7 +1186,7 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 		code := rErr.GetCode()
 		switch code {
 		case rest.RestResourceBusy:
-			//According to specification from
+			// According to specification from
 			err = status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestFailureUnknown:
 			err = status.Errorf(codes.Internal, rErr.Error())
@@ -1211,7 +1195,7 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 		}
 	}
 
-	//Snapshot created successfully
+	// Snapshot created successfully
 	if rErr == nil {
 		layout := "2006-1-2 15:4:5"
 		t, err := time.Parse(layout, s.Creation)
@@ -1221,7 +1205,6 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 			return nil, status.Errorf(codes.Internal, msg)
 		}
 		creationTime := &timestamp.Timestamp{
-
 			Seconds: t.Unix(),
 		}
 
@@ -1274,7 +1257,7 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 		l.Warn(msg)
 		return &csi.DeleteSnapshotResponse{}, nil
 		// TODO: inspect this, according to csi-test
-		//return nil, status.Error(codes.InvalidArgument, msg)
+		// return nil, status.Error(codes.InvalidArgument, msg)
 	}
 
 	vname := snameT[0]
@@ -1282,9 +1265,7 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 	//////////////////////////////////////////////////////////////////////////////
 
 	snap, err := cp.getSnapshot(sname)
-
 	if err != nil {
-
 		if codes.NotFound == grpc.Code(err) {
 			msg := fmt.Sprintf("Snapshot already deleted %s", sname)
 
@@ -1327,7 +1308,6 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 	cp.delSnapshotRecord(snameT[1])
 
 	return &csi.DeleteSnapshotResponse{}, nil
-
 }
 
 // ListSnapshots return the list of valid snapshots
@@ -1359,7 +1339,6 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 			return &csi.ListSnapshotsResponse{
 				Entries: []*csi.ListSnapshotsResponse_Entry{},
 			}, nil
-
 		}
 
 		snameT := strings.Split(sname, "_")
@@ -1369,20 +1348,20 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 			status.Errorf(codes.Internal, "%s", rErr.Error())
 		}
 		timeStamp := timestamp.Timestamp{
-
 			Seconds: iTime,
 		}
 
 		return &csi.ListSnapshotsResponse{
 			Entries: []*csi.ListSnapshotsResponse_Entry{
 				{
-					Snapshot: &csi.Snapshot{SnapshotId: sname,
+					Snapshot: &csi.Snapshot{
+						SnapshotId: sname,
 						SourceVolumeId: snameT[0],
-						CreationTime:   &timeStamp},
+						CreationTime:   &timeStamp,
+					},
 				},
 			},
 		}, nil
-
 	}
 
 	vname := req.GetSourceVolumeId()
@@ -1390,7 +1369,6 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	if len(vname) != 0 {
 		_, err = cp.getVolume(vname)
 		if err != nil {
-
 			if codes.NotFound == grpc.Code(err) {
 				msg := fmt.Sprintf("Unable to find volume %s, Err%s", vname, err.Error())
 				cp.l.Warn(msg)
@@ -1398,11 +1376,9 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 				return &csi.ListSnapshotsResponse{
 					Entries: []*csi.ListSnapshotsResponse_Entry{},
 				}, nil
-				return nil, err
 			}
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-
 	}
 	l.Trace("Verification done")
 
@@ -1427,7 +1403,6 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	cp.l.Debugf("Obtained snapshots: %d", len(snapshots))
 	for i, s := range snapshots {
 		cp.l.Debugf("Snap %d, %s", i, s)
-
 	}
 
 	iToken, _ := strconv.ParseInt(sToken, 10, 64)
@@ -1438,7 +1413,7 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		}, nil
 	}
 
-	//TODO: case with zero snapshots
+	// TODO: case with zero snapshots
 	if rErr != nil {
 		switch rErr.GetCode() {
 		case rest.RestUnableToConnect:
@@ -1448,7 +1423,7 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		}
 	}
 
-	var nextToken = ""
+	nextToken := ""
 
 	if maxEnt != 0 || len(sToken) != 0 {
 		l.Trace("Listing snapshots of particular parameters")
@@ -1477,7 +1452,6 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		cp.l.Debugf("Add snap %s", s.Name)
 		timeInt, _ := strconv.ParseInt(s.Properties.Creation, 10, 64)
 		timeStamp := timestamp.Timestamp{
-
 			Seconds: timeInt,
 		}
 		entries[i] = &csi.ListSnapshotsResponse_Entry{
@@ -1561,7 +1535,6 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	_, err = cp.getVolume(vname)
 
 	if err != nil {
-
 		return nil, status.Error(codes.NotFound, err.Error())
 	}
 
@@ -1575,7 +1548,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 		code := rErr.GetCode()
 		switch code {
 		case rest.RestResourceBusy:
-			//According to specification from
+			// According to specification from
 			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestFailureUnknown:
 			err = status.Errorf(codes.Internal, rErr.Error())
@@ -1605,7 +1578,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 		code := rErr.GetCode()
 		switch code {
 		case rest.RestResourceBusy:
-			//According to specification from
+			// According to specification from
 			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestFailureUnknown:
 			err = status.Errorf(codes.Internal, rErr.Error())
@@ -1635,7 +1608,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 		code := rErr.GetCode()
 		switch code {
 		case rest.RestResourceBusy:
-			//According to specification from
+			// According to specification from
 			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestFailureUnknown:
 			err = status.Errorf(codes.Internal, rErr.Error())
@@ -1657,7 +1630,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 			code := rErr.GetCode()
 			switch code {
 			case rest.RestResourceDNE:
-				//According to specification from
+				// According to specification from
 				return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 			default:
 				return nil, status.Errorf(codes.Internal, rErr.Error())
@@ -1672,7 +1645,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	if target.Active == false {
 		return nil, status.Errorf(codes.Internal, "Unable to make target ready")
 	}
-	//TODO: add target ip
+	// TODO: add target ip
 	// target port
 	resp := &csi.ControllerPublishVolumeResponse{
 		PublishContext: secrets,
@@ -1726,7 +1699,7 @@ func (cp *ControllerPlugin) ControllerUnpublishVolume(ctx context.Context, req *
 		case rest.RestResourceDNE:
 
 		case rest.RestResourceBusy:
-			//According to specification from
+			// According to specification from
 			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 		case rest.RestFailureUnknown:
 			err = status.Errorf(codes.Internal, rErr.Error())
@@ -1749,7 +1722,8 @@ func (cp *ControllerPlugin) ControllerUnpublishVolume(ctx context.Context, req *
 func (cp *ControllerPlugin) ValidateVolumeCapabilities(
 	ctx context.Context,
 	req *csi.ValidateVolumeCapabilitiesRequest) (
-	*csi.ValidateVolumeCapabilitiesResponse, error) {
+	*csi.ValidateVolumeCapabilitiesResponse, error,
+) {
 
 	supported := true
 	vname := req.GetVolumeId()
@@ -1758,9 +1732,7 @@ func (cp *ControllerPlugin) ValidateVolumeCapabilities(
 		cp.l.Warn(msg)
 		return nil, status.Error(codes.InvalidArgument, msg)
 	}
-
 	_, err := cp.getVolume(vname)
-
 	if err != nil {
 
 		return nil, status.Error(codes.NotFound, err.Error())
@@ -1784,11 +1756,9 @@ func (cp *ControllerPlugin) ValidateVolumeCapabilities(
 			supported = false
 			break
 		}
-
 	}
 
 	if supported != true {
-
 	}
 
 	vCtx := req.GetVolumeContext()
@@ -1804,7 +1774,6 @@ func (cp *ControllerPlugin) ValidateVolumeCapabilities(
 	}
 
 	return resp, nil
-
 }
 
 // ControllerExpandVolume expands capacity of given volume
