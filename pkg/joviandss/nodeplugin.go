@@ -18,11 +18,13 @@ var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
 	csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 }
 
+//NodePlugin responsible for attaching and detaching volumes to host
 type NodePlugin struct {
 	cfg *NodeCfg
 	l   *logrus.Entry
 }
 
+//GetNodePlugin inits NodePlugin
 func GetNodePlugin(conf *NodeCfg, log *logrus.Entry) (np *NodePlugin, err error) {
 
 	lFields := logrus.Fields{
@@ -37,12 +39,14 @@ func GetNodePlugin(conf *NodeCfg, log *logrus.Entry) (np *NodePlugin, err error)
 	return np, nil
 }
 
+//NodeExpandVolume responsible for update of file system on volume
 func (np *NodePlugin) NodeExpandVolume(ctx context.Context, in *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	np.l.Trace("Expanding Volume")
 	out := new(csi.NodeExpandVolumeResponse)
 	return out, nil
 }
 
+//NodeGetInfo returns node info
 func (np *NodePlugin) NodeGetInfo(
 	ctx context.Context,
 	req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
@@ -55,7 +59,11 @@ func (np *NodePlugin) NodeGetInfo(
 	}, nil
 }
 
-func (np *NodePlugin) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+//NodeStageVolume introduce volume to host
+func (np *NodePlugin) NodeStageVolume(
+	ctx context.Context,
+	req *csi.NodeStageVolumeRequest,
+) (*csi.NodeStageVolumeResponse, error) {
 
 	np.l.Tracef("Node Stage Volume")
 	var msg string
@@ -97,7 +105,11 @@ func (np *NodePlugin) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-func (np *NodePlugin) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+//NodeUnstageVolume remove volume from host
+func (np *NodePlugin) NodeUnstageVolume(
+	ctx context.Context,
+	req *csi.NodeUnstageVolumeRequest,
+) (*csi.NodeUnstageVolumeResponse, error) {
 	// Log out from specified target
 	var msg string
 	np.l.Tracef("Node Unstage Volume %s", req.GetVolumeId())
@@ -134,7 +146,11 @@ func (np *NodePlugin) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-func (np *NodePlugin) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+//NodePublishVolume mount volume to target
+func (np *NodePlugin) NodePublishVolume(
+	ctx context.Context,
+	req *csi.NodePublishVolumeRequest,
+) (*csi.NodePublishVolumeResponse, error) {
 
 	// TODO: ValidateCapability()
 
@@ -163,7 +179,11 @@ func (np *NodePlugin) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (np *NodePlugin) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+//NodeUnpublishVolume unmount volume
+func (np *NodePlugin) NodeUnpublishVolume(
+	ctx context.Context,
+	req *csi.NodeUnpublishVolumeRequest,
+) (*csi.NodeUnpublishVolumeResponse, error) {
 
 	np.l.Tracef("Node Unpublish Volume %s", req.GetVolumeId())
 
@@ -198,7 +218,8 @@ func (np *NodePlugin) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-func GetNodeServiceCapability(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
+//NodeGetServiceCapability provides service capabilities
+func NodeGetServiceCapability(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
 	return &csi.NodeServiceCapability{
 		Type: &csi.NodeServiceCapability_Rpc{
 			Rpc: &csi.NodeServiceCapability_RPC{
@@ -208,12 +229,16 @@ func GetNodeServiceCapability(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeS
 	}
 }
 
-func (ns *NodePlugin) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+//NodeGetCapabilities provides node capabilities
+func (ns *NodePlugin) NodeGetCapabilities(
+	ctx context.Context,
+	req *csi.NodeGetCapabilitiesRequest,
+) (*csi.NodeGetCapabilitiesResponse, error) {
 	ns.l.Infof("Using default NodeGetCapabilities")
 
 	var capabilities []*csi.NodeServiceCapability
 	for _, c := range supportedNodeServiceCapabilities {
-		capabilities = append(capabilities, GetNodeServiceCapability(c))
+		capabilities = append(capabilities, NodeGetServiceCapability(c))
 	}
 
 	return &csi.NodeGetCapabilitiesResponse{
