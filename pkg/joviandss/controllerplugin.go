@@ -210,9 +210,9 @@ func (cp *ControllerPlugin) unlockVolume(vID string) error {
 	return err
 }
 
-func (cp *ControllerPlugin) getStandardId(salt string, name string) string {
+func (cp *ControllerPlugin) getStandardID(salt string, name string) string {
 	l := cp.l.WithFields(logrus.Fields{
-		"func": "getStandardId",
+		"func": "getStandardID",
 	})
 
 	// Get universal volume ID
@@ -432,7 +432,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	//////////////////////////////////////////////////////////////////////////////
 	// Check if volume exists
 
-	volumeID := cp.getStandardId(cp.cfg.Salt, vName)
+	volumeID := cp.getStandardID(cp.cfg.Salt, vName)
 
 	v, err := cp.getVolume(volumeID)
 	if err != nil {
@@ -1061,7 +1061,7 @@ func (cp *ControllerPlugin) createConcealedSnapshot(vname string) (*string, erro
 	var sname string
 
 	for i := 0; true; i++ {
-		sID := cp.getStandardId("", cp.getRandomName(32))
+		sID := cp.getStandardID("", cp.getRandomName(32))
 		sname = fmt.Sprintf("c_%s_%s", vname, sID)
 
 		if _, err := cp.getSnapshot(sname); status.Code(err) == codes.NotFound {
@@ -1079,7 +1079,7 @@ func (cp *ControllerPlugin) createConcealedSnapshot(vname string) (*string, erro
 	if rErr != nil {
 		(*cp.endpoints[0]).DeleteSnapshot(vname, sname)
 
-		return nil, status.Error(codes.Internal, "Unable to create intermidiate snapshot")
+		return nil, status.Error(codes.Internal, "Unable to create intermediate snapshot")
 	}
 
 	return &sname, nil
@@ -1120,7 +1120,7 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	//////////////////////////////////////////////////////////////////////////////
 
-	sID := cp.getStandardId(cp.cfg.Salt, sNameRaw)
+	sID := cp.getStandardID(cp.cfg.Salt, sNameRaw)
 
 	sname := fmt.Sprintf("%s_%s", vname, sID)
 
@@ -1492,7 +1492,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 		msg := fmt.Sprintf("Volume id %s is incorrect", vname)
 		l.Warn(msg)
 		// Get universal volume ID
-		vname = cp.getStandardId(cp.cfg.Salt, vname)
+		vname = cp.getStandardID(cp.cfg.Salt, vname)
 
 	}
 	// TODO: verify capabiolity

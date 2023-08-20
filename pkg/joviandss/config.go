@@ -8,6 +8,7 @@ import (
 	"github.com/open-e/JovianDSS-KubernetesCSI/pkg/rest"
 )
 
+//ControllerCfg stores configaration properties of controller instance
 type ControllerCfg struct {
 	Salt             string
 	StorageEndpoints []rest.StorageCfg
@@ -17,12 +18,14 @@ type ControllerCfg struct {
 	Iqn              string
 }
 
+//NodeCfg storese info of node service
 type NodeCfg struct {
 	Id   string
 	Addr string
 	Port int
 }
 
+//Config stores config file representation
 type Config struct {
 	Salt    string
 	Network string
@@ -42,6 +45,7 @@ type Config struct {
 	Node       NodeCfg
 }
 
+//GetConfing reads Config from config file
 func GetConfing(path string) (*Config, error) {
 	var c Config
 	source, err := ioutil.ReadFile(path)
