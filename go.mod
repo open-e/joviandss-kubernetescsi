@@ -1,4 +1,4 @@
-module JovianDSS-KubernetesCSI
+module github.com/open-e/JovianDSS-KubernetesCSI
 
 go 1.19
 
