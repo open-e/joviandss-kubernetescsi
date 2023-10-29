@@ -36,7 +36,7 @@ func GetPluginServer(cfg *Config, l *logrus.Entry) (s *PluginServer, err error) 
 
 	if cfg.Network == "unix" {
 		if err := os.Remove(cfg.Addr); err != nil && !os.IsNotExist(err) {
-			s.l.Warn("Unable to clear unix socket %s. Error: %s", cfg.Addr, err)
+			s.l.Warningf("Unable to clear unix socket %s. Error: %s", cfg.Addr, err)
 			return nil, err
 		}
 	}
@@ -90,7 +90,7 @@ func GetPluginServer(cfg *Config, l *logrus.Entry) (s *PluginServer, err error) 
 func (s *PluginServer) Run() (err error) {
 	err = s.server.Serve(*s.listener)
 	if err != nil {
-		s.l.Warn("Unable to start listening on socket: %s", err)
+		s.l.Warningf("Unable to start listening on socket: %s", err)
 		return err
 	}
 	return nil

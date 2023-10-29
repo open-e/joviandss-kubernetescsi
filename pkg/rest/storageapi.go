@@ -256,8 +256,7 @@ func (s *Storage) DeleteVolume(vname string, rSnapshots bool) RestError {
 
 	data := DeleteVolume{
 		RecursivelyChildren:   false,
-		RecursivelyDependents: false,
-		ForceUmount:           false,
+		ForceUmount:           true,
 	}
 	if rSnapshots == true {
 		data.RecursivelyChildren = true
@@ -406,7 +405,6 @@ func (s *Storage) GetSnapshot(vname string, sname string) (*Snapshot, RestError)
 	}
 
 	return &rsp.Data, nil
-
 }
 
 func (s *Storage) CreateSnapshot(vname string, sname string) RestError {
