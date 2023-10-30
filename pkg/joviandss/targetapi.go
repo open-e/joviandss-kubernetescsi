@@ -3,7 +3,6 @@ package joviandss
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -261,7 +260,7 @@ func (t *Target) SerializeTarget() error {
 func (t *Target) DeSerializeTarget(stp string) error {
 	var msg string
 
-	data, err := ioutil.ReadFile(stp)
+	data, err := os.ReadFile(stp)
 
 	if err != nil {
 		msg = fmt.Sprintf("Unable to read Target data file %s err %s", stp, err)
@@ -398,7 +397,7 @@ func (t *Target) UnMountVolume() error {
 	}
 
 	if mCount == 0 && exists == false {
-	        t.l.Trace("Target %s already umounted", t.TPath)
+		t.l.Tracef("Target %s already umounted", t.TPath)
 		return nil
 	}
 

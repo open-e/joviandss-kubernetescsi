@@ -42,7 +42,7 @@ type restError struct {
 	code int
 }
 
-//TODO: Refactor to move logging of error message in this func
+// TODO: Refactor to move logging of error message in this func
 func GetError(c int, m string) RestError {
 	out := restError{
 		code: c,

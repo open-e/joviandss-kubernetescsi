@@ -416,7 +416,7 @@ type Target struct {
 	DenyIP              []string `json:"deny_ip"`
 }
 
-//GetTargetData data
+// GetTargetData data
 type GetTargetData struct {
 	Data  Target
 	Error ErrorT

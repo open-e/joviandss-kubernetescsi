@@ -1,14 +1,14 @@
 package joviandss
 
 import (
-	"io/ioutil"
-	
+	"os"
+
 	"gopkg.in/yaml.v2"
 
-	"github.com/open-e/JovianDSS-KubernetesCSI/pkg/rest"
+	"JovianDSS-KubernetesCSI/pkg/rest"
 )
 
-//ControllerCfg stores configaration properties of controller instance
+// ControllerCfg stores configaration properties of controller instance
 type ControllerCfg struct {
 	Salt             string
 	StorageEndpoints []rest.StorageCfg
@@ -18,14 +18,14 @@ type ControllerCfg struct {
 	Iqn              string
 }
 
-//NodeCfg storese info of node service
+// NodeCfg storese info of node service
 type NodeCfg struct {
 	Id   string
 	Addr string
 	Port int
 }
 
-//Config stores config file representation
+// Config stores config file representation
 type Config struct {
 	Salt    string
 	Network string
@@ -45,10 +45,10 @@ type Config struct {
 	Node       NodeCfg
 }
 
-//GetConfing reads Config from config file
-func GetConfing(path string) (*Config, error) {
+// GetConfing reads Config from config file
+func GetConfig(path string) (*Config, error) {
 	var c Config
-	source, err := ioutil.ReadFile(path)
+	source, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
