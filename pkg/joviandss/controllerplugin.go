@@ -1,6 +1,7 @@
 package joviandss
 
 import (
+	"JovianDSS-KubernetesCSI/pkg/rest"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
@@ -12,14 +13,12 @@ import (
 	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	"github.com/open-e/JovianDSS-KubernetesCSI/pkg/rest"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -178,7 +177,7 @@ func GetControllerPlugin(cfg *ControllerCfg, l *logrus.Entry) (
 func (cp *ControllerPlugin) lockVolume(vID string) error {
 	var err error
 	err = nil
-	msg := fmt.Sprintf("Volume is busy", vID)
+	msg := fmt.Sprintf("Volume %s is busy", vID)
 	errFail := status.Error(codes.Aborted, msg)
 
 	cp.volumesAccess.Lock()
@@ -195,7 +194,7 @@ func (cp *ControllerPlugin) lockVolume(vID string) error {
 func (cp *ControllerPlugin) unlockVolume(vID string) error {
 	var err error
 	err = nil
-	msg := fmt.Sprintf("Volume is not locked", vID)
+	msg := fmt.Sprintf("Volume %s is not locked", vID)
 	errFail := status.Error(codes.FailedPrecondition, msg)
 
 	cp.volumesAccess.Lock()
@@ -218,7 +217,7 @@ func (cp *ControllerPlugin) getStandardID(salt string, name string) string {
 	preID := []byte(salt + name)
 	rawID := sha256.Sum256(preID)
 	id := strings.ToLower(fmt.Sprintf("%X", rawID))
-	l.Trace("For %s id is %s", name, id)
+	l.Printf("For %s id is %s", name, id)
 	return id
 }
 
@@ -435,7 +434,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	v, err := cp.getVolume(volumeID)
 	if err != nil {
-		if codes.NotFound != grpc.Code(err) {
+		if codes.NotFound != status.Code(err) {
 			msg := fmt.Sprintf("Internal error %s", err.Error())
 			err = status.Errorf(codes.Internal, msg)
 			return nil, err
@@ -1198,7 +1197,7 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 			cp.l.Warn(msg)
 			return nil, status.Errorf(codes.Internal, msg)
 		}
-		creationTime := &timestamp.Timestamp{
+		creationTime := &timestamppb.Timestamp{
 			Seconds: t.Unix(),
 		}
 
@@ -1337,7 +1336,7 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		if rErr != nil {
 			status.Errorf(codes.Internal, "%s", rErr.Error())
 		}
-		timeStamp := timestamp.Timestamp{
+		timeStamp := timestamppb.Timestamp{
 			Seconds: iTime,
 		}
 
@@ -1441,7 +1440,7 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	for i, s := range snapshots {
 		cp.l.Debugf("Add snap %s", s.Name)
 		timeInt, _ := strconv.ParseInt(s.Properties.Creation, 10, 64)
-		timeStamp := timestamp.Timestamp{
+		timeStamp := timestamppb.Timestamp{
 			Seconds: timeInt,
 		}
 		entries[i] = &csi.ListSnapshotsResponse_Entry{

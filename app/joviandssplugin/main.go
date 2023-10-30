@@ -1,13 +1,12 @@
 package main
 
 import (
+	"JovianDSS-KubernetesCSI/pkg/joviandss"
 	"flag"
 	"fmt"
 	"os"
 
 	"github.com/sirupsen/logrus"
-
-	"github.com/open-e/JovianDSS-KubernetesCSI/pkg/joviandss"
 )
 
 func init() {
@@ -87,7 +86,7 @@ func handleArgs() *joviandss.Config {
 		os.Exit(1)
 	}
 
-	cfg, err := joviandss.GetConfing(*configPath)
+	cfg, err := joviandss.GetConfig(*configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to process config: %s", err.Error())
 		os.Exit(1)
