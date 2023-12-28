@@ -127,40 +127,40 @@ const GetPoolsRCode = 200
 /// Volume
 
 // Volume response structure
-type Volume struct {
-	Origin               string `json:"origin"`
-	Reference            string `json:"referencce"`
-	Primarycache         string `json:"primarycache"`
-	Logbias              string `json:"logbias"`
-	Creation             string `json:"creation"`
-	Sync                 string `json:"sync"`
-	IsClone              bool   `json:"is_clone"`
-	Dedup                string
-	Used                 string
-	Full_name            string
-	Type                 string
-	Written              string
-	Usedbyrefreservation string
-	Compression          string
-	Usedbysnapshots      string
-	Copies               string
-	Compressratio        string
-	Readonly             string
-	Mlslabel             string
-	Secondarycache       string
-	Available            string
-	Resource_name        string
-	Volblocksize         string
-	Refcompressratio     string
-	Snapdev              string
-	Volsize              string
-	Reservation          string
-	Usedbychildren       string
-	Usedbydataset        string
-	Name                 string
-	Checksum             string
-	Refreservation       string
-}
+// type Volume struct {
+// 	Origin               string `json:"origin"`
+// 	Reference            string `json:"referencce"`
+// 	Primarycache         string `json:"primarycache"`
+// 	Logbias              string `json:"logbias"`
+// 	Creation             string `json:"creation"`
+// 	Sync                 string `json:"sync"`
+// 	IsClone              bool   `json:"is_clone"`
+// 	Dedup                string
+// 	Used                 string
+// 	Full_name            string
+// 	Type                 string
+// 	Written              string
+// 	Usedbyrefreservation string
+// 	Compression          string
+// 	Usedbysnapshots      string
+// 	Copies               string
+// 	Compressratio        string
+// 	Readonly             string
+// 	Mlslabel             string
+// 	Secondarycache       string
+// 	Available            string
+// 	Resource_name        string
+// 	Volblocksize         string
+// 	Refcompressratio     string
+// 	Snapdev              string
+// 	Volsize              string
+// 	Reservation          string
+// 	Usedbychildren       string
+// 	Usedbydataset        string
+// 	Name                 string
+// 	Checksum             string
+// 	Refreservation       string
+// }
 
 // GetVolumeData data
 type GetVolumeData struct {
@@ -173,7 +173,7 @@ const GetVolumeRCode = 200
 
 // GetVolumesData data structure
 type GetVolumesData struct {
-	Data  []Volume `json:"data"`
+	Data  *[]Volume `json:"data"`
 	Error ErrorT   `json:"error"`
 }
 
@@ -184,10 +184,10 @@ const GetVolumesRCode = 200
 /// Create Volume
 
 // CreateVolume request
-type CreateVolume struct {
-	Name string `json:"name"`
-	Size string `json:"size"`
-}
+//type CreateVolume struct {
+//	Name string `json:"name"`
+//	Size string `json:"size"`
+//}
 
 // CreateVolumeData data
 type CreateVolumeData struct {

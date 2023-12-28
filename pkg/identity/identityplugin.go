@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"github.com/open-e/JovianDSS-KubernetesCSI/v1/pkg/common"
+	"joviandss-kubernetescsi/pkg/common"
 )
 
 type IdentityPlugin struct {

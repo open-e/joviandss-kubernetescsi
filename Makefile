@@ -18,8 +18,8 @@ all:  joviandss joviandss-container
 
 joviandss:
 	go mod tidy
-	go get ./pkg/joviandss
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X JovianDSS-KubernetesCSI/pkg/joviandss.Version=$(IMAGE_VERSION) -extldflags "-static"' -o _output/jdss-csi-plugin ./app/joviandssplugin
+	go get ./app/joviandssplugin
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X jovianDSS-kubernetescsi/pkg/joviandss.Version=$(IMAGE_VERSION) -extldflags "-static"' -o _output/jdss-csi-plugin ./app/joviandssplugin
 
 joviandss-container: joviandss
 	@echo Building Container

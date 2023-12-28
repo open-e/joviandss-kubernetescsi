@@ -35,10 +35,10 @@ type StorageInterface interface {
 	GetPools() ([]PoolShort, error)
 
 	// Volumes
-	CreateVolume(vdesc CreateVolumeDescriptor) RestError
+	CreateVolume(poolName string, vol Volume) RestError
 	GetVolume(vname string) (*Volume, RestError)
 	DeleteVolume(vname string, rSnapshots bool) RestError
-	ListVolumes() ([]string, RestError)
+	ListVolumes(poolName string, vols *[]Volume) (RestError)
 
 	CreateSnapshot(vname string, sname string) RestError
 	GetSnapshot(vname string, sname string) (*Snapshot, RestError)
@@ -60,16 +60,21 @@ type StorageInterface interface {
 	PromoteClone(vname string, sname string, cname string) RestError
 }
 
-type Storage struct {
-	addr string
-	port int
-	user string
-	pass string
-	pool string
-	rp   RestProxyInterface
-	l    *logrus.Entry
 
-	prot string
+type RestEndpointCfg struct {
+	Addrs        []string
+	Port        int
+	Prot        string
+	User        string
+	Pass        string
+	IdleTimeOut string // See time Duration
+	Tries       int
+}
+
+type RestEndpoint struct {
+	rec  RestEndpointCfg
+	rp   RestProxy
+	l    *logrus.Entry
 }
 
 type StorageCfg struct {
@@ -85,45 +90,52 @@ type StorageCfg struct {
 	IdleTimeOut string
 }
 
-func (s *Storage) String() string {
-	return s.addr
+func (re *RestEndpoint) String() string {
+	return re.rec.Addrs[0]
 }
 
-func NewProvider(cfg *StorageCfg, l *logrus.Entry) (s *Storage, err error) {
+// func GetEndpoint(cfg *RestEndpointCfg, l *logrus.Entry) (s *RestEndpoint, err error) {
+	
+//	return nil, nil
+	// restProxy, err := NewRestProxy(cfg, l)
+	// if err != nil {
+	// 	l.Errorf("cannot create REST client for: %s", cfg.Addrs[0])
+	// }
 
-	rpc := RestProxyCfg{
-		Addr:        cfg.Addr,
-		Port:        cfg.Port,
-		Prot:        cfg.Prot,
-		User:        cfg.User,
-		Pass:        cfg.Pass,
-		Pool:        cfg.Pool,
-		IdleTimeOut: cfg.IdleTimeOut,
-		Tries:       cfg.Tries,
+	// s = &Storage{
+	// 	addr: cfg.Addrs[0],
+	// 	port: cfg.Port,
+	// 	user: cfg.User,
+	// 	pass: cfg.Pass,
+	// 	rp:   restProxy,
+	// 	l:    l,
+	// }
+
+	// l = l.WithFields(logrus.Fields{
+	// 	"obj":     "RestEndpoint",
+	// 	"storage": cfg.Addrs[0] + ":" + string(cfg.Port),
+	// })
+
+	// l.Debugf("Created for %s", cfg.Addrs[0])
+
+	// return s, nil
+// }
+
+func SetupEndpoint(rn *RestEndpoint, cfg *RestEndpointCfg, logger *logrus.Entry) (err error) {
+
+	rn.rec = *cfg
+	
+	rn.l = logger.WithFields(logrus.Fields{"section":     "rest",})
+
+	rn.l.Debugf("Setup rest endpoint for addresses %v", cfg.Addrs)
+
+	if ser := SetupRestProxy(&rn.rp, cfg, rn.l); ser != nil {
+		logrus.Errorf("cannot create REST client for: %v", cfg.Addrs)
 	}
-
-	restProxy, err := NewRestProxy(rpc, l)
-	if err != nil {
-		l.Errorf("cannot create REST client for: %s", cfg.Addr)
-	}
-
-	s = &Storage{
-		addr: cfg.Addr,
-		port: cfg.Port,
-		user: cfg.User,
-		pass: cfg.Pass,
-		pool: cfg.Pool,
-		rp:   restProxy,
-		l:    l,
-	}
-
-	l = l.WithFields(logrus.Fields{
-		"obj":     "Storage",
-		"storage": s.addr + ":" + string(s.port),
-		"pool":    s.pool,
-	})
-
-	l.Debugf("Created for %s", cfg.Addr)
-
-	return s, nil
+	
+	rn.l.Debugf("RP log value %+s", rn.rp)
+	
+	// var v []Volume
+	// rn.ListVolumes("Pool-0", &v)
+	return nil
 }

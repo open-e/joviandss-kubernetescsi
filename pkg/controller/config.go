@@ -6,12 +6,12 @@ import (
 
 	"gopkg.in/yaml.v2"
 	
-	"github.com/open-e/JovianDSS-KubernetesCSI/pkg/rest"
+	"joviandss-kubernetescsi/pkg/rest"
 )
 
 //ControllerCfg stores configaration properties of controller instance
 type ControllerCfg struct {
-	StorageEndpoints []rest.StorageCfg
+	RestEndpoint     rest.StorageCfg
 	Vnamelen         int
 	Vpasslen         int
 	Iqn              string
