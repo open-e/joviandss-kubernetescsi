@@ -23,12 +23,12 @@ joviandss:
 
 joviandss-container: joviandss
 	@echo Building Container
-	sudo docker build -t $(IMAGE_TAG_CENTOS) -f ./app/joviandssplugin/centos.Dockerfile .
-	sudo docker build -t $(IMAGE_TAG_UBUNTU) -f ./app/joviandssplugin/ubuntu.Dockerfile .
-	sudo docker build -t $(IMAGE_TAG_UBUNTU_16) -f ./app/joviandssplugin/ubuntu-16.Dockerfile .
+	sudo podman build -t $(IMAGE_TAG_CENTOS) -f ./app/joviandssplugin/centos.Dockerfile .
+	sudo podman build -t $(IMAGE_TAG_UBUNTU) -f ./app/joviandssplugin/ubuntu.Dockerfile .
+	sudo podman build -t $(IMAGE_TAG_UBUNTU_16) -f ./app/joviandssplugin/ubuntu-16.Dockerfile .
 
 clean:
 	go clean -r -x
-	-rm -rf _outpusudo docker push $(IMAGE_TAG_CENTOS)
-	-rm -rf _outpusudo docker push $(IMAGE_TAG_UBUNTU)
-	-rm -rf _outpusudo docker push $(IMAGE_TAG_UBUNTU_16)
+	-rm -rf _outpusudo podman push $(IMAGE_TAG_CENTOS)
+	-rm -rf _outpusudo podman push $(IMAGE_TAG_UBUNTU)
+	-rm -rf _outpusudo podman push $(IMAGE_TAG_UBUNTU_16)

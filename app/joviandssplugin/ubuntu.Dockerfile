@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:22.04
 LABEL maintainers="Andrei Perepiolkin"
 LABEL description="JovianDSS CSI Plugin"
 
