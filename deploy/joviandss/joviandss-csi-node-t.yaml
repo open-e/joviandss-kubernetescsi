@@ -1,0 +1,170 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: joviandss-csi-node-service-account
+  namespace: joviandss-csi
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-node-cluster-role
+rules:
+  - apiGroups: ['']
+    resources: ['events']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch']
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "update"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "update"]
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-node-cluster-role-binding
+  namespace: joviandss-csi
+subjects:
+  - kind: ServiceAccount
+    name: joviandss-csi-node-service-account
+    namespace: joviandss-csi
+roleRef:
+  kind: ClusterRole
+  name: joviandss-csi-node-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+---
+
+
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: joviandss-csi-node
+  namespace: joviandss-csi
+spec:
+  selector:
+    matchLabels:
+      app: joviandss-csi-node
+  template:
+    metadata:
+      labels:
+        app: joviandss-csi-node
+    spec:
+      serviceAccount: joviandss-csi-node-service-account
+      hostNetwork: true
+      containers:
+        - name: csi-registrar
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -rf /registration/com.open-e.joviandss.csi"]
+          args:
+            - --v=5
+            - --csi-address=/csi/csi.sock
+            - --kubelet-registration-path=/var/lib/kubelet/plugins_registry/com.open-e.joviandss.csi/csi.sock
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+        - name: csi-node
+          securityContext:
+            privileged: true
+            capabilities:
+              add: ['SYS_ADMIN']
+            allowPrivilegeEscalation: true
+          image: opene/joviandss-csi-u:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --csi-address=/csi/csi.sock
+            - --soc-type=unix
+            - --config=/config/node-cfg.yaml
+            - --nodeid=$(KUBE_NODE_NAME)
+          env:
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: config
+              mountPath: /config
+            - name: mount-dir
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: Bidirectional
+            - mountPath: /var/lib/iscsi
+              readOnly: true
+              name: var-lib-iscsi
+            - mountPath: /etc/iscsi
+              name: system-iscsi
+            - mountPath: /run/lock/iscsi
+              mountPropagation: Bidirectional
+              name: run-lock-iscsi
+            - mountPath: /var/lock/iscsi
+              mountPropagation: Bidirectional
+              name: run-lock-iscsi
+            - mountPath: /usr/local/lib
+              name: usr-local-lib
+              readOnly: true
+
+      volumes:
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/com.open-e.joviandss.csi
+            type: DirectoryOrCreate
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: DirectoryOrCreate
+        - name: mount-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+        - name: config
+          secret:
+            secretName: jdss-node-cfg
+
+        - name: iscsi-config-dir
+          hostPath:
+            path: /usr/local/etc/iscsi
+            type: DirectoryOrCreate
+        - name: sbin-dir
+          hostPath:
+            path: /sbin
+            type: DirectoryOrCreate
+        - name: var-lib-iscsi
+          hostPath:
+            path: /var/lib/iscsi
+        - name: usr-local-lib
+          hostPath:
+            path: /usr/local/lib
+            type: DirectoryOrCreate
+        - name: system-iscsi
+          hostPath:
+            path: /system/iscsi
+            type: DirectoryOrCreate
+        - name: iscsi-conf
+          hostPath:
+            path: /usr/local/etc/iscsi/iscsid.conf
+            type: File
+        - name: run-lock-iscsi
+          hostPath:
+            path: /run/lock/iscsi
+            type: DirectoryOrCreate
