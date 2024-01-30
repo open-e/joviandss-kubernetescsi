@@ -337,13 +337,13 @@ func (cp *ControllerPlugin) getRandomPassword(l int) (s string) {
 	return string(out[:])
 }
 
-func (cp *ControllerPlugin) getVolume(vID string) (*jrest.Volume, error) {
+func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.Volume, error) {
 	// return nil, nil
-	l := cp.l.WithFields(log.Fields{
-		"func": "getVolume",
-	})
+	l := cp.l.WithField("traceId", ctx.Value("traceId"))
+		//Value("traceId").(string))
 
-	l.Tracef("Get volume with id: %s", vID)
+	l.Debugf("context %+v", ctx)
+	l.Debugf("Get volume with id: %s", vID)
 	var err error
 
 	//////////////////////////////////////////////////////////////////////////////
@@ -357,14 +357,16 @@ func (cp *ControllerPlugin) getVolume(vID string) (*jrest.Volume, error) {
 
 	//////////////////////////////////////////////////////////////////////////////
 
-	v, rErr := cp.re.GetVolume(vID) // v for Volume
+	v, rErr := cp.re.GetVolume(ctx, cp.pool, vID) // v for Volume
 
+	l.Debugf("%+v\n",v)
+	l.Debugf("%+v\n",rErr)
+	l.Debugf("%+v\n",rErr.GetCode())
 	if rErr != nil {
 		switch rErr.GetCode() {
 		case jrest.RestRequestMalfunction:
 			// TODO: correctly process error messages
 			err = status.Error(codes.NotFound, rErr.Error())
-
 		case jrest.RestRPM:
 			err = status.Error(codes.Internal, rErr.Error())
 		case jrest.RestResourceDNE:
@@ -461,8 +463,10 @@ func (cp *ControllerPlugin) getVolumeSize(vname string) (int64, error) {
 
 // CreateVolume create volume with properties
 func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
+
 	l := cp.l.WithFields(log.Fields{
 		"request": "CreateVolume",
+	        "traceId": ctx.Value("traceId"),
 	})
 
 	var err error
@@ -509,16 +513,16 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		volumeSize = minVolumeSize
 	}
 
-	l.Tracef("Create volume %+v of size %+v",
-		vName,
-		volumeSize)
+//	l.WithField( Tracef("Create volume %+v of size %+v",
+//		vName,
+//		volumeSize)
 
 	//////////////////////////////////////////////////////////////////////////////
 	// Check if volume exists
 
 	volumeID := cp.getStandardID(vName)
 
-	v, err := cp.getVolume(volumeID)
+	v, err := cp.getVolume(ctx, volumeID)
 	if err != nil {
 		if codes.NotFound != status.Code(err) {
 			msg := fmt.Sprintf("Internal error %s", err.Error())
@@ -545,7 +549,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 			// Volume
 			sourceVolume = srcVolume.GetVolumeId()
 			// Check if volume exists
-			if _, err = cp.getVolume(sourceVolume); err != nil {
+			if _, err = cp.getVolume(ctx, sourceVolume); err != nil {
 				return nil, err
 			}
 			cp.l.Tracef("Sopurce volume %s exists.", sourceVolume)
@@ -559,7 +563,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// if voluem exists make shure it has same size
 	if v != nil {
 		var vSize int64
-		vSize, err = strconv.ParseInt((*v).Volsize, 10, 64)
+		vSize, err = strconv.ParseInt((*v).Size, 10, 64)
 		if vSize != volumeSize {
 			msg := fmt.Sprintf("Exists volume with size %d, when requsted for %d", vSize, volumeSize)
 			cp.l.Warn(msg)
@@ -619,7 +623,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return &out, nil
 
 	} else {
-		rErr = cp.re.CreateVolume(cp.pool, vd)
+		rErr = cp.re.CreateVolume(ctx, cp.pool, vd)
 	}
 	if rErr != nil {
 		code := rErr.GetCode()
@@ -967,7 +971,7 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 	}
 
 	if len(sToken) > 0 {
-		_, err := cp.getVolume(sToken)
+		_, err := cp.getVolume(ctx, sToken)
 		if err != nil {
 			return nil, status.Errorf(codes.Aborted, "%s", err.Error())
 		}
@@ -976,7 +980,7 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 	// //////////////////////////////////////////////////////////////////////////////
 
 	var volumes []jrest.Volume
-	if err := cp.re.ListVolumes(cp.pool, &volumes); err != nil {
+	if err := cp.re.ListVolumes(ctx, cp.pool, &volumes); err != nil {
 		switch err.GetCode() {
 		case jrest.RestUnableToConnect:
 			return nil, status.Errorf(codes.Internal, "Unable to connect.")

@@ -17,15 +17,22 @@ under the License.
 
 package rest
 
+// Operation completedGetPoolsRCode success response code
+const CodeOK = 200
+const CodeCreated = 201
+const CodeAccepted = 202
+const CodeNoContent =204
+
+
 ///////////////////////////////////////////////////////////////////////////////
 /// Error message
 
 // ErrorT error message returned by server
 type ErrorT struct {
-	Class   string
-	Errno   int
-	Message string
-	Url     string
+	Class   *string	`json:"class,omitempty"`
+	Errno   *int	`json:"errno,omitempty"`
+	Message *string	`json:"message,omitempty"`
+	Url     *string	`json:"url,omitempty"`
 }
 
 // ErrorData response mask
@@ -164,8 +171,8 @@ const GetPoolsRCode = 200
 
 // GetVolumeData data
 type GetVolumeData struct {
-	Data  Volume
-	Error ErrorT
+	Data  *Volume	`json:"data,omitempty"`
+	Error *ErrorT	`json:"error,ommitempty"`
 }
 
 // GetVolumeRCode success response code

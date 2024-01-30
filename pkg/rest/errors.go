@@ -18,18 +18,23 @@ under the License.
 package rest
 
 import (
+	"context"
 	"fmt"
+	"regexp"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
-	RestFailureUnknown        = 1
-	RestResourceBusy          = 2
-	RestRequestMalfunction    = 3
-	RestResourceDNE           = 4
-	RestUnableToConnect       = 5
-	RestRPM                   = 6 // Response Processing Malfunction
-	RestStorageFailureUnknown = 7
-	RestObjectExists          = 8
+	RestFailureUnknown		= 1
+	RestResourceBusy		= 2
+	RestRequestMalfunction		= 3
+	RestResourceDNE			= 4
+	RestUnableToConnect		= 5
+	RestRPM				= 6 // Response Processing Malfunction
+	RestStorageFailureUnknown	= 7
+	RestObjectExists		= 8
+	RestRequestTimeout		= 9
 )
 
 type RestError interface {
@@ -38,8 +43,8 @@ type RestError interface {
 }
 
 type restError struct {
-	msg  string
 	code int
+	msg  string
 }
 
 //TODO: Refactor to move logging of error message in this func
@@ -49,6 +54,38 @@ func GetError(c int, m string) RestError {
 		msg:  m,
 	}
 	return &out
+}
+
+const (
+	resourceDneMsgPattern = `^Zfs resource: .* not found in this collection\.$`
+	resourceHasClonesMsgPattern = `^In order to delete a zvol, you must delete all of its clones first\.$`
+	resourceHasSnapshotsMsgPattern = `^cannot destroy '.*/.*': volume has children\nuse '-r' to destroy the following datasets:\n.*`
+	resourceHasClonesClassPattern = `^opene.storage.zfs.ZfsOeError$`
+	resourceHasSnapshotsClassPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
+)
+var resourceDneMsgRegexp = regexp.MustCompile(resourceDneMsgPattern)
+var resourceHasClonesMsgRegexp = regexp.MustCompile(resourceHasClonesMsgPattern)
+var resourceHasSnapshotsMsgRegexp = regexp.MustCompile(resourceHasSnapshotsMsgPattern)
+var resourceHasClonesClassRegexp = regexp.MustCompile(resourceHasClonesClassPattern)
+var resourceHasSnapshotsClassRegexp = regexp.MustCompile(resourceHasSnapshotsClassPattern)
+
+
+func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restError {
+	
+	l := le.WithFields(logrus.Fields{
+		"func": "ErrorFromErrorT",
+		"traceId": ctx.Value("traceId"),
+	})
+
+	if *err.Errno == 1 {
+		if err.Message != nil {
+			if resourceDneMsgRegexp.MatchString(*err.Message) {
+				return &restError { code: RestResourceDNE }
+			}
+		}
+	}
+	l.Warnf("Errno:%d, Class:%s, Message:%s, Url:%s", *err.Errno, *err.Class, *err.Message, *err.Url )
+	return &restError{code: RestFailureUnknown}
 }
 
 func (err *restError) Error() (out string) {

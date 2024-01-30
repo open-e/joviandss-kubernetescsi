@@ -133,7 +133,7 @@ func SetupEndpoint(rn *RestEndpoint, cfg *RestEndpointCfg, logger *logrus.Entry)
 		logrus.Errorf("cannot create REST client for: %v", cfg.Addrs)
 	}
 	
-	rn.l.Debugf("RP log value %+s", rn.rp)
+	// rn.l.Debugf("RP log value %+s", rn.rp)
 	
 	// var v []Volume
 	// rn.ListVolumes("Pool-0", &v)
