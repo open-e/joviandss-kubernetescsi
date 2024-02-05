@@ -18,7 +18,10 @@ under the License.
 package rest
 
 import (
+	"fmt"
 	"github.com/sirupsen/logrus"
+
+	jcom "joviandss-kubernetescsi/pkg/common"
 )
 
 var (
@@ -61,18 +64,9 @@ type StorageInterface interface {
 }
 
 
-type RestEndpointCfg struct {
-	Addrs        []string
-	Port        int
-	Prot        string
-	User        string
-	Pass        string
-	IdleTimeOut string // See time Duration
-	Tries       int
-}
 
 type RestEndpoint struct {
-	rec  RestEndpointCfg
+	rec  jcom.RestEndpointCfg
 	rp   RestProxy
 	l    *logrus.Entry
 }
@@ -91,6 +85,16 @@ type StorageCfg struct {
 }
 
 func (re *RestEndpoint) String() string {
+	var ret string
+	
+	if len(re.rec.Addrs) > 0{
+		ret += " addres:"
+		for _, val := range re.rec.Addrs {
+			ret += val
+		}
+	}
+	ret += fmt.Sprintf(" port: %d", re.rec.Port)
+	
 	return re.rec.Addrs[0]
 }
 
@@ -121,7 +125,7 @@ func (re *RestEndpoint) String() string {
 	// return s, nil
 // }
 
-func SetupEndpoint(rn *RestEndpoint, cfg *RestEndpointCfg, logger *logrus.Entry) (err error) {
+func SetupEndpoint(rn *RestEndpoint, cfg *jcom.RestEndpointCfg, logger *logrus.Entry) (err error) {
 
 	rn.rec = *cfg
 	

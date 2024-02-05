@@ -28,12 +28,12 @@ import (
 const (
 	RestFailureUnknown		= 1
 	RestResourceBusy		= 2
-	RestRequestMalfunction		= 3
-	RestResourceDNE			= 4
-	RestUnableToConnect		= 5
-	RestRPM				= 6 // Response Processing Malfunction
-	RestStorageFailureUnknown	= 7
-	RestObjectExists		= 8
+	RestResourceExists		= 3
+	RestRequestMalfunction		= 4
+	RestResourceDNE			= 5
+	RestUnableToConnect		= 6
+	RestRPM				= 7 // Response Processing Malfunction
+	RestStorageFailureUnknown	= 8
 	RestRequestTimeout		= 9
 )
 
@@ -57,12 +57,20 @@ func GetError(c int, m string) RestError {
 }
 
 const (
-	resourceDneMsgPattern = `^Zfs resource: .* not found in this collection\.$`
+	resourceExistsMsgPattern = `Resource .*\/.* already exists\.`
+	cloneCreateFailureDatasetExistsPattern = `cannot create .*\/.*: dataset already exists`
+	// resourceExistsMsgPattern = `.*`
+	resourceIsBusyMsgPattern = `In order to delete a zvol, you must delete all of its clones first.`
+	resourceDneMsgPattern = `Zfs resource: (.+\/.+) not found in this collection`
 	resourceHasClonesMsgPattern = `^In order to delete a zvol, you must delete all of its clones first\.$`
-	resourceHasSnapshotsMsgPattern = `^cannot destroy '.*/.*': volume has children\nuse '-r' to destroy the following datasets:\n.*`
+	resourceHasSnapshotsMsgPattern = `^cannot destroy '.*\/.*': volume has children.use '-r' to destroy the following datasets:\n.*`
 	resourceHasClonesClassPattern = `^opene.storage.zfs.ZfsOeError$`
 	resourceHasSnapshotsClassPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
 )
+
+var resourceExistsMsgRegexp = regexp.MustCompile(resourceExistsMsgPattern)
+var cloneCreateFailureDatasetExistsRegexp = regexp.MustCompile(cloneCreateFailureDatasetExistsPattern)
+var resourceIsBusyMsgRegexp = regexp.MustCompile(resourceIsBusyMsgPattern)
 var resourceDneMsgRegexp = regexp.MustCompile(resourceDneMsgPattern)
 var resourceHasClonesMsgRegexp = regexp.MustCompile(resourceHasClonesMsgPattern)
 var resourceHasSnapshotsMsgRegexp = regexp.MustCompile(resourceHasSnapshotsMsgPattern)
@@ -71,20 +79,74 @@ var resourceHasSnapshotsClassRegexp = regexp.MustCompile(resourceHasSnapshotsCla
 
 
 func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restError {
-	
+
 	l := le.WithFields(logrus.Fields{
 		"func": "ErrorFromErrorT",
 		"traceId": ctx.Value("traceId"),
 	})
 
-	if *err.Errno == 1 {
-		if err.Message != nil {
-			if resourceDneMsgRegexp.MatchString(*err.Message) {
-				return &restError { code: RestResourceDNE }
+	//if err, ok := errC.(*ErrorT); ok {
+	//	return &restError{code: RestFailureUnknown, msg: *errC.Message}
+	//}
+
+	l.Debugf("ErrorT data %+v", err)
+		if err.Errno != nil {
+		if *err.Errno == 1 {
+			if err.Message != nil {
+				if resourceDneMsgRegexp.MatchString(*err.Message) {
+					return &restError { code: RestResourceDNE }
+				}
+				if resourceExistsMsgRegexp.MatchString(*err.Message) {
+					return &restError { code: RestResourceExists }
+				}
+			}
+
+		}
+		if *err.Errno == 5 {
+			if err.Message != nil {
+				l.Debug("Error 5")
+				if resourceExistsMsgRegexp.MatchString(*err.Message) {
+					l.Debug("Res exists!")
+
+					return &restError { code: RestResourceExists }
+				}
+			}
+
+		}
+		if *err.Errno == 100 {
+			if err.Message != nil {
+				l.Debug("Error 5")
+				if resourceExistsMsgRegexp.MatchString(*err.Message) {
+					l.Debug("Resource exists!")
+					return &restError { code: RestResourceExists }
+				} else if cloneCreateFailureDatasetExistsRegexp.MatchString(*err.Message) {
+					l.Debug("Clone exists!")
+					return &restError { code: RestResourceExists }
+				}
+			}
+
+		}
+
+		if *err.Errno == 500 {
+			if err.Message != nil {
+				if resourceIsBusyMsgRegexp.MatchString(*err.Message) {
+					return &restError { code: RestResourceBusy }
+				} else if resourceDneMsgRegexp.MatchString(*err.Message) {
+					match := resourceDneMsgRegexp.FindStringSubmatch(*err.Message)
+					if len(match) > 1 {
+						msg := fmt.Sprintf("Resource %s not found", match[1])
+						l.Warnf(msg)
+						return &restError { code: RestResourceBusy, msg: msg }
+					}
+					l.Warn("Resource not found")
+					return &restError { code: RestResourceBusy, msg: *err.Message }
+				}
+
 			}
 		}
 	}
-	l.Warnf("Errno:%d, Class:%s, Message:%s, Url:%s", *err.Errno, *err.Class, *err.Message, *err.Url )
+	l.Warn(err.String())
+	//l.Warnf("Errno:%d, Class:%s, Message:%s, Url:%s", *err.Errno, *err.Class, *err.Message, *err.Url )
 	return &restError{code: RestFailureUnknown}
 }
 
@@ -102,8 +164,7 @@ func (err *restError) Error() (out string) {
 		out = fmt.Sprintf("Failure during processing response from storage: %s", err.msg)
 	case RestResourceDNE:
 		out = fmt.Sprintf("Resource %s do not exists", err.msg)
-	case RestObjectExists:
-
+	case RestResourceExists:
 		out = fmt.Sprintf("Object exists: %s", err.msg)
 
 	case RestStorageFailureUnknown:

@@ -5,8 +5,9 @@ import (
 	"os"
 	"gopkg.in/yaml.v3"
 	
-	"joviandss-kubernetescsi/pkg/rest"
-
+	// "joviandss-kubernetescsi/pkg/rest"
+	
+	"context"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,6 +16,16 @@ var Version string
 
 // Plugin name
 var PluginName = "joviandss-csi-iscsi.open-e.com"
+
+type RestEndpointCfg struct {
+	Addrs        []string
+	Port        int
+	Prot        string
+	User        string
+	Pass        string
+	IdleTimeOut string // See time Duration
+	Tries       int
+}
 
 
 type ISCSIEndpointCfg struct {
@@ -29,7 +40,7 @@ type JovianDSSCfg struct {
 	LDest			string			`yaml:"logfile"`
 	Pool			string			`yaml:"pool"`
         
-	RestEndpointCfg		rest.RestEndpointCfg	`yaml:"endpoint"`
+	RestEndpointCfg		RestEndpointCfg		`yaml:"endpoint"`
 	ISCSIEndpointCfg	ISCSIEndpointCfg	`yaml:"iscsi"`
 }
 
@@ -113,3 +124,21 @@ func SetupConfig(path string, c *JovianDSSCfg) (error) {
         }
         return nil
 }
+
+type JDSSLoggerContextID int
+
+const loggerKey JDSSLoggerContextID = iota
+
+func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
+    return context.WithValue(ctx, loggerKey, logger)
+}
+
+// Logger From Context
+func LFC(ctx context.Context) *logrus.Entry {
+	logger, ok := ctx.Value(loggerKey).(*logrus.Entry)
+	if !ok {
+		panic(fmt.Sprintf("Unable to get logger from context %+v", ctx))
+	}
+    return logger
+}
+

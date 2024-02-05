@@ -4,11 +4,12 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+	//"encoding/json"
 	"os"
 
 	//"errors"
 	"fmt"
-	"strconv"
+	//"strconv"
 	"strings"
 	"sync"
 
@@ -23,7 +24,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"joviandss-kubernetescsi/pkg/common"
+	jcomm "joviandss-kubernetescsi/pkg/common"
+	// "joviandss-kubernetescsi/pkg/driver"
+	jdrvr "joviandss-kubernetescsi/pkg/driver"
 	jrest "joviandss-kubernetescsi/pkg/rest"
 	// jtypes "joviandss-kubernetescsi/pkg/types"
 )
@@ -38,7 +41,7 @@ const (
 )
 
 const (
-	minVolumeSize = 16 * mib
+	minSupportedVolumeSize = 16 * mib
 )
 
 var supportedControllerCapabilities = []csi.ControllerServiceCapability_RPC_Type{
@@ -75,8 +78,9 @@ type ControllerPlugin struct {
 	volumesInProcess	map[string]bool
 	
 	pool			string
+	d			jdrvr.CSIDriver
 	re			jrest.RestEndpoint
-	iscsiEendpointCfg	common.ISCSIEndpointCfg
+	iscsiEendpointCfg	jcomm.ISCSIEndpointCfg
 	// TODO: add iscsi endpoint
 	//iscsiEndpoint    []*rest.StorageInterface
 	capabilities []*csi.ControllerServiceCapability
@@ -111,7 +115,7 @@ func parseOrigin(or string) (*origin, error) {
 }
 
 // GetControllerPlugin get plugin information
-func GetControllerPlugin(cp * ControllerPlugin, cfg *common.JovianDSSCfg, l *log.Logger) (
+func GetControllerPlugin(cp * ControllerPlugin, cfg *jcomm.JovianDSSCfg, l *log.Logger) (
 	err error,
 ) {
 	os.Exit(1)
@@ -185,12 +189,12 @@ func GetControllerPlugin(cp * ControllerPlugin, cfg *common.JovianDSSCfg, l *log
 }
 
 // GetControllerPlugin get plugin information
-func SetupControllerPlugin(cp *ControllerPlugin, cfg *common.JovianDSSCfg) (
+func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcomm.JovianDSSCfg) (
 	err error,
 ) {
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 	var e error
-	if cp.l, e = common.GetLogger(cfg.LLevel, cfg.LDest); e != nil {
+	if cp.l, e = jcomm.GetLogger(cfg.LLevel, cfg.LDest); e != nil {
 		fmt.Fprintln(os.Stderr, "Unable to init loging because:", e)
 		os.Exit(1)
 	}
@@ -306,6 +310,33 @@ func (cp *ControllerPlugin) getStandardID(name string) string {
 	return id
 }
 
+func (cp *ControllerPlugin) getIDFromName(name string) string {
+	l := cp.l.WithFields(log.Fields{
+		"func": "getIDFromName",
+	})
+
+	// Get universal volume ID
+	preID := []byte(name)
+	rawID := sha256.Sum256(preID)
+	id := strings.ToLower(fmt.Sprintf("%X", rawID))
+	l.Tracef("For %s id is %s", name, id)
+	return id
+}
+
+func (cp *ControllerPlugin) getVIDFromName(name string) string {
+	l := cp.l.WithFields(log.Fields{
+		"func": "getVIDfrom",
+	})
+
+	// Get universal volume ID
+	preID := []byte(name)
+	rawID := sha256.Sum256(preID)
+	id := strings.ToLower(fmt.Sprintf("%X", rawID))
+	l.Tracef("For %s id is %s", name, id)
+	return id
+}
+
+
 func (cp *ControllerPlugin) getRandomName(l int) (s string) {
 	var v int64
 	out := make([]byte, l)
@@ -379,7 +410,8 @@ func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.V
 	return v, nil
 }
 
-func (cp *ControllerPlugin) createVolumeFromSnapshot(sname string, nvname string) error {
+
+func (cp *ControllerPlugin) createVolumeFromSnapshot(sid jdrvr.SnapshotId, nvid jdrvr.VolumeId) error {
 //	l := cp.l.WithFields(logrus.Fields{
 //		"func": "createVolumeFromSnapshot",
 //	})
@@ -419,18 +451,18 @@ func (cp *ControllerPlugin) createVolumeFromSnapshot(sname string, nvname string
 	return nil
 }
 
-func (cp *ControllerPlugin) createVolumeFromVolume(srcVol string, newVol string) error {
+func (cp *ControllerPlugin) createVolumeFromVolume(sid jdrvr.SnapshotId, nvid jdrvr.VolumeId) error {
 	l := cp.l.WithFields(log.Fields{
 		"func": "createVolumeFromVolume",
 	})
-	msg := fmt.Sprintf("Create %s From %s", newVol, srcVol)
+	msg := fmt.Sprintf("Create %s From %s", sid.ID(), nvid.ID())
 	l.Tracef(msg)
 
-	csname, err := cp.createConcealedSnapshot(srcVol)
-	if err != nil {
-		return err
-	}
-	err = cp.createVolumeFromSnapshot(*csname, newVol)
+	// csname, err := cp.createConcealedSnapshot(srcVol)
+	// if err != nil {
+	// 	return err
+	// }
+	err := cp.createVolumeFromSnapshot(sid, nvid)
 	return err
 }
 
@@ -468,6 +500,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		"request": "CreateVolume",
 	        "traceId": ctx.Value("traceId"),
 	})
+	ctx = jcomm.WithLogger(ctx, l)
 
 	var err error
 	out := csi.CreateVolumeResponse{
@@ -486,10 +519,10 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		l.Warnf("Unable to create volume req: %v", req)
 		return nil, err
 	}
-	vName := req.GetName()
-
-	if len(vName) == 0 {
-		return nil, status.Error(codes.InvalidArgument, "Name missing in request")
+	// vName := req.GetName()
+	var nvid *jdrvr.VolumeId
+	if nvid, err = jdrvr.NewVolumeIdFromName(req.GetName()); err != nil {
+		return nil, err
 	}
 
 	// TODO: process volume capabilities
@@ -500,17 +533,13 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	volumeSize := req.GetCapacityRange().GetRequiredBytes()
 
-	if volumeSize < minVolumeSize {
+	if volumeSize < minSupportedVolumeSize {
 		maxVSize := req.GetCapacityRange().GetLimitBytes()
-		l.Tracef("Minimal volume size %d too small, using max val: %d", volumeSize, maxVSize)
-		volumeSize = maxVSize
-	}
-
-	if volumeSize < minVolumeSize {
-		msg := fmt.Sprintf("Setting volume size to default: %d", volumeSize)
-		cp.l.Warn(msg)
-
-		volumeSize = minVolumeSize
+		if maxVSize < minSupportedVolumeSize {
+			return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Volume size must be at least %d bytes", minSupportedVolumeSize))
+		}
+		l.Tracef("Minimal volume size %d too small, using minila allowed volume size: %d", volumeSize, minSupportedVolumeSize)
+		volumeSize = minSupportedVolumeSize
 	}
 
 //	l.WithField( Tracef("Create volume %+v of size %+v",
@@ -520,16 +549,14 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	//////////////////////////////////////////////////////////////////////////////
 	// Check if volume exists
 
-	volumeID := cp.getStandardID(vName)
-
-	v, err := cp.getVolume(ctx, volumeID)
-	if err != nil {
-		if codes.NotFound != status.Code(err) {
-			msg := fmt.Sprintf("Internal error %s", err.Error())
-			err = status.Errorf(codes.Internal, msg)
-			return nil, err
-		}
-	}
+	// v, err := cp.getVolume(ctx, volumeID)
+	// if err != nil {
+	// 	if codes.NotFound != status.Code(err) {
+	// 		msg := fmt.Sprintf("Internal error %s", err.Error())
+	// 		err = status.Errorf(codes.Internal, msg)
+	// 		return nil, err
+	// 	}
+	// }
 
 	// Get info about volume source
 	vSource := req.GetVolumeContentSource()
@@ -538,95 +565,97 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 		if srcSnapshot := vSource.GetSnapshot(); srcSnapshot != nil {
 			// Snapshot
-			sourceSnapshot = srcSnapshot.GetSnapshotId()
-			// Check if snapshot exists
-			if _, err = cp.getSnapshot(sourceSnapshot); err != nil {
+			sourceSnapshotID := srcSnapshot.GetSnapshotId()
+			sid, err := jdrvr.NewSnapshotIdFromName(sourceSnapshotID)	
+			if err != nil {
 				return nil, err
 			}
-			l.Tracef("Sopurce snapshot %s exists.", sourceSnapshot)
+
+			l.Debugf("Creating volume %s from volume %s", nvid.ID(), sid.ID())
+			err = cp.d.CreateVolumeFromSnapshot(ctx, sid, nvid)
+			if err != nil {
+			 	return nil, status.Error(codes.FailedPrecondition, err.Error())
+			}
 
 		} else if srcVolume := vSource.GetVolume(); srcVolume != nil {
 			// Volume
-			sourceVolume = srcVolume.GetVolumeId()
+			sourceVolumeID := srcVolume.GetVolumeId()
 			// Check if volume exists
-			if _, err = cp.getVolume(ctx, sourceVolume); err != nil {
+			vid, err := jdrvr.NewVolumeIdFromId(sourceVolumeID)
+			if err != nil {
 				return nil, err
 			}
-			cp.l.Tracef("Sopurce volume %s exists.", sourceVolume)
+			l.Debugf("Creating volume %s from volume %s", vid, nvid)
+			err = cp.d.CreateVolumeFromVolume(ctx, vid, nvid)
 		} else {
 			return nil, status.Errorf(codes.Unimplemented,
 				"Unable to create volume from other sources")
 		}
+	} else {
+		err = cp.d.CreateVolume(ctx, nvid)
 	}
+
 
 	// TODO: develop support for different max capacity
 	// if voluem exists make shure it has same size
-	if v != nil {
-		var vSize int64
-		vSize, err = strconv.ParseInt((*v).Size, 10, 64)
-		if vSize != volumeSize {
-			msg := fmt.Sprintf("Exists volume with size %d, when requsted for %d", vSize, volumeSize)
-			cp.l.Warn(msg)
-			err = status.Error(codes.AlreadyExists, msg)
-			return nil, err
-		}
-		// Volume exists
-		l.Tracef("Request for the same volume %s with size %d ", volumeID, vSize)
+	// if v != nil {
+	// 	var vSize int64
+	// 	vSize, err = strconv.ParseInt((*v).Size, 10, 64)
+	// 	if vSize != volumeSize {
+	// 		msg := fmt.Sprintf("Exists volume with size %d, when requsted for %d", vSize, volumeSize)
+	// 		cp.l.Warn(msg)
+	// 		err = status.Error(codes.AlreadyExists, msg)
+	// 		return nil, err
+	// 	}
+	// 	// Volume exists
+	// 	l.Tracef("Request for the same volume %s with size %d ", volumeID, vSize)
 
-		out.Volume.VolumeId = volumeID
-		out.Volume.CapacityBytes = volumeSize
+	// 	out.Volume.VolumeId = volumeID
+	// 	out.Volume.CapacityBytes = volumeSize
 
-		return &out, nil
+	// 	return &out, nil
 
-	}
+	// }
 	//////////////////////////////////////////////////////////////////////////////
 	l.Tracef("req: %+v ", req)
 
 	// Create volume
 
 	vd := jrest.CreateVolumeDescriptor{
-		Name: volumeID,
-		Size: volumeSize,
+		Name: vid.VID(),
+		Size: fmt.Sprintf("%d", volumeSize),
 	}
-	var rErr jrest.RestError
 
-	if len(sourceSnapshot) > 0 {
-		// from snapshot
-		err = cp.createVolumeFromSnapshot(sourceSnapshot, volumeID)
-		if err != nil {
-			return nil, err
-		}
-		vSize, err := cp.getVolumeSize(volumeID)
-		if err != nil {
-			return nil, err
-		}
+	// var rErr jrest.RestError = nil
 
-		out.Volume.VolumeId = volumeID
-		out.Volume.CapacityBytes = vSize
+	// if len(sourceSnapshot) > 0 {
+	// 	// from snapshot
 
-		return &out, nil
 
-	} else if len(sourceVolume) > 0 {
-		// from volume
-		err = cp.createVolumeFromVolume(sourceVolume, volumeID)
-		if err != nil {
-			return nil, err
-		}
-		vSize, err := cp.getVolumeSize(volumeID)
-		if err != nil {
-			return nil, err
-		}
+	// 	return &out, nil
 
-		out.Volume.VolumeId = volumeID
-		out.Volume.CapacityBytes = vSize
+	// } else if len(sourceVolume) > 0 {
+	// 	// from volume
+	// 	err = cp.createVolumeFromVolume(sourceVolume, volumeID)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	vSize, err := cp.getVolumeSize(volumeID)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
-		return &out, nil
+	// 	out.Volume.VolumeId = volumeID
+	// 	out.Volume.CapacityBytes = vSize
 
-	} else {
-		rErr = cp.re.CreateVolume(ctx, cp.pool, vd)
-	}
+	// 	return &out, nil
+
+	// } else {
+	// 	rErr = cp.re.CreateVolume(ctx, cp.pool, vd)
+	// }
 	if rErr != nil {
 		code := rErr.GetCode()
+		l.Debugln("Error code is", code)
 		switch code {
 		case jrest.RestResourceBusy:
 			// According to specification from
@@ -635,7 +664,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 			err = status.Errorf(codes.Internal, rErr.Error())
 			return nil, err
 
-		case jrest.RestObjectExists:
+		case jrest.RestResourceExists:
 			l.Warn("Specified volume already exists.")
 
 		default:
@@ -848,114 +877,42 @@ func (cp *ControllerPlugin) concealVolume(vID string) error {
 
 // DeleteVolume deletes volume or hides it for later deletion
 func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "DeleteVolume",
-	// })
+	l := cp.l.WithFields(log.Fields{
+		"func": "DeleteVolume",
+	        "traceId": ctx.Value("traceId"),
+	})
 
-	// var err error
-	// err = nil
-	// // Check arguments
-	// if len(req.GetVolumeId()) == 0 {
-	// 	return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
-	// }
-	// if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME) {
-	// 	err = status.Errorf(codes.Internal, "Capability is not supported.")
-	// 	cp.l.Warnf("Unable to delete volume req: %v", req)
-	// 	return nil, err
-	// }
+	// Check arguments
+	if len(req.GetVolumeId()) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "Volume ID missing in request")
+	}
+	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME) {
+		err := status.Errorf(codes.Internal, "Capability is not supported.")
+		cp.l.Warnf("Unable to delete volume req: %v", req)
+		return nil, err
+	}
 
-	// vID := req.VolumeId
-	// l.Tracef("Deleting volume %s", vID)
-
-	// // Protect volume from modifications
-	// if err = cp.lockVolume(vID); err != nil {
-	// 	return nil, status.Errorf(codes.Internal, err.Error())
-	// }
-
-	// dvol, lErr := cp.getVolume(vID)
-	// if codes.NotFound == status.Code(lErr) {
-	// 	cp.unlockVolume(vID)
-	// 	return &csi.DeleteVolumeResponse{}, nil
-	// }
-
-	// if lErr != nil {
-	// 	cp.unlockVolume(vID)
-	// 	return nil, status.Errorf(codes.Internal, lErr.Error())
-	// }
-
-	// // Try to delete without recursiuon
-	// lErr = (*cp.endpoints[0]).DeleteVolume(vID, false)
-
-	// if lErr == nil {
-	// 	// If volume is a clone, GC concealed parents
-	// 	cp.unlockVolume(vID)
-	// 	if dvol.IsClone {
-	// 		or, err := parseOrigin(dvol.Origin)
-	// 		if err != nil {
-	// 			return nil, err
-	// 		}
-	// 		if or.Snapshot[:2] == "c_" {
-	// 			// volume is made of concealed snapshot
-	// 			rErr := (*cp.endpoints[0]).DeleteSnapshot(or.Volume, or.Snapshot)
-
-	// 			if rErr != nil {
-	// 				code := rErr.GetCode()
-	// 				switch code {
-	// 				case rest.RestResourceDNE:
-	// 				default:
-	// 					cp.unlockVolume(vID)
-	// 					return nil, status.Errorf(codes.Internal, rErr.Error())
-	// 				}
-	// 			}
-	// 			// Try to remove parents if they are concealed
-	// 			cp.gcVolume(or.Volume)
-	// 		}
-	// 	}
-
-	// 	return &csi.DeleteVolumeResponse{}, nil
-	// }
-
-	// switch grpc.Code(lErr) {
-	// case rest.RestResourceDNE:
-	// 	cp.unlockVolume(vID)
-	// 	return &csi.DeleteVolumeResponse{}, nil
-	// case rest.RestFailureUnknown:
-	// 	cp.unlockVolume(vID)
-	// 	return nil, status.Errorf(codes.Internal, lErr.Error())
-	// case rest.RestResourceBusy:
-	// 	// It is likly that volume has snapshots, do nothing
-	// default:
-	// 	cp.unlockVolume(vID)
-	// 	return nil, status.Errorf(codes.Internal, "Unknown internal error")
-	// }
-
-	// // check if volume has public snapshots
-	// psl, lErr := cp.getVolumeSnapshots(vID)
-	// if lErr != nil {
-	// 	switch status.Code(lErr) {
-	// 	case codes.FailedPrecondition:
-	// 		cp.unlockVolume(vID)
-	// 		return &csi.DeleteVolumeResponse{}, nil
-	// 	default:
-	// 		cp.unlockVolume(vID)
-	// 		return nil, status.Errorf(codes.Internal, lErr.Error())
-	// 	}
-	// }
-	// if len(psl) > 0 {
-	// 	// Volume has snapshots, list snapshots in error message
-	// 	msg := fmt.Sprintf("Volume %s has snapshots: ", vID)
-	// 	for _, s := range psl {
-	// 		msg += s.Name + " "
-	// 	}
-	// 	cp.unlockVolume(vID)
-	// 	return nil, status.Error(codes.FailedPrecondition, msg)
-	// }
-
-	// lErr = cp.concealVolume(vID)
-	// if lErr != nil {
-	// 	return nil, lErr
-	// }
-	return &csi.DeleteVolumeResponse{}, nil
+	vID := req.VolumeId
+	l.Tracef("Deleting volume %s", vID)
+	
+	// Try to delete without recursiuon
+	var dvd = jrest.DeleteVolumeDescriptor{
+		RecursivelyChildren: false,
+		ForceUmount: true,
+	}
+	if err := cp.re.DeleteVolume(ctx, cp.pool, vID, dvd); err == nil {
+		return &csi.DeleteVolumeResponse{}, nil
+	} else {
+		switch err.GetCode() {
+		case jrest.RestResourceBusy:
+			return nil, status.Error(codes.FailedPrecondition, "In order to delete a volume, you must delete all of its clones first")
+		case jrest.RestResourceDNE:
+			l.Warnf("Volume %s was deleted before", vID)
+			return &csi.DeleteVolumeResponse{}, nil
+		default:
+			return nil, status.Errorf(codes.Internal, err.Error())
+		}
+	}
 }
 
 //ListVolumes return the list of volumes
@@ -986,7 +943,7 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 			return nil, status.Errorf(codes.Internal, "Unable to connect.")
 
 		default:
-			return nil, status.Errorf(codes.Internal, "Unable to connect.")
+			return nil, status.Errorf(codes.Internal, err.Error())
 		}
 	}
 

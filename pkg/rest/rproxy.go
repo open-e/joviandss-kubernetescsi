@@ -33,6 +33,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	jcom "joviandss-kubernetescsi/pkg/common"
 )
 
 const sessionTimeout = 30 * time.Second
@@ -108,6 +110,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 		if err != nil {
 			return 0, nil, &restError{RestRequestMalfunction, err.Error()}
 		}
+		l.Debugf("sending marshaled data %+v", data)
 		reader = strings.NewReader(string(jdata))
 	}
 
@@ -158,62 +161,10 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 		err = status.Error(codes.Internal, "Unable to process response")
 		return res.StatusCode, nil, &restError{RestRequestMalfunction, err.Error()}
 	}
-	l.Debugf("Request completed with code %d", res.StatusCode)
+	l.Debugf("Request completed with code %d, obtained %d bytes", res.StatusCode, len(bodyBytes))
 	return res.StatusCode, bodyBytes, nil
 }
 
-// func (rp *RestProxy) Send(method, path string, data interface{}, ok int) (int, []byte, error) {
-// 	var res *http.Response
-// 	var err error
-// 
-// 	rp.mu.Lock()
-// 	rp.requestID++
-// 	rp.mu.Unlock()
-// 
-// 	addr := fmt.Sprintf("%s://%s:%d/%s", rp.prot, rp.addrs[rp.active_addr], rp.port, path)
-// 
-// 	// send request data as json
-// 	var reader io.Reader
-// 	if data == nil {
-// 		rp.l.WithFields(logrus.Fields{"url": path}).Debugf("sending with no data")
-// 
-// 		reader = nil
-// 	} else {
-// 		rp.l.WithFields(logrus.Fields{"url": path}).Debugf("sending data %+v", data)
-// 		jdata, err := json.Marshal(data)
-// 		if err != nil {
-// 			return 0, nil, err
-// 		}
-// 		reader = strings.NewReader(string(jdata))
-// 	}
-// 
-// 	req, err := http.NewRequest(method, addr, reader)
-// 	req.SetBasicAuth(rp.user, rp.pass)
-// 	if err != nil {
-// 		//rp.l.Warnf("Unable to create req: %s", err)
-// 		return 0, nil, err
-// 	}
-// 	req.Header.Set("Content-Type", "application/json")
-// 	req.Header.Set("User-Agent", "Kubernetes CSI Plugin")
-// 	res, err = rp.httpRestProxy.Do(req)
-// 
-// 	defer res.Body.Close()
-// 
-// 	if err != nil {
-// 		rp.l.Warnf("Request error: %+v", err)
-// 		return 0, nil, err
-// 	}
-// 
-// 	// validate response body
-// 	bodyBytes, err := io.ReadAll(res.Body)
-// 	if err != nil {
-// 		rp.l.Warnf("Response failure: %+v", err)
-// 		err = status.Error(codes.Internal, "Unable to process response")
-// 		return res.StatusCode, nil, err
-// 	}
-// 
-// 	return res.StatusCode, bodyBytes, err
-// }
 
 type RestProxyCfg struct {
 	Addrs        string
@@ -276,7 +227,7 @@ type RestProxyCfg struct {
 // 	return ri, nil
 // }
 
-func SetupRestProxy(rp *RestProxy, cfg *RestEndpointCfg, l *logrus.Entry) (err error) {
+func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) (err error) {
 
 	// rp.l = l.WithField("section", "restproxy")
  	rp.l = l.WithFields(logrus.Fields{"section": "restproxy", "addrs": cfg.Addrs, "port": cfg.Port,})

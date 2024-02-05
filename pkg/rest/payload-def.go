@@ -17,6 +17,10 @@ under the License.
 
 package rest
 
+import (
+	"fmt"
+)
+
 // Operation completedGetPoolsRCode success response code
 const CodeOK = 200
 const CodeCreated = 201
@@ -35,6 +39,23 @@ type ErrorT struct {
 	Url     *string	`json:"url,omitempty"`
 }
 
+func (err *ErrorT) String() string {
+	var ret string = "Rest Error: "
+	if err.Errno != nil {
+		ret += fmt.Sprintf("Errno: %d, ", *err.Errno)
+	}
+	if err.Class != nil {
+		ret += fmt.Sprintf("Class: %s, ", *err.Class)
+	}
+	if err.Message != nil {
+		ret += fmt.Sprintf("Message: %s, ", *err.Message)
+	}
+	if err.Url != nil {
+		ret += fmt.Sprintf("Url: %s, ", *err.Url)
+	}
+	return ret
+}
+
 // ErrorData response mask
 type ErrorData struct {
 	Data  interface{}
@@ -48,7 +69,7 @@ type ErrorData struct {
 type IOStats struct {
 	Read   string `json:"read"`
 	Write  string `json:"write"`
-	chksum string `json:"chksum"`
+	Chksum string `json:"chksum"`
 }
 
 // Disk structure returned by server
@@ -88,9 +109,9 @@ type PoolEnabled struct {
 
 // Pool response structure
 type Pool struct {
-	Available  string      `json: "available"`
+	Available  string      `json:"available"`
 	Status     int         `json:"status"`
-	Name       string      `json:"name": "Pool-0"`
+	Name       string      `json:"name"`
 	Scan       int         `json:"scan"`
 	Encryption PoolEnabled `json:"encryption"`
 	Iostats    IOStats     `json:"iostats"`
