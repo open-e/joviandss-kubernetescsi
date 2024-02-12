@@ -192,8 +192,8 @@ const GetPoolsRCode = 200
 
 // GetVolumeData data
 type GetVolumeData struct {
-	Data  *Volume	`json:"data,omitempty"`
-	Error *ErrorT	`json:"error,ommitempty"`
+	Data  *ResourceVolume	`json:"data,omitempty"`
+	Error *ErrorT			`json:"error,ommitempty"`
 }
 
 // GetVolumeRCode success response code
@@ -201,8 +201,8 @@ const GetVolumeRCode = 200
 
 // GetVolumesData data structure
 type GetVolumesData struct {
-	Data  *[]Volume `json:"data"`
-	Error ErrorT   `json:"error"`
+	Data  *[]ResourceVolume	`json:"data"`
+	Error ErrorT			`json:"error"`
 }
 
 // GetVolumesRCode success response code
@@ -277,26 +277,26 @@ type CreateSnapshotData struct {
 /// Get Snapshot
 
 // Snapshot structure
-type Snapshot struct {
-	Referenced       string
-	Name             string
-	Defer_destroy    string
-	Userrefs         string
-	Primarycache     string
-	Type             string
-	Creation         string
-	Refcompressratio string
-	Compressratio    string
-	Written          string
-	Used             string
-	Clones           string
-	Mlslabel         string
-	Secondarycache   string
-}
+// type Snapshot struct {
+// 	Referenced       string
+// 	Name             string
+// 	Defer_destroy    string
+// 	Userrefs         string
+// 	Primarycache     string
+// 	Type             string
+// 	Creation         string
+// 	Refcompressratio string
+// 	Compressratio    string
+// 	Written          string
+// 	Used             string
+// 	Clones           string
+// 	Mlslabel         string
+// 	Secondarycache   string
+// }
 
 // GetSnapshotData data
 type GetSnapshotData struct {
-	Data  Snapshot
+	Data  ResourceSnapshot
 	Error ErrorT
 }
 
@@ -314,40 +314,40 @@ type SnapshotProperties struct {
 	Creation string
 }
 
-// SnapshotShort structure
-type SnapshotShort struct {
-	Volume     string
-	Name       string
-	Clones     string
-	Properties SnapshotProperties
+
+type ResultEntries struct {
+	Results		int64		`json:"results"`
+	Entries		interface{}	`json:"entries"`
 }
 
 // AllSnapshots structure
-type AllSnapshots struct {
-	Results int
-	Entries []SnapshotShort
+type GetVolumeSnapshotsData struct {
+	Data  ResultEntries		`jsom:"data"`
+	Error ErrorT			`json:"error"`
 }
 
-// GetAllSnapshotsData data
 type GetAllSnapshotsData struct {
-	Data  AllSnapshots
-	Error ErrorT
+	Data  ResultEntries		`jsom:"data"`
+	Error ErrorT			`json:"error"`
 }
+
+// AllSnapshots structure
+// type GetAllSnapshots struct {
+// 	Results int
+// 	Entries []SnapshotShort
+// }
+
+// GetAllSnapshotsData data
+
 
 // GetAllSnapshotsRCode success status code
 const GetAllSnapshotsRCode = 200
 
 // VolSnapshots structure
-type VolSnapshots struct {
-	Results int
-	Entries []Snapshot
-}
-
-// GetVolSnapshotsData data
-type GetVolSnapshotsData struct {
-	Data  VolSnapshots
-	Error ErrorT
-}
+// type GetVolumeSnapshots struct {
+// 	Results int
+// 	Entries []ResourceSnapshot
+// }
 
 // GetVolSnapshotsRCode success status code
 const GetVolSnapshotsRCode = 200

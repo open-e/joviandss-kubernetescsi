@@ -100,19 +100,25 @@ type CreateVolumeDescriptor struct {
 }
 
 type DeleteVolumeDescriptor struct {
-	RecursivelyChildren	*bool	`json:"recursively_children,omitempty"`
-	ForceUmount		*bool	`json:"force_umount,omitempty"`
+	RecursivelyChildren	bool	`json:"recursively_children,omitempty"`
+	ForceUmount		bool	`json:"force_umount,omitempty"`
 }
 
 type CloneVolumeDescriptor struct {
-	Name          *string		    `json:"name"` // string with the name that will be assigned to clone.
-	Snapshot      *string		    `json:"snapshot"` // string name of the snapshot that clone will be created from.
+	Name          string			    `json:"name"` // string with the name that will be assigned to clone.
+	Snapshot      string			    `json:"snapshot"` // string name of the snapshot that clone will be created from.
 	CreateParents *bool			    `json:"create_parents,omitempty"` // boolean, if positive creates all non existing parents of dataset where snapshot will be
-	Properties    *CreateVolumeProperties    `json:"properties,omitempty"` // object with properties for the new clone. 
+	Properties    *CreateVolumeProperties	    `json:"properties,omitempty"` // object with properties for the new clone. 
+}
+
+// TODO: Expand spanpshot properties
+type CreateSnapshotProperties struct {
+	Primarycache   *Primarycache `json:"primarycache,omitempty"`
+	Secondarycache *Primarycache `json:"secondarycache,omitempty"`
 }
 
 type CreateSnapshotDescriptor struct {
-	SnapshotName string            `json:"snapshot_name"` // string with name of the new snapshot.
-	Recursive    bool              `json:"recursive"` // boolean indicating if recursively create snapshots of all descendant datasets
-	Properties   map[string]string `json:"properties,omitempty"` //object containing properties of new snapshot. 
+	SnapshotName string			`json:"snapshot_name"` // string with name of the new snapshot.
+	Recursive    bool			`json:"recursive"` // boolean indicating if recursively create snapshots of all descendant datasets
+	Properties   CreateSnapshotProperties	`json:"properties,omitempty"` //object containing properties of new snapshot. 
 }

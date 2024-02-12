@@ -38,16 +38,16 @@ type StorageInterface interface {
 	GetPools() ([]PoolShort, error)
 
 	// Volumes
-	CreateVolume(poolName string, vol Volume) RestError
-	GetVolume(vname string) (*Volume, RestError)
+	CreateVolume(poolName string, vol ResourceVolume) RestError
+	GetVolume(vname string) (*ResourceVolume, RestError)
 	DeleteVolume(vname string, rSnapshots bool) RestError
-	ListVolumes(poolName string, vols *[]Volume) (RestError)
+	ListVolumes(poolName string, vols *[]ResourceVolume) (RestError)
 
 	CreateSnapshot(vname string, sname string) RestError
-	GetSnapshot(vname string, sname string) (*Snapshot, RestError)
+	GetSnapshot(vname string, sname string) (*ResourceSnapshot, RestError)
 	DeleteSnapshot(vname string, sname string) RestError
-	ListAllSnapshots(f func(string) bool) ([]SnapshotShort, RestError)
-	ListVolumeSnapshots(string, func(string) bool) ([]SnapshotShort, RestError)
+	ListAllSnapshots(f func(string) bool) ([]ResourceSnapshotShort, RestError)
+	ListVolumeSnapshots(string, func(string) bool) ([]ResourceSnapshotShort, RestError)
 
 	GetTarget(tname string) (*Target, RestError)
 	CreateTarget(tname string) RestError

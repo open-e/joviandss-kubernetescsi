@@ -26,15 +26,16 @@ import (
 )
 
 const (
-	RestFailureUnknown		= 1
-	RestResourceBusy		= 2
-	RestResourceExists		= 3
-	RestRequestMalfunction		= 4
-	RestResourceDNE			= 5
-	RestUnableToConnect		= 6
-	RestRPM				= 7 // Response Processing Malfunction
-	RestStorageFailureUnknown	= 8
-	RestRequestTimeout		= 9
+	RestErrorFailureUnknown			= 1
+	RestErrorResourceBusy			= 2
+	RestErrorResourceExists			= 3
+	RestErrorRequestMalfunction		= 4
+	RestErrorResourceDNE			= 5
+	RestErrorUnableToConnect		= 6
+	RestErrorRPM				= 7 // Response Processing Malfunction
+	RestErrorStorageFailureUnknown		= 8
+	RestErrorRequestTimeout			= 9
+	RestErrorArgumentIncorrect		= 10
 )
 
 type RestError interface {
@@ -90,84 +91,81 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 	//}
 
 	l.Debugf("ErrorT data %+v", err)
-		if err.Errno != nil {
-		if *err.Errno == 1 {
-			if err.Message != nil {
-				if resourceDneMsgRegexp.MatchString(*err.Message) {
-					return &restError { code: RestResourceDNE }
-				}
-				if resourceExistsMsgRegexp.MatchString(*err.Message) {
-					return &restError { code: RestResourceExists }
-				}
-			}
+	if err.Errno != nil {
+		l.Warnln("Error number ", *err.Errno)
 
-		}
-		if *err.Errno == 5 {
-			if err.Message != nil {
-				l.Debug("Error 5")
-				if resourceExistsMsgRegexp.MatchString(*err.Message) {
-					l.Debug("Res exists!")
+		switch *err.Errno {
 
-					return &restError { code: RestResourceExists }
-				}
-			}
-
-		}
-		if *err.Errno == 100 {
-			if err.Message != nil {
-				l.Debug("Error 5")
-				if resourceExistsMsgRegexp.MatchString(*err.Message) {
-					l.Debug("Resource exists!")
-					return &restError { code: RestResourceExists }
-				} else if cloneCreateFailureDatasetExistsRegexp.MatchString(*err.Message) {
-					l.Debug("Clone exists!")
-					return &restError { code: RestResourceExists }
-				}
-			}
-
-		}
-
-		if *err.Errno == 500 {
-			if err.Message != nil {
-				if resourceIsBusyMsgRegexp.MatchString(*err.Message) {
-					return &restError { code: RestResourceBusy }
-				} else if resourceDneMsgRegexp.MatchString(*err.Message) {
-					match := resourceDneMsgRegexp.FindStringSubmatch(*err.Message)
-					if len(match) > 1 {
-						msg := fmt.Sprintf("Resource %s not found", match[1])
-						l.Warnf(msg)
-						return &restError { code: RestResourceBusy, msg: msg }
+			case 1:
+				if err.Message != nil {
+					if resourceDneMsgRegexp.MatchString(*err.Message) {
+						return &restError { code: RestErrorResourceDNE }
 					}
-					l.Warn("Resource not found")
-					return &restError { code: RestResourceBusy, msg: *err.Message }
+					if resourceExistsMsgRegexp.MatchString(*err.Message) {
+						return &restError { code: RestErrorResourceExists }
+					}
 				}
 
+			case 5:
+				if err.Message != nil {
+
+					if resourceExistsMsgRegexp.MatchString(*err.Message) {
+						l.Debug("Res exists!")
+
+						return &restError { code: RestErrorResourceExists }
+					}
+				}
+			case 100:
+				if err.Message != nil {
+					l.Debug("Error 5")
+					if resourceExistsMsgRegexp.MatchString(*err.Message) {
+						l.Debug("Resource exists!")
+						return &restError { code: RestErrorResourceExists }
+					} else if cloneCreateFailureDatasetExistsRegexp.MatchString(*err.Message) {
+						l.Debug("Clone exists!")
+						return &restError { code: RestErrorResourceExists }
+					}
+				}
+		}
+	} else {
+		if err.Message != nil {
+			if resourceIsBusyMsgRegexp.MatchString(*err.Message) {
+				return &restError { code: RestErrorResourceBusy }
+			} else if resourceDneMsgRegexp.MatchString(*err.Message) {
+				match := resourceDneMsgRegexp.FindStringSubmatch(*err.Message)
+				if len(match) > 1 {
+					msg := fmt.Sprintf("Resource %s not found", match[1])
+					l.Warnf(msg)
+					return &restError { code: RestErrorResourceBusy, msg: msg }
+				}
+				l.Warn("Resource not found")
+				return &restError { code: RestErrorResourceBusy, msg: *err.Message }
 			}
 		}
 	}
 	l.Warn(err.String())
 	//l.Warnf("Errno:%d, Class:%s, Message:%s, Url:%s", *err.Errno, *err.Class, *err.Message, *err.Url )
-	return &restError{code: RestFailureUnknown}
+	return &restError{code: RestErrorFailureUnknown}
 }
 
 func (err *restError) Error() (out string) {
 
 	switch (*err).code {
 
-	case RestResourceBusy:
+	case RestErrorResourceBusy:
 		out = fmt.Sprintf("Resource is busy. %s", err.msg)
 
-	case RestRequestMalfunction:
+	case RestErrorRequestMalfunction:
 		out = fmt.Sprintf("Failure in sending data to storage: %s", err.msg)
 
-	case RestRPM:
+	case RestErrorRPM:
 		out = fmt.Sprintf("Failure during processing response from storage: %s", err.msg)
-	case RestResourceDNE:
+	case RestErrorResourceDNE:
 		out = fmt.Sprintf("Resource %s do not exists", err.msg)
-	case RestResourceExists:
+	case RestErrorResourceExists:
 		out = fmt.Sprintf("Object exists: %s", err.msg)
 
-	case RestStorageFailureUnknown:
+	case RestErrorStorageFailureUnknown:
 		out = fmt.Sprintf("Storage failes with unknown error: %s", err.msg)
 
 	default:

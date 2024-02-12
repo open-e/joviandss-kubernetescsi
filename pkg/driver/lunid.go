@@ -7,6 +7,8 @@ import (
 
 	"fmt"
 	"strings"
+	"strconv"
+	"regexp"
 )
 
 type LunID interface {
@@ -19,6 +21,22 @@ type SnapshotId struct {
 	name	string
 	vid	string
 	id	string
+}
+
+//const allowedSymbols = 
+const allowedSymbolsPattern = "[^abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789]" 
+var allowedSymbolsRegexp = regexp.MustCompile(allowedSymbolsPattern)
+
+func nameToID(name string) string {
+
+    	// Replace each non-allowed symbol with its hexadecimal representation
+    	transformedString := allowedSymbolsRegexp.ReplaceAllStringFunc(name, func(s string) string {
+    	    // Convert the non-allowed symbol to its hexadecimal representation
+    	    runeValue := []rune(s)[0]
+    	    hexRepresentation := strconv.FormatInt(int64(runeValue), 16)
+    	    return "_" + hexRepresentation
+    	})
+	return transformedString
 }
 
 func NewSnapshotIdFromName(name string) (*SnapshotId, error) {
