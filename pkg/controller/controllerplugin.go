@@ -411,7 +411,7 @@ func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.R
 }
 
 
-func (cp *ControllerPlugin) createVolumeFromSnapshot(sid jdrvr.SnapshotId, nvid jdrvr.VolumeId) error {
+func (cp *ControllerPlugin) createVolumeFromSnapshot(sid jdrvr.SnapshotId, nvid jdrvr.VolumeDesc) error {
 //	l := cp.l.WithFields(logrus.Fields{
 //		"func": "createVolumeFromSnapshot",
 //	})
@@ -451,7 +451,7 @@ func (cp *ControllerPlugin) createVolumeFromSnapshot(sid jdrvr.SnapshotId, nvid 
 	return nil
 }
 
-func (cp *ControllerPlugin) createVolumeFromVolume(sid jdrvr.SnapshotId, nvid jdrvr.VolumeId) error {
+func (cp *ControllerPlugin) createVolumeFromVolume(sid jdrvr.SnapshotId, nvid jdrvr.VolumeDesc) error {
 	l := cp.l.WithFields(log.Fields{
 		"func": "createVolumeFromVolume",
 	})
@@ -493,7 +493,7 @@ func (cp *ControllerPlugin) getVolumeSize(vname string) (int64, error) {
 	return 0, nil
 }
 
-func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvid *jdrvr.VolumeId, size int64, vSource *csi.VolumeContentSource) error {
+func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvid *jdrvr.VolumeDesc, size int64, vSource *csi.VolumeContentSource) error {
 	
 	l := jcom.LFC(ctx)
 	
@@ -515,7 +515,7 @@ func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvid *jdrvr.Vol
 			// Volume
 			sourceVolumeID := srcVolume.GetVolumeId()
 			// Check if volume exists
-			vid, err := jdrvr.NewVolumeIdFromId(sourceVolumeID)
+			vid, err := jdrvr.NewVolumeDescFromId(sourceVolumeID)
 			if err != nil {
 				return err
 			}
@@ -576,8 +576,8 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, err
 	}
 	// vName := req.GetName()
-	var nvid *jdrvr.VolumeId
-	if nvid, err = jdrvr.NewVolumeIdFromName(req.GetName()); err != nil {
+	var nvid *jdrvr.VolumeDesc
+	if nvid, err = jdrvr.NewVolumeDescFromName(req.GetName()); err != nil {
 		return nil, err
 	}
 
@@ -631,7 +631,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// 	// Volume exists
 	// 	l.Tracef("Request for the same volume %s with size %d ", volumeID, vSize)
 
-	// 	out.Volume.VolumeId = volumeID
+	// 	out.Volume.VolumeDesc = volumeID
 	// 	out.Volume.CapacityBytes = volumeSize
 
 	// 	return &out, nil

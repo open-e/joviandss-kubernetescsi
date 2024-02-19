@@ -542,9 +542,67 @@ func (s *RestEndpoint) ListAllSnapshots(f func(string) bool) ([]ResourceSnapshot
 	// return out, nil
 }
 
-func (s *RestEndpoint) GetPoolSnapshots(ctx context.Context, pool string, page *int64) (re *ResultEntries, err RestError) {
+func (s *RestEndpoint) GetPoolSnapshots(ctx context.Context, pool string, page *int64, dc *int64) (results *int64, entries *[]ResourceSnapshotShort, err RestError) {
+	
+	addr := fmt.Sprintf("api/v3/pools/%s/volumes/snapshots", pool)
+	
+	if page != nil || dc != nil {
+		addr += "?"
+	}
 
-	return nil, nil
+	if page != nil {
+		addr += fmt.Sprintf("page=%d", *page)
+	}
+	
+	if dc != nil {
+		if page != nil {
+			addr += "&"
+		}
+		addr += fmt.Sprintf("_dc=%d", *dc)
+	}
+	
+	l := jcom.LFC(ctx)
+	l = l.WithFields(log.Fields{
+		"func": "GetPoolSnapshots",
+		"url": addr,
+	})
+
+	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetAllSnapshotsRCode)
+
+	if err != nil {
+		s.l.Warnln("Unable to get snapshot list for pool %s", pool)
+		return nil, nil, err
+	}
+
+	var rsp = GeneralResponse{}
+
+	if errU := s.unmarshal(body, rsp); errU != nil {
+		return nil, nil, errU
+	}
+
+	switch stat {
+	case CodeOK:
+	case CodeCreated:
+		if rsp.Data != nil {
+
+			data, ok := rsp.Data.(ResultEntries)
+
+			if ok {
+				switch snaps := data.Entries.(type) {
+				case []ResourceSnapshotShort:
+					return &data.Results, &snaps ,nil
+				default:
+				return  nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("Snapshot list is formated in bad format %+v", data.Entries))
+				}
+			}
+			return nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", data))
+		}
+	default:
+		if rsp.Error != nil {
+			return nil, nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+		}
+	}
+	return nil, nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
 }
 
 

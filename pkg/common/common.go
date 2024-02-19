@@ -3,6 +3,9 @@ package common
 import (
 	"fmt"
 	"os"
+	"encoding/base64"
+	"strings"
+
 	"gopkg.in/yaml.v3"
 	
 	// "joviandss-kubernetescsi/pkg/rest"
@@ -16,6 +19,9 @@ var Version string
 
 // Plugin name
 var PluginName = "joviandss-csi-iscsi.open-e.com"
+
+var replacertojbase64 = strings.NewReplacer("+", "_", "/", "-", "=", ".")
+var replacerfromjbase64 = strings.NewReplacer("_", "+", "-", "/", ".", "=")
 
 type RestEndpointCfg struct {
 	Addrs        []string
@@ -139,6 +145,22 @@ func LFC(ctx context.Context) *logrus.Entry {
 	if !ok {
 		panic(fmt.Sprintf("Unable to get logger from context %+v", ctx))
 	}
-    return logger
+	l := logger.WithFields(logrus.Fields{
+		"traceId": ctx.Value("traceId"),
+	})
+
+    return l
 }
 
+func JBase64ToStr(in string) (out string) {
+	out = base64.StdEncoding.EncodeToString([]byte(in))
+	out = replacertojbase64.Replace(out)
+	return out
+}
+
+func JBase64FromSrt(in string) (out string, err error) {
+	out = replacerfromjbase64.Replace(in)
+	bout, err := base64.StdEncoding.DecodeString(out)
+	return string(bout[:]), err
+
+}
