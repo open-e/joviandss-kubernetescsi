@@ -13,16 +13,16 @@ import (
 	jcom "joviandss-kubernetescsi/pkg/common"
 )
 
-type LunID interface {
+type LunDesc interface {
 	Name() string 
 	VDS() string
 }
 
-type SnapshotId struct {
-	name	string
-	vds	string
-	id	string
-}
+// type SnapshotId struct {
+// 	name	string
+// 	vds	string
+// 	id	string
+// }
 
 const MaxVolumeNameLength int = 248
 
@@ -122,10 +122,7 @@ func NewVolumeDescFromName(name string) (*VolumeDesc, error) {
 		if allowedSymbolsRegexp.MatchString(name) {
 			vid.vds = "vp_" + name
 			vid.idFormat = "vp"
-		} else if bname, err := jcom.JBase64FromSrt(name); len(bname) <=240 {
-			if err != nil {
-				return nil, err
-			}
+		} else if bname := jcom.JBase64FromStr(name); len(bname) <=240 {
 			vid.vds = "vb_" + bname
 			vid.idFormat = "vb"
 		} else {
@@ -159,13 +156,13 @@ func NewVolumeDescFromName(name string) (*VolumeDesc, error) {
 // 	return &vid, nil
 // }
 
-func NewVolumeDescFromVD(vds string) (*VolumeDesc, error) {
+func NewVolumeDescFromVDS(vds string) (*VolumeDesc, error) {
 
 	// Get universal volume ID
 	var vd VolumeDesc
 
 	parts := strings.Split(vds, "_")
-	if len(parts) != 2 {
+	if len(parts) < 2 {
 	 	return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Volume descriptor have bad format %s", vds))
 	}
 	
@@ -178,7 +175,7 @@ func NewVolumeDescFromVD(vds string) (*VolumeDesc, error) {
 		vd.name = strings.Join(parts[1:], "")
 	// Volume name in form of base52
 	case "vb":
-		if name, err := jcom.JBase64FromSrt(strings.Join(parts[1:], "")); err != nil {
+		if name, err := jcom.JBase64ToStr(strings.Join(parts[1:], "")); err != nil {
 			return nil, err
 		} else {
 			vd.name = name
@@ -202,7 +199,7 @@ func NewVolumeDescFromVD(vds string) (*VolumeDesc, error) {
 func (vid *VolumeDesc)Name() string {
 
 	if len(vid.name) == 0 {
-	 	panic(fmt.Sprintf("Unable to identify volume name %+v", vid))
+		return vid.VDS()
 	}
 	return vid.name
 }

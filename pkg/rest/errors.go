@@ -20,6 +20,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"strings"
 	"regexp"
 
 	"github.com/sirupsen/logrus"
@@ -36,6 +37,8 @@ const (
 	RestErrorStorageFailureUnknown		= 8
 	RestErrorRequestTimeout			= 9
 	RestErrorArgumentIncorrect		= 10
+	RestErrorResourceBusySnapshotHasClones	= 11
+	RestErrorResourceBusyVolumeHasClones	= 12
 )
 
 type RestError interface {
@@ -63,20 +66,26 @@ const (
 	// resourceExistsMsgPattern = `.*`
 	resourceIsBusyMsgPattern = `In order to delete a zvol, you must delete all of its clones first.`
 	resourceDneMsgPattern = `Zfs resource: (.+\/.+) not found in this collection`
+	snapshotDneMsgPatterm = `cannot open '([\w\-\/]+@[\w\-]+)': dataset does not exist`
 	resourceHasClonesMsgPattern = `^In order to delete a zvol, you must delete all of its clones first\.$`
 	resourceHasSnapshotsMsgPattern = `^cannot destroy '.*\/.*': volume has children.use '-r' to destroy the following datasets:\n.*`
+	snapshotHasDatasetsMsgPattern = `^cannot destroy '([\w\-\/]+@[\w\-]+)': snapshot has dependent clones\nuse '-R' to destroy the following datasets:(.*)`
 	resourceHasClonesClassPattern = `^opene.storage.zfs.ZfsOeError$`
 	resourceHasSnapshotsClassPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
+	zfsCmdErrorPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
 )
 
 var resourceExistsMsgRegexp = regexp.MustCompile(resourceExistsMsgPattern)
 var cloneCreateFailureDatasetExistsRegexp = regexp.MustCompile(cloneCreateFailureDatasetExistsPattern)
 var resourceIsBusyMsgRegexp = regexp.MustCompile(resourceIsBusyMsgPattern)
 var resourceDneMsgRegexp = regexp.MustCompile(resourceDneMsgPattern)
+var snapshotDneMsgRegexp = regexp.MustCompile(snapshotDneMsgPatterm)
 var resourceHasClonesMsgRegexp = regexp.MustCompile(resourceHasClonesMsgPattern)
 var resourceHasSnapshotsMsgRegexp = regexp.MustCompile(resourceHasSnapshotsMsgPattern)
+var snapshotHasDatasetsMsgRegexp = regexp.MustCompile(snapshotHasDatasetsMsgPattern)
 var resourceHasClonesClassRegexp = regexp.MustCompile(resourceHasClonesClassPattern)
 var resourceHasSnapshotsClassRegexp = regexp.MustCompile(resourceHasSnapshotsClassPattern)
+var zfsCmdErrorRegexp = regexp.MustCompile(zfsCmdErrorPattern)
 
 
 func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restError {
@@ -96,10 +105,30 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 
 		switch *err.Errno {
 
+			case 0:
+				if err.Message != nil {
+					// Check if that is DNE message
+					if snapshotDneMsgRegexp.MatchString(*err.Message) {
+						if err.Class != nil {
+							if zfsCmdErrorRegexp.MatchString(*err.Class) {
+								return &restError { code: RestErrorResourceDNE }
+							}
+						}
+						return &restError { code: RestErrorResourceDNE }
+					}
+				}
+
 			case 1:
 				if err.Message != nil {
 					if resourceDneMsgRegexp.MatchString(*err.Message) {
-						return &restError { code: RestErrorResourceDNE }
+						match := resourceDneMsgRegexp.FindStringSubmatch(*err.Message)
+						if len(match) > 1 {
+							msg := fmt.Sprintf("Resource %s not found", match[1])
+							l.Warnf(msg)
+							return &restError { code: RestErrorResourceDNE, msg: msg }
+						}
+						l.Warn("Resource not found")
+						return &restError { code: RestErrorResourceDNE, msg: *err.Message }
 					}
 					if resourceExistsMsgRegexp.MatchString(*err.Message) {
 						return &restError { code: RestErrorResourceExists }
@@ -108,7 +137,6 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 
 			case 5:
 				if err.Message != nil {
-
 					if resourceExistsMsgRegexp.MatchString(*err.Message) {
 						l.Debug("Res exists!")
 
@@ -117,13 +145,24 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 				}
 			case 100:
 				if err.Message != nil {
-					l.Debug("Error 5")
 					if resourceExistsMsgRegexp.MatchString(*err.Message) {
 						l.Debug("Resource exists!")
 						return &restError { code: RestErrorResourceExists }
 					} else if cloneCreateFailureDatasetExistsRegexp.MatchString(*err.Message) {
 						l.Debug("Clone exists!")
 						return &restError { code: RestErrorResourceExists }
+					}
+				}
+			case 1000:
+				if err.Message != nil {
+					if snapshotHasDatasetsMsgRegexp.MatchString(*err.Message) {
+						match := resourceDneMsgRegexp.FindStringSubmatch(*err.Message)
+						datasets := snapshotHasDatasetsMsgRegexp.SubexpIndex("datasets")
+						snapshot := snapshotHasDatasetsMsgRegexp.SubexpIndex("snapshot")
+
+						msg := fmt.Sprintf("Snapshot %s has dependent resources %s", match[snapshot] ,strings.Replace(match[datasets], "\n", " ", -1))
+						l.Debug(msg)
+						return &restError { code: RestErrorResourceBusySnapshotHasClones, msg: msg}
 					}
 				}
 		}
@@ -136,10 +175,10 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 				if len(match) > 1 {
 					msg := fmt.Sprintf("Resource %s not found", match[1])
 					l.Warnf(msg)
-					return &restError { code: RestErrorResourceBusy, msg: msg }
+					return &restError { code: RestErrorResourceDNE, msg: msg }
 				}
 				l.Warn("Resource not found")
-				return &restError { code: RestErrorResourceBusy, msg: *err.Message }
+				return &restError { code: RestErrorResourceDNE, msg: *err.Message }
 			}
 		}
 	}
@@ -157,14 +196,12 @@ func (err *restError) Error() (out string) {
 
 	case RestErrorRequestMalfunction:
 		out = fmt.Sprintf("Failure in sending data to storage: %s", err.msg)
-
 	case RestErrorRPM:
 		out = fmt.Sprintf("Failure during processing response from storage: %s", err.msg)
 	case RestErrorResourceDNE:
 		out = fmt.Sprintf("Resource %s do not exists", err.msg)
 	case RestErrorResourceExists:
 		out = fmt.Sprintf("Object exists: %s", err.msg)
-
 	case RestErrorStorageFailureUnknown:
 		out = fmt.Sprintf("Storage failes with unknown error: %s", err.msg)
 

@@ -152,15 +152,16 @@ func LFC(ctx context.Context) *logrus.Entry {
     return l
 }
 
-func JBase64ToStr(in string) (out string) {
+//Takes inut string and converts it to JBase64 string
+func JBase64FromStr(in string) (out string) {
 	out = base64.StdEncoding.EncodeToString([]byte(in))
 	out = replacertojbase64.Replace(out)
 	return out
 }
 
-func JBase64FromSrt(in string) (out string, err error) {
+//Takes JBase64 input and extracts original string
+func JBase64ToStr(in string) (out string, err error) {
 	out = replacerfromjbase64.Replace(in)
 	bout, err := base64.StdEncoding.DecodeString(out)
 	return string(bout[:]), err
-
 }

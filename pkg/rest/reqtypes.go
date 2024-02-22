@@ -122,3 +122,8 @@ type CreateSnapshotDescriptor struct {
 	Recursive    bool			`json:"recursive"` // boolean indicating if recursively create snapshots of all descendant datasets
 	Properties   CreateSnapshotProperties	`json:"properties,omitempty"` //object containing properties of new snapshot. 
 }
+
+type DeleteSnapshotDescriptor struct {
+	RecursivelyChildren	bool	`json:"recursively_children,omitempty"`
+        ForceUnmount		bool	`json:"force_umount,omitempty"`
+}

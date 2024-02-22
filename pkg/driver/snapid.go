@@ -6,105 +6,152 @@ import (
 	"encoding/base64"
 	"crypto/sha256"
 	
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	jcom "joviandss-kubernetescsi/pkg/common"
 	jrest "joviandss-kubernetescsi/pkg/rest"
 )
 
 
 type SnapshotDesc struct {
-	lid LunID	// volume that this snapshot is made from
+	ld	LunDesc	// volume that this snapshot is made from
 	name string	// name given by user
 	sds string	// how snapshot is named inside joviandss
+	id string	// that is sds without idFormat
 	idFormat string
-	csiID string	// this id getsend to kubernetes
+	// This id get formed by combining vds and sds encoded in base64 and separated by underscore
+	csiID string	// this id provided to kubernetes
 }
 
-func NewSnapshotDescFromName(lid LunID, name string) (*SnapshotDesc) {
+func NewSnapshotDescFromName(lid LunDesc, name string) (*SnapshotDesc) {
 
 	// Get universal volume ID
 	var sd SnapshotDesc
 
-	psid.lid = lid
-	psid.name = name
-	
+	sd.ld = lid
+	sd.name = name
+
 	if len(name) <= 240 {
-		if allowedSymbolsRegexp.MatchString(name) {
-			sd.vds = "sp_" + name
+		if allowedSymbolsRegexp.MatchString(name) && len(name) < 240 {
+			sd.sds = "sp_" + name
 			sd.idFormat = "sp"
-		} else if bname, err := jcom.JBase64FromSrt(name); len(bname) <=240 {
-			if err != nil {
-				return nil, err
-			}
-			sd.vds = "sb_" + bname
+		} else if bname := jcom.JBase64FromStr(name); len(bname) <=240 {
+			sd.sds = "sb_" + bname
 			sd.idFormat = "sb"
 		} else {
 			preID := []byte(name)
 			rawID := sha256.Sum256(preID)
-			sd.vds	= fmt.Sprintf("ss_%X", rawID)
+			sd.sds	= fmt.Sprintf("ss_%X", rawID)
 			sd.idFormat = "ss"
 		}
 	} else {
 		preID := []byte(name)
 		rawID := sha256.Sum256(preID)
-		vid.vds	= fmt.Sprintf("ss_%X", rawID)
-		vid.idFormat = "ss"
+		sd.sds	= fmt.Sprintf("ss_%X", rawID)
+		sd.idFormat = "ss"
 	}
 
-	psid.id = strings.ToLower(fmt.Sprintf("%X", sha256.Sum256([]byte(name))))
-
-	psid.psid = fmt.Sprintf("s_%s", psid.id)
-	psid.csiID = fmt.Sprintf("%s_%s",
-		base64.StdEncoding.EncodeToString([]byte(psid.lid.VDS())),
-		base64.StdEncoding.EncodeToString([]byte(psid.psid)))
-	return &psid
+	sd.csiID = fmt.Sprintf("%s_%s",
+		base64.StdEncoding.EncodeToString([]byte(sd.ld.VDS())),
+		base64.StdEncoding.EncodeToString([]byte(sd.sds)))
+	return &sd
 }
 
+// parseSDS take sds string as 
+func (sd *SnapshotDesc)parseSDS(sds string) (error) {
 
+	parts := strings.Split(sds, "_")
+
+	if len(parts) < 2 {
+	 	return status.Error(codes.InvalidArgument, fmt.Sprintf("Snapshot descriptor have bad format %s", sds))
+	}
+
+	sd.sds = sds
+
+	switch parts[0] {
+	// Volume name in plain form
+	case "sp":
+		sd.idFormat = "sp"
+		sd.name = strings.Join(parts[1:], "")
+	// Volume name in form of base52
+	case "sb":
+		if name, err := jcom.JBase64ToStr(strings.Join(parts[1:], "")); err != nil {
+			return err
+		} else {
+			sd.name = name
+		}
+		sd.idFormat = "sb"
+	// Volume name, by default in sha512 hash
+	case "s":
+		sd.name = ""
+		sd.idFormat = "s"
+	// Volume name in form of sha512 hash
+	case "ss":
+		sd.name = ""
+		sd.idFormat = "ss"
+	default:
+	 	return status.Error(codes.InvalidArgument, fmt.Sprintf("Unable to identify type of snapshot naming %s", sds))
+	}
+
+	return nil
+}
+
+// NewSnapshotDescFromCSIID takes as argument csi snapshot id that is supplied to kubernetes and
+// initialize desctiptor with it
 func NewSnapshotDescFromCSIID(csiid string) (*SnapshotDesc, jrest.RestError) {
-	var psid SnapshotDesc
-	
+	var sd SnapshotDesc
+
+	sd.csiID = csiid
+
 	csiidl	:= strings.Split(csiid, "_")
 	if len(csiidl) != 2 {
 		return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to process snapshot token %s", csiid))
 	}
 
-	if vid, err := base64.StdEncoding.DecodeString(csiidl[0]); err != nil {
+	if vds, err := base64.StdEncoding.DecodeString(csiidl[0]); err != nil {
 		return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to process snapshot token %s, decoding failed %s", csiid, err.Error()))
 	} else {
-		if psid.lid, err = NewVolumeIdFromId(string(vid)); err != nil {
+		if sd.ld, err = NewVolumeDescFromVDS(string(vds)); err != nil {
 			return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to restore voprocess snapshot token %s, decoding failed %s", csiid, err.Error())) 
 		}
 	}
-	if err != nil {
-		return nil
+	
+	if sdb , err := base64.StdEncoding.DecodeString(csiidl[1]); err != nil {
+		return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to process snapshot token %s, decoding failed %s", csiid, err.Error()))
+	} else {
+		sd.sds = string(sdb)
 	}
-	psid	:= base64.StdEncoding.DecodeString(csiidl[1])
 
-	psid.lid = lid
-	psid.name = name
-
-	psid.id = strings.ToLower(fmt.Sprintf("%X", sha256.Sum256([]byte(name))))
-
-	psid.psid = fmt.Sprintf("s_%s", psid.id)
-	psid.csiID = fmt.Sprintf("%s_%s",
-		base64.StdEncoding.EncodeToString([]byte(psid.lid.VID())),
-		base64.StdEncoding.EncodeToString([]byte(psid.psid)))
-	return &psid
+	sd.parseSDS(sd.sds)
+	return &sd, nil
 }
-
-// func NewSnapshotDescFromId(lid LunID, id string) (*SnapshotDesc) {
-// 
-// 	// Get universal volume ID
-// 	var vid VolumeId
-// 
-// 	if len(id) != 64 {
-// 		return nil, status.Error(codes.InvalidArgument, "Incorrect snapshot ID") 
-// 	}
-// 	vid.name = ""
-// 	vid.id = id
-// 	vid.vid = "csi_s_" + vid.id
-// 	return &vid, nil
-// }
 
 func (ps *SnapshotDesc)String () string {
 	return fmt.Sprintf("%s_%s")
 }
+
+func (sd *SnapshotDesc)Name() string {
+
+	if len(sd.name) == 0 {
+	 	panic(fmt.Sprintf("Unable to identify snapshot name %+v", sd))
+	}
+	return sd.name
+}
+
+func (sd *SnapshotDesc)SDS() string {
+
+	if len(sd.sds) == 0 {
+	 	panic(fmt.Sprintf("Unable to identify snapshot descriptor string %+v", sd))
+	}
+	return sd.sds
+}
+
+func (sd *SnapshotDesc)CSIID() string {
+
+	if len(sd.csiID) == 0 {
+	 	panic(fmt.Sprintf("Unable to identify snapshot csi id %+v", sd))
+	}
+	return sd.sds
+}
+

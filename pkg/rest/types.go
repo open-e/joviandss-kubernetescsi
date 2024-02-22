@@ -18,8 +18,14 @@ under the License.
 package rest
 
 import (
-    "time"
+	"time"
+	"regexp"
 )
+
+const resourceNamePattern = `/([\w\-\/]+)`
+
+var resourceNameRegexp = regexp.MustCompile(resourceNamePattern)
+
 
 type GeneralResponse struct {
 	Data			interface{}	`json:"data,omitempty"`
@@ -123,7 +129,7 @@ type ResourceSnapshot struct {
 	VolSize           	int       	`json:"volsize,omitempty"`
 	CreateTxg         	int       	`json:"createtxg,omitempty"`
 	GUID              	string    	`json:"guid,omitempty"`
-	CompressRatio     	float64   	`json:"compressratio,omitempty"`
+	CompressRatio     	string   	`json:"compressratio,omitempty"`
 	RootContext       	string    	`json:"rootcontext,omitempty"`
 	Encryption        	string    	`json:"encryption,omitempty"`
 	DefContext        	string    	`json:"defcontext,omitempty"`
@@ -131,7 +137,7 @@ type ResourceSnapshot struct {
 	Type              	string    	`json:"type,omitempty"`
 	SecondaryCache    	string    	`json:"secondarycache,omitempty"`
 	Used              	int       	`json:"used,omitempty"`
-	RefCompressRatio  	float64   	`json:"refcompressratio,omitempty"`
+	RefCompressRatio  	string   	`json:"refcompressratio,omitempty"`
 	FSContext         	string    	`json:"fscontext,omitempty"`
 	ObjSetID          	int       	`json:"objsetid,omitempty"`
 	Name              	string    	`json:"name,omitempty"`
@@ -140,7 +146,20 @@ type ResourceSnapshot struct {
 	MLSLabel          	string    	`json:"mlslabel,omitempty"`
 	LogicalReferenced 	int       	`json:"logicalreferenced,omitempty"`
 	Context           	string    	`json:"context,omitempty"`
+	Clones			string		`json:"clones,omitempty"`
 }
+
+func (s *ResourceSnapshot)ClonesNames() (clones []string) {
+	if len(s.Clones) > 0 {
+		matches := resourceNameRegexp.FindAllStringSubmatch(s.Clones, -1)
+
+		for _, v := range matches {
+			clones = append(clones, v[1])
+		}
+	}
+	return clones
+}
+
 
 type ResourceSnapshotShortProperties struct {
 	Creation          	time.Time	`json:"creation,omitempty"`

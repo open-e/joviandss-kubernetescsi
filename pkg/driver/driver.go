@@ -18,7 +18,7 @@ type CSIDriver struct {
 }
 
 
-func (d *CSIDriver) cloneLUN(ctx context.Context, pool string, source LunID, clone LunID, snap *SnapshotDesc) jrest.RestError {
+func (d *CSIDriver) cloneLUN(ctx context.Context, pool string, source LunDesc, clone LunDesc, snap *SnapshotDesc) jrest.RestError {
 	
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
@@ -27,6 +27,7 @@ func (d *CSIDriver) cloneLUN(ctx context.Context, pool string, source LunID, clo
 	
 	l.Debugf("Start cloning")
 
+	var sds string
 	if snap == nil {
 		var snapdata = jrest.CreateSnapshotDescriptor{SnapshotName: clone.VDS()} 
 
@@ -39,17 +40,20 @@ func (d *CSIDriver) cloneLUN(ctx context.Context, pool string, source LunID, clo
 			//	is the same as name of the clone, then return error
 			//	if there are no clones snapshot have to be deleteted and recreated
 		}
-		snap = 
+		sds = clone.VDS()
+	}else {
+		sds = snap.sds
 	}
-	var clonedata = jrest.CloneVolumeDescriptor{Name: clone.VDS(), Snapshot:clone.VDS() }
+
+	var clonedata = jrest.CloneVolumeDescriptor{Name: clone.VDS(), Snapshot: sds }
 	err := d.re.CreateClone(ctx, pool, source.VDS(), clonedata)
 	return err
 }
 
-func (d *CSIDriver) CreateVolume(ctx context.Context, pool string, nvid *VolumeDesc, volumeSize int64) jrest.RestError {
+func (d *CSIDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDesc, volumeSize int64) jrest.RestError {
 	
 	vd := jrest.CreateVolumeDescriptor{
-		Name: nvid.VID(),
+		Name: nvd.VDS(),
 		Size: fmt.Sprintf("%d", volumeSize),
 	}
 
@@ -58,14 +62,69 @@ func (d *CSIDriver) CreateVolume(ctx context.Context, pool string, nvid *VolumeD
 	return err
 }
 
-func (d *CSIDriver) CreateVolumeFromSnapshot(ctx context.Context, pool string, sid *SnapshotId, nvid *VolumeDesc) jrest.RestError {
-
-	return d.cloneLUN(ctx, pool, sid, nvid)
+func (d *CSIDriver) CreateVolumeFromSnapshot(ctx context.Context, pool string, sd *SnapshotDesc, nvd *VolumeDesc) jrest.RestError {
+	
+	var clonedata = jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: sd.SDS() }
+	return d.re.CreateClone(ctx, pool, sd.ld.VDS(), clonedata)
 }
 
-func (d *CSIDriver) CreateVolumeFromVolume(ctx context.Context, pool string, vid *VolumeDesc, nvid *VolumeDesc) jrest.RestError {
+func (d *CSIDriver) CreateVolumeFromVolume(ctx context.Context, pool string, vd *VolumeDesc, nvd *VolumeDesc) (err jrest.RestError) {
 
-	return d.cloneLUN(ctx, pool, vid, nvid)
+	var snapdata = jrest.CreateSnapshotDescriptor{SnapshotName: nvd.VDS()}
+
+	if err := d.re.CreateSnapshot(ctx, pool, vd.VDS(), &snapdata); err != nil {
+		code := err.GetCode()
+		// We are not able to create this snapshot for some reason
+		if code == jrest.RestErrorResourceExists {
+
+			snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUnmount:true}
+			if err = d.re.DeleteSnapshot(ctx, pool, vd.VDS(), nvd.VDS(), snapdeldata); err != nil {
+				code := err.GetCode()
+				// If that is true that means that somebody else already trying to crete volume with such name from particular snapshot
+				if code == jrest.RestErrorResourceBusySnapshotHasClones {
+					// We gona check if volume name is exactly volume that we have to create before returning success
+					if snap, errGS := d.re.GetVolumeSnapshot(ctx, pool, vd.VDS(), nvd.VDS()); errGS != nil {
+						// That is a weird, previously we failed because snapshot existed and now it is gone
+						// looks like some king of race condition
+						if errGS.GetCode() == jrest.RestErrorResourceDNE {
+							return  jrest.GetError(jrest.RestErrorStorageFailureUnknown,
+										fmt.Sprintf("It looks like volume %s is in process of creation by other processat", nvd.Name()))
+						}
+						return jrest.GetError(jrest.RestErrorStorageFailureUnknown,
+									fmt.Sprintf("Unable to create intermediate snapshot %s in order to create volume %s, snapshot is not responsive: %s",
+									nvd.VDS(), nvd.Name(), errGS.Error()))
+					} else {
+						// Target volume already created
+						if clones := snap.ClonesNames(); len(clones) == 1 {
+							if clones[0] == nvd.VDS() {
+								return jrest.GetError(jrest.RestErrorResourceExists, fmt.Sprintf("Volume %s created from %s already exists", nvd.Name(), vd.Name()))
+							}
+						} else {
+							return jrest.GetError(jrest.RestErrorStorageFailureUnknown, fmt.Sprintf("Intermediate snapshot have multiple clones: %+v, that should never happen", clones))
+						}
+					}
+				}
+				return GetError(jrest.RestErrorStorageFailureUnknown, fmt.Sprintf( "Unablet to clear intermediate snapshot %s, please delete it manualy for Volume ", nvd.Name(), vd.Name())
+			}
+			return err
+		} else {
+			
+			return err
+		}
+		// TODO: check if specific snapshot have clones, if it does and name of clone
+		//	is the same as name of the clone, then return error
+		//	if there are no clones snapshot have to be deleteted and recreated
+	}
+
+	defer func() {
+	        if err != nil {
+            // Cleanup because something failed
+			d.re.DeleteSnapshot(ctx, vd.VDS(), nvd.VDS())
+		}
+        // Always release resources
+        releaseResource(resource)
+    }()
+	return d.cloneLUN(ctx, pool, vd, nvd)
 }
 
 

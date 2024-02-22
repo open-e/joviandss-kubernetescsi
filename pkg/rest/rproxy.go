@@ -85,11 +85,11 @@ type RestProxyInterface interface {
 func (rp *RestProxy) Send(ctx context.Context, method string, path string, data interface{}, ok int) (int, []byte, RestError) {
 	var res *http.Response
 	// var err restError
+	l := jcom.LFC(ctx)
 	
-	l := rp.l.WithFields(logrus.Fields{
-		"func": "GetVolume",
-		"traceId": ctx.Value("traceId"),
-		"url": path,
+	l = l.WithFields(logrus.Fields{
+		"func": "Send",
+		"section": "rest",
 		"method": method,
 	})
 
