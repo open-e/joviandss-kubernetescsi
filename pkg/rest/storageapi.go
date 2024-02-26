@@ -232,20 +232,20 @@ func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol Create
 //
 // set rSnapshots to true in order to delete snapshots
 func (s *RestEndpoint) DeleteVolume(ctx context.Context, pool string, vname string, data DeleteVolumeDescriptor) RestError {
-	
+
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s", pool, vname)
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
 		"func": "DeleteVolume",
 		"url": addr,
-
+		"section": "rest",
 	})
 
 	l.Debugln("Deleting volume ", vname)
 
 	stat, body, err := s.rp.Send(ctx, "DELETE", addr, data, DeleteVolumeRCode)
-	
+
 	if err != nil {
 		s.l.Warnln("Unable to delete volume: ", vname)
 		return err
@@ -254,7 +254,7 @@ func (s *RestEndpoint) DeleteVolume(ctx context.Context, pool string, vname stri
 	if stat == CodeOK || stat == CodeNoContent {
 		return nil
 	}
-	
+
 	return s.getError(ctx, body)
 }
 

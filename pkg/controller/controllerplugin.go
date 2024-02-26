@@ -78,7 +78,7 @@ type ControllerPlugin struct {
 	volumesInProcess	map[string]bool
 	
 	pool			string
-	d			jdrvr.CSIDriver
+	d			*jdrvr.CSIDriver
 	re			jrest.RestEndpoint
 	iscsiEendpointCfg	jcom.ISCSIEndpointCfg
 	// TODO: add iscsi endpoint
@@ -189,16 +189,19 @@ func GetControllerPlugin(cp * ControllerPlugin, cfg *jcom.JovianDSSCfg, l *log.L
 }
 
 // GetControllerPlugin get plugin information
-func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (
-	err error,
-) {
+func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err error) {
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 	var e error
 	if cp.l, e = jcom.GetLogger(cfg.LLevel, cfg.LDest); e != nil {
 		fmt.Fprintln(os.Stderr, "Unable to init loging because:", e)
 		os.Exit(1)
 	}
-	cp.le =cp.l.WithFields(log.Fields{"pool": cfg.Pool})
+	cp.le =cp.l.WithFields(log.Fields{"section": "controller", "traceId": "setup" })
+
+	if cp.d, err = jdrvr.NewJovianDSSCSIDriver(&cfg.RestEndpointCfg, cp.le); err != nil {
+		return err
+	}
+
 	jrest.SetupEndpoint(&cp.re, &cfg.RestEndpointCfg, cp.le)
 
 
@@ -263,6 +266,7 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (
 
 	return nil
 }
+
 func (cp *ControllerPlugin) lockVolume(vID string) error {
 	var err error
 	err = nil
@@ -411,7 +415,7 @@ func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.R
 }
 
 
-func (cp *ControllerPlugin) createVolumeFromSnapshot(sid jdrvr.SnapshotId, nvid jdrvr.VolumeDesc) error {
+func (cp *ControllerPlugin) createVolumeFromSnapshot(sd jdrvr.SnapshotDesc, nvid jdrvr.VolumeDesc) error {
 //	l := cp.l.WithFields(logrus.Fields{
 //		"func": "createVolumeFromSnapshot",
 //	})
@@ -451,18 +455,19 @@ func (cp *ControllerPlugin) createVolumeFromSnapshot(sid jdrvr.SnapshotId, nvid 
 	return nil
 }
 
-func (cp *ControllerPlugin) createVolumeFromVolume(sid jdrvr.SnapshotId, nvid jdrvr.VolumeDesc) error {
+func (cp *ControllerPlugin) createVolumeFromVolume(sd jdrvr.SnapshotDesc, nvid jdrvr.VolumeDesc) error {
 	l := cp.l.WithFields(log.Fields{
 		"func": "createVolumeFromVolume",
 	})
-	msg := fmt.Sprintf("Create %s From %s", sid.ID(), nvid.ID())
+
+	msg := fmt.Sprintf("Create %s From %s", sd.Name(), nvid.Name())
 	l.Tracef(msg)
 
 	// csname, err := cp.createConcealedSnapshot(srcVol)
 	// if err != nil {
 	// 	return err
 	// }
-	err := cp.createVolumeFromSnapshot(sid, nvid)
+	err := cp.createVolumeFromSnapshot(sd, nvid)
 	return err
 }
 
@@ -493,7 +498,7 @@ func (cp *ControllerPlugin) getVolumeSize(vname string) (int64, error) {
 	return 0, nil
 }
 
-func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvid *jdrvr.VolumeDesc, size int64, vSource *csi.VolumeContentSource) error {
+func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.VolumeDesc, size int64, vSource *csi.VolumeContentSource) error {
 	
 	l := jcom.LFC(ctx)
 	
@@ -503,30 +508,30 @@ func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvid *jdrvr.Vol
 		if srcSnapshot := vSource.GetSnapshot(); srcSnapshot != nil {
 			// Snapshot
 			sourceSnapshotID := srcSnapshot.GetSnapshotId()
-			sid, err := jdrvr.NewSnapshotIdFromName(sourceSnapshotID)	
+			sd, err := jdrvr.NewSnapshotDescFromCSIID(sourceSnapshotID)	
 			if err != nil {
 				return err
 			}
 
-			l.Debugf("Creating volume %s from volume %s", nvid.ID(), sid.ID())
-			err = cp.d.CreateVolumeFromSnapshot(ctx, cp.pool, sid, nvid)
+			l.Debugf("Creating volume %s from volume %s", nvd.Name(), sd.Name())
+			err = cp.d.CreateVolumeFromSnapshot(ctx, cp.pool, sd, nvd)
 
 		} else if srcVolume := vSource.GetVolume(); srcVolume != nil {
 			// Volume
 			sourceVolumeID := srcVolume.GetVolumeId()
 			// Check if volume exists
-			vid, err := jdrvr.NewVolumeDescFromId(sourceVolumeID)
+			vd, err := jdrvr.NewVolumeDescFromVDS(sourceVolumeID)
 			if err != nil {
 				return err
 			}
-			l.Debugf("Creating volume %s from volume %s", vid, nvid)
-			err = cp.d.CreateVolumeFromVolume(ctx, cp.pool, vid, nvid)
+			l.Debugf("Creating volume %s from volume %s", nvd.Name(), vd.Name())
+			err = cp.d.CreateVolumeFromVolume(ctx, cp.pool, vd, nvd)
 		} else {
 			return status.Errorf(codes.Unimplemented,
 				"Unable to create volume from other sources")
 		}
 	} else {
-		err = cp.d.CreateVolume(ctx, cp.pool, nvid, size)
+		err = cp.d.CreateVolume(ctx, cp.pool, nvd, size)
 	}
 
 	
@@ -551,10 +556,11 @@ func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvid *jdrvr.Vol
 
 // CreateVolume create volume with properties
 func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-
+	
 	l := cp.l.WithFields(log.Fields{
 		"request": "CreateVolume",
-	        "traceId": ctx.Value("traceId"),
+		"func": "CreateVolume",
+		"section": "controller",
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
@@ -594,10 +600,11 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		if maxVSize < minSupportedVolumeSize {
 			return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Volume size must be at least %d bytes", minSupportedVolumeSize))
 		}
-		l.Tracef("Minimal volume size %d too small, using minila allowed volume size: %d", volumeSize, minSupportedVolumeSize)
+		l.Debugf("Minimal volume size %d too small, using minila allowed volume size: %d", volumeSize, minSupportedVolumeSize)
 		volumeSize = minSupportedVolumeSize
 	}
 
+	l.Debugf("Create volume capability check done")
 //	l.WithField( Tracef("Create volume %+v of size %+v",
 //		vName,
 //		volumeSize)
@@ -638,7 +645,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	// }
 	//////////////////////////////////////////////////////////////////////////////
-	l.Tracef("req: %+v ", req)
+	l.Debugf("Create volume with req: %+v ", req)
 
 	// Create volume
 	
@@ -649,15 +656,15 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, err
 	}
 
-	out.Volume.VolumeId = nvid.ID()
+	out.Volume.VolumeId = nvid.VDS()
 	out.Volume.CapacityBytes = volumeSize
 
 	return &out, nil
 }
 
 // getVolumeSnapshots return array of public volume snapshots
-func (cp *ControllerPlugin) getVolumeSnapshots(vname string) ([]jrest.SnapshotShort, error) {
-	return nil, nil
+//func (cp *ControllerPlugin) getVolumeSnapshots(vname string) ([]jrest.SnapshotShort, error) {
+//	return nil, nil
 	// filter := func(s string) bool {
 	// 	snameT := strings.Split(s, "_")
 	// 	if "c_" == s[:2] {
@@ -686,11 +693,11 @@ func (cp *ControllerPlugin) getVolumeSnapshots(vname string) ([]jrest.SnapshotSh
 	// 	err = status.Errorf(codes.Internal, "Unknown internal error")
 	// }
 	// return nil, err
-}
+//}
 
 // getVolumeConcealedSnapshots return array of concealed volume snapshots
-func (cp *ControllerPlugin) getVolumeConcealedSnapshots(vname string) ([]jrest.SnapshotShort, error) {
-	return nil, nil
+//func (cp *ControllerPlugin) getVolumeConcealedSnapshots(vname string) ([]jrest.SnapshotShort, error) {
+//	return nil, nil
 
 	// filter := func(s string) bool {
 	// 	if "c_" == s[:2] {
@@ -711,12 +718,12 @@ func (cp *ControllerPlugin) getVolumeConcealedSnapshots(vname string) ([]jrest.S
 	// 	err = status.Errorf(codes.Internal, "Unknown internal error")
 	// }
 	// return nil, err
-}
+//}
 
 // getVolumeAllSnapshots return array of concealed volume snapshots
-func (cp *ControllerPlugin) getVolumeAllSnapshots(vname string) ([]jrest.SnapshotShort, error) {
+//func (cp *ControllerPlugin) getVolumeAllSnapshots(vname string) ([]jrest.SnapshotShort, error) {
 
-	return nil, nil
+//	return nil, nil
 	
 	// filter := func(s string) bool {
 	// 	return true
@@ -734,10 +741,10 @@ func (cp *ControllerPlugin) getVolumeAllSnapshots(vname string) ([]jrest.Snapsho
 	// 	err = status.Errorf(codes.Internal, "Internal error %s", rErr.Error())
 	// }
 	// return nil, err
-}
+//}
 
-func (cp *ControllerPlugin) gcVolume(vname string) error {
-	return nil
+//func (cp *ControllerPlugin) gcVolume(vname string) error {
+//	return nil
 	// if err := cp.lockVolume(vname); err != nil {
 	// 	return err
 	// }
@@ -794,7 +801,7 @@ func (cp *ControllerPlugin) gcVolume(vname string) error {
 	// }
 
 	// return nil
-}
+//}
 
 // concealVolume tryes to conceal volume
 //
@@ -802,7 +809,7 @@ func (cp *ControllerPlugin) gcVolume(vname string) error {
 // checks if volume have and public clones
 // conceal volume if it has public clones
 // deletes volume if it has no public clones and call concealVolume on its parrent
-func (cp *ControllerPlugin) concealVolume(vID string) error {
+//func (cp *ControllerPlugin) concealVolume(vID string) error {
 	// l := cp.l.WithFields(logrus.Fields{
 	// 	"func": "concealVolume",
 	// })
@@ -848,15 +855,18 @@ func (cp *ControllerPlugin) concealVolume(vID string) error {
 	// 	return status.Error(codes.Internal, msg)
 	// }
 
-	return nil
-}
+//	return nil
+//}
 
 // DeleteVolume deletes volume or hides it for later deletion
 func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
+	
 	l := cp.l.WithFields(log.Fields{
+		"request": "DeleteVolume",
 		"func": "DeleteVolume",
-	        "traceId": ctx.Value("traceId"),
+		"section": "controller",
 	})
+	ctx = jcom.WithLogger(ctx, l)
 
 	// Check arguments
 	if len(req.GetVolumeId()) == 0 {
@@ -868,33 +878,41 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		return nil, err
 	}
 
-	vID := req.VolumeId
-	l.Tracef("Deleting volume %s", vID)
-	
-	// Try to delete without recursiuon
-	var dvd = jrest.DeleteVolumeDescriptor{
-		RecursivelyChildren: false,
-		ForceUmount: true,
-	}
-	if err := cp.re.DeleteVolume(ctx, cp.pool, vID, dvd); err == nil {
-		return &csi.DeleteVolumeResponse{}, nil
-	} else {
-		switch err.GetCode() {
-		case jrest.RestErrorResourceBusy:
-			return nil, status.Error(codes.FailedPrecondition, "In order to delete a volume, you must delete all of its clones first")
-		case jrest.RestErrorResourceDNE:
-			l.Warnf("Volume %s was deleted before", vID)
+	if vd, rerr := jdrvr.NewVolumeDescFromVDS(req.VolumeId); rerr == nil {
+
+		l.Debugf("Deleting volume %s", vd.Name())
+		
+		// Try to delete without recursiuon
+		if err := cp.d.DeleteVolume(ctx, cp.pool, vd); err == nil {
 			return &csi.DeleteVolumeResponse{}, nil
-		default:
-			return nil, status.Errorf(codes.Internal, err.Error())
+		} else {
+			switch err.GetCode() {
+			case jrest.RestErrorResourceBusy:
+				return nil, status.Error(codes.FailedPrecondition, "In order to delete a volume, you must delete all of its clones first")
+			case jrest.RestErrorResourceDNE:
+				l.Warnf("Volume %s was deleted before", vd)
+				return &csi.DeleteVolumeResponse{}, nil
+			default:
+				return nil, status.Errorf(codes.Internal, err.Error())
+			}
 		}
+	} else {
+		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("Incorent volume id %s", req.VolumeId))
+
 	}
 }
 
 //ListVolumes return the list of volumes
 func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
 	maxEnt := int64(req.GetMaxEntries())
-	sToken := req.GetStartingToken()
+
+	l := cp.l.WithFields(log.Fields{
+		"request": "ListVolumes",
+		"func": "ListVolumes",
+		"section": "controller",
+	})
+	ctx = jcom.WithLogger(ctx, l)
+
 	// return nil, nil
 	////////////////////////////////////////////////////////////////////////////////////////
 	// Verify arguments
@@ -903,14 +921,9 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 		return nil, status.Errorf(codes.Internal, "Number of Entries must not be negative.")
 	}
 
-	if len(sToken) > 0 {
-		_, err := cp.getVolume(ctx, sToken)
-		if err != nil {
-			return nil, status.Errorf(codes.Aborted, "%s", err.Error())
-		}
-	}
-
 	// //////////////////////////////////////////////////////////////////////////////
+	
+	l.Debugf("Listing volumes by <%d> at a time starting with token %s", req.MaxEntries,req.StartingToken)
 
 	var volumes []jrest.ResourceVolume
 	if err := cp.re.ListVolumes(ctx, cp.pool, &volumes); err != nil {

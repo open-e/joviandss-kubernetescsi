@@ -136,18 +136,22 @@ type JDSSLoggerContextID int
 const loggerKey JDSSLoggerContextID = iota
 
 func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
-    return context.WithValue(ctx, loggerKey, logger)
+
+	l := logger.WithFields(logrus.Fields{
+		"traceId": ctx.Value("traceId"),
+	})
+
+	return context.WithValue(ctx, loggerKey, l)
 }
 
 // Logger From Context
 func LFC(ctx context.Context) *logrus.Entry {
-	logger, ok := ctx.Value(loggerKey).(*logrus.Entry)
+	
+	l, ok := ctx.Value(loggerKey).(*logrus.Entry)
+
 	if !ok {
 		panic(fmt.Sprintf("Unable to get logger from context %+v", ctx))
 	}
-	l := logger.WithFields(logrus.Fields{
-		"traceId": ctx.Value("traceId"),
-	})
 
     return l
 }

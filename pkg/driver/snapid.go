@@ -22,6 +22,11 @@ type SnapshotDesc struct {
 	idFormat string
 	// This id get formed by combining vds and sds encoded in base64 and separated by underscore
 	csiID string	// this id provided to kubernetes
+	isIntermidiateSnapshot bool // flag that indicate that this snapshot is intermediate snapshot to another volume
+}
+
+func IsSDS(vds string) bool {
+	return vds[0] == 's'
 }
 
 func NewSnapshotDescFromName(lid LunDesc, name string) (*SnapshotDesc) {
@@ -95,6 +100,21 @@ func (sd *SnapshotDesc)parseSDS(sds string) (error) {
 	}
 
 	return nil
+}
+
+func NewSnapshotDescFromSDS(ld LunDesc, sds string) (*SnapshotDesc, error) {
+	var sd SnapshotDesc
+
+	sd.ld = ld
+
+	if err := sd.parseSDS(sds); err != nil {
+		return nil, err
+	}
+
+	sd.csiID = fmt.Sprintf("%s_%s",
+		base64.StdEncoding.EncodeToString([]byte(sd.ld.VDS())),
+		base64.StdEncoding.EncodeToString([]byte(sd.sds)))
+	return &sd, nil
 }
 
 // NewSnapshotDescFromCSIID takes as argument csi snapshot id that is supplied to kubernetes and

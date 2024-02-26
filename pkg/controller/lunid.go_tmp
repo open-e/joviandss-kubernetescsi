@@ -1,0 +1,17 @@
+package controller
+
+// import (
+// 	"crypto/sha256"
+// 	"google.golang.org/grpc/codes"
+// 	"google.golang.org/grpc/status"
+// 
+// 	"fmt"
+// 	"strings"
+// )
+
+type lunID interface {
+	Name() string 
+	VID() string
+	ID() string 
+}
+

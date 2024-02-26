@@ -156,6 +156,11 @@ func NewVolumeDescFromName(name string) (*VolumeDesc, error) {
 // 	return &vid, nil
 // }
 
+
+func IsVDS(vds string) bool {
+	return vds[0] == 'v'
+}
+
 func NewVolumeDescFromVDS(vds string) (*VolumeDesc, error) {
 
 	// Get universal volume ID

@@ -38,7 +38,7 @@ const (
 	RestErrorRequestTimeout			= 9
 	RestErrorArgumentIncorrect		= 10
 	RestErrorResourceBusySnapshotHasClones	= 11
-	RestErrorResourceBusyVolumeHasClones	= 12
+	RestErrorResourceBusyVolumeHasSnapshots	= 12
 )
 
 type RestError interface {
@@ -68,8 +68,9 @@ const (
 	resourceDneMsgPattern = `Zfs resource: (.+\/.+) not found in this collection`
 	snapshotDneMsgPatterm = `cannot open '([\w\-\/]+@[\w\-]+)': dataset does not exist`
 	resourceHasClonesMsgPattern = `^In order to delete a zvol, you must delete all of its clones first\.$`
-	resourceHasSnapshotsMsgPattern = `^cannot destroy '.*\/.*': volume has children.use '-r' to destroy the following datasets:\n.*`
-	snapshotHasDatasetsMsgPattern = `^cannot destroy '([\w\-\/]+@[\w\-]+)': snapshot has dependent clones\nuse '-R' to destroy the following datasets:(.*)`
+	volumeHasChildrenMsgPattern = `^cannot destroy '(?P<volume>[\w\-/]+)': volume has children[\s\S]use '-r' to destroy the following datasets:(?P<datasets>[.\s\S]*)`
+	snapshotHasClonesMsgPattern = `^cannot destroy '(?P<snapshot>[\w\-/]+@[\w\-]+)': snapshot has dependent clones[\s\S]use '-R' to destroy the following datasets(?P<datasets>[.\s\S]*)`
+					//`^cannot destroy '([\w\-\/]+@[\w\-]+)': snapshot has dependent clones\nuse '-R' to destroy the following datasets:(.*)`
 	resourceHasClonesClassPattern = `^opene.storage.zfs.ZfsOeError$`
 	resourceHasSnapshotsClassPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
 	zfsCmdErrorPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
@@ -81,8 +82,8 @@ var resourceIsBusyMsgRegexp = regexp.MustCompile(resourceIsBusyMsgPattern)
 var resourceDneMsgRegexp = regexp.MustCompile(resourceDneMsgPattern)
 var snapshotDneMsgRegexp = regexp.MustCompile(snapshotDneMsgPatterm)
 var resourceHasClonesMsgRegexp = regexp.MustCompile(resourceHasClonesMsgPattern)
-var resourceHasSnapshotsMsgRegexp = regexp.MustCompile(resourceHasSnapshotsMsgPattern)
-var snapshotHasDatasetsMsgRegexp = regexp.MustCompile(snapshotHasDatasetsMsgPattern)
+var volumeHasChildrenMsgRegexp = regexp.MustCompile(volumeHasChildrenMsgPattern)
+var snapshotHasClonesMsgRegexp = regexp.MustCompile(snapshotHasClonesMsgPattern)
 var resourceHasClonesClassRegexp = regexp.MustCompile(resourceHasClonesClassPattern)
 var resourceHasSnapshotsClassRegexp = regexp.MustCompile(resourceHasSnapshotsClassPattern)
 var zfsCmdErrorRegexp = regexp.MustCompile(zfsCmdErrorPattern)
@@ -92,7 +93,7 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 
 	l := le.WithFields(logrus.Fields{
 		"func": "ErrorFromErrorT",
-		"traceId": ctx.Value("traceId"),
+		"section": "rest",
 	})
 
 	//if err, ok := errC.(*ErrorT); ok {
@@ -154,15 +155,25 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 					}
 				}
 			case 1000:
+
 				if err.Message != nil {
-					if snapshotHasDatasetsMsgRegexp.MatchString(*err.Message) {
-						match := resourceDneMsgRegexp.FindStringSubmatch(*err.Message)
-						datasets := snapshotHasDatasetsMsgRegexp.SubexpIndex("datasets")
-						snapshot := snapshotHasDatasetsMsgRegexp.SubexpIndex("snapshot")
+					if snapshotHasClonesMsgRegexp.MatchString(*err.Message) {
+						match := snapshotHasClonesMsgRegexp.FindStringSubmatch(*err.Message)
+						datasets := snapshotHasClonesMsgRegexp.SubexpIndex("datasets")
+						snapshot := snapshotHasClonesMsgRegexp.SubexpIndex("snapshot")
 
 						msg := fmt.Sprintf("Snapshot %s has dependent resources %s", match[snapshot] ,strings.Replace(match[datasets], "\n", " ", -1))
 						l.Debug(msg)
 						return &restError { code: RestErrorResourceBusySnapshotHasClones, msg: msg}
+					}
+					if volumeHasChildrenMsgRegexp.MatchString(*err.Message) {
+						match := volumeHasChildrenMsgRegexp.FindStringSubmatch(*err.Message)
+						datasets := volumeHasChildrenMsgRegexp.SubexpIndex("datasets")
+						volume := volumeHasChildrenMsgRegexp.SubexpIndex("volume")
+
+						msg := fmt.Sprintf("Volume %s has dependent resources %s", match[volume] ,strings.Replace(match[datasets], "\n", " ", -1))
+						l.Debug(msg)
+						return &restError { code: RestErrorResourceBusyVolumeHasSnapshots, msg: msg}
 					}
 				}
 		}
@@ -182,7 +193,7 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 			}
 		}
 	}
-	l.Warn(err.String())
+	l.Warnln("Unable to identify error: ", err.String())
 	//l.Warnf("Errno:%d, Class:%s, Message:%s, Url:%s", *err.Errno, *err.Class, *err.Message, *err.Url )
 	return &restError{code: RestErrorFailureUnknown}
 }
