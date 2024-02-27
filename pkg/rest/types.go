@@ -20,6 +20,7 @@ package rest
 import (
 	"time"
 	"regexp"
+	"strconv"
 )
 
 const resourceNamePattern = `/([\w\-\/]+)`
@@ -121,6 +122,14 @@ type ResourceVolume struct {
 	NBMAND            	string 		`json:"nbmand,omitempty"`
 }
 
+func (v *ResourceVolume)GetSize() int64 {
+	if i, err := strconv.ParseInt(v.VolSize , 10, 64); err != nil {
+		return 0
+	} else {
+		return i
+	}
+}
+
 type ResourceSnapshot struct {
 	Referenced		int		`json:"referenced,omitempty"`
 	UserRefs          	int       	`json:"userrefs,omitempty"`
@@ -160,6 +169,9 @@ func (s *ResourceSnapshot)ClonesNames() (clones []string) {
 	return clones
 }
 
+func (s *ResourceSnapshot)GetSize() int {
+	return s.VolSize
+}
 
 type ResourceSnapshotShortProperties struct {
 	Creation          	time.Time	`json:"creation,omitempty"`

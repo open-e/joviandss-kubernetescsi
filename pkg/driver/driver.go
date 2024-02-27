@@ -51,7 +51,7 @@ func (d *CSIDriver) cloneLUN(ctx context.Context, pool string, source LunDesc, c
 }
 
 func (d *CSIDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDesc, volumeSize int64) jrest.RestError {
-	
+
 	vd := jrest.CreateVolumeDescriptor{
 		Name: nvd.VDS(),
 		Size: fmt.Sprintf("%d", volumeSize),
@@ -448,43 +448,50 @@ func NewJovianDSSCSIDriver(cfg *jcom.RestEndpointCfg, l *logrus.Entry) (d *CSIDr
 	return &drvr, nil 
 }
 
-// func GetVolume(vID string) (*jrest.Volume, error) {
-// 	// return nil, nil
-// 	l := cp.l.WithFields(logrus.Fields{
-// 		"func": "getVolume",
-// 	})
-// 
-// 	l.Tracef("Get volume with id: %s", vID)
-// 	var err error
-// 
-// 	//////////////////////////////////////////////////////////////////////////////
-// 	/// Checks
-// 
-// 	if len(vID) == 0 {
-// 		msg := "Volume name missing in request"
-// 		l.Warn(msg)
-// 		return nil, status.Error(codes.InvalidArgument, msg)
-// 	}
-// 
-// 	//////////////////////////////////////////////////////////////////////////////
-// 
-// 	v, rErr := (*cp.endpoints[0]).GetVolume(vID) // v for Volume
-// 
-// 	if rErr != nil {
-// 		switch rErr.GetCode() {
-// 		case rest.RestRequestMalfunction:
-// 			// TODO: correctly process error messages
-// 			err = status.Error(codes.NotFound, rErr.Error())
-// 
-// 		case rest.RestRPM:
-// 			err = status.Error(codes.Internal, rErr.Error())
-// 		case rest.RestResourceDNE:
-// 			err = status.Error(codes.NotFound, rErr.Error())
-// 		default:
-// 			err = status.Errorf(codes.Internal, rErr.Error())
-// 		}
-// 		return nil, err
-// 	}
-// 	return v, nil
-// }
+func (d* CSIDriver)GetVolume(ctx context.Context, pool string, vd *VolumeDesc) (out *jrest.ResourceVolume, err jrest.RestError) {
+	// return nil, nil
+
+	l := jcom.LFC(ctx)
+	l = l.WithFields(logrus.Fields{
+		"func": "GetVolume",
+		"section" : "driver",
+	})
+
+	l.Debugf("Get volume with id: %s", vd.VDS())
+	
+
+	return d.re.GetVolume(ctx, pool, vd.VDS()) // v for Volume
+
+	// if rErr != nil {
+	// 	switch rErr.GetCode() {
+	// 	case rest.RestRequestMalfunction:
+	// 		// TODO: correctly process error messages
+	// 		err = status.Error(codes.NotFound, rErr.Error())
+
+	// 	case rest.RestRPM:
+	// 		err = status.Error(codes.Internal, rErr.Error())
+	// 	case rest.RestResourceDNE:
+	// 		err = status.Error(codes.NotFound, rErr.Error())
+	// 	default:
+	// 		err = status.Errorf(codes.Internal, rErr.Error())
+	// 	}
+	// 	return nil, err
+	// }
+	//return v, nil
+}
+
+func (d* CSIDriver)GetSnapshot(ctx context.Context, pool string, vd *VolumeDesc, sd *SnapshotDesc) (out *jrest.ResourceSnapshot, err jrest.RestError) {
+	// return nil, nil
+
+	l := jcom.LFC(ctx)
+	l = l.WithFields(logrus.Fields{
+		"func": "GetSnapshot",
+		"section" : "driver",
+	})
+
+	l.Debugf("Get snapshot %s of volume %s", sd.SDS(), vd.VDS())
+	
+
+	return d.re.GetVolumeSnapshot(ctx, pool, vd.VDS(), sd.SDS())
+}
 
