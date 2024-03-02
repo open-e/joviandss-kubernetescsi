@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
+
 	//"encoding/json"
 	"os"
 
@@ -499,62 +500,142 @@ func (cp *ControllerPlugin) getVolumeSize(vname string) (int64, error) {
 }
 
 func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.VolumeDesc, capr *csi.CapacityRange, vSource *csi.VolumeContentSource) (volumeSize int64, csierr error) {
-	
+
 	l := jcom.LFC(ctx)
-	
+	l = l.WithFields(log.Fields{
+		"func": "createNeVolume",
+		"section": "controller",
+	})
+
 	var err jrest.RestError = nil
 	if vSource != nil {
-
+		l.Debugf("Creating volume from source %+v", vSource)
 		if srcSnapshot := vSource.GetSnapshot(); srcSnapshot != nil {
 			// Snapshot
 			sourceSnapshotID := srcSnapshot.GetSnapshotId()
 			sd, err := jdrvr.NewSnapshotDescFromCSIID(sourceSnapshotID)	
 			if err == nil {
-				l.Debugf("Creating volume %s from volume %s", nvd.Name(), sd.Name())
+				l.Debugf("Creating volume %s from snapshot %s", nvd.Name(), sd.Name())
 				err = cp.d.CreateVolumeFromSnapshot(ctx, cp.pool, sd, nvd)
+			} else {
+				return 0, status.Error(codes.InvalidArgument, fmt.Sprintf("Unable to identify snapshot source %s", sourceSnapshotID))
 			}
 
 		} else if srcVolume := vSource.GetVolume(); srcVolume != nil {
 			// Volume
 			sourceVolumeID := srcVolume.GetVolumeId()
 			// Check if volume exists
-			vd, err := jdrvr.NewVolumeDescFromVDS(sourceVolumeID)
-			if err == nil {
+			vd, csierr := jdrvr.NewVolumeDescFromVDS(sourceVolumeID)
+			if csierr == nil {
 				l.Debugf("Creating volume %s from volume %s", nvd.Name(), vd.Name())
 				err = cp.d.CreateVolumeFromVolume(ctx, cp.pool, vd, nvd)
+			} else {
+				return 0, status.Error(codes.InvalidArgument, fmt.Sprintf("Unable to identify volume source %s", sourceVolumeID))
 			}
 
 		} else {
 			return 0, status.Errorf(codes.Unimplemented, "Unable to create volume from other sources")
 		}
 	} else {
+		l.Debugf("required bytes %d, limit bytes %d", capr.GetRequiredBytes(), capr.GetLimitBytes())
+
 		if capr.GetLimitBytes() == capr.GetRequiredBytes() {
 			volumeSize = capr.GetLimitBytes()
-		} else if capr.GetRequiredBytes() == 0 && capr.GetLimitBytes() > minSupportedVolumeSize {
+		} else if capr.GetRequiredBytes() < minSupportedVolumeSize {
 			volumeSize = minSupportedVolumeSize
-		} 
-		volumeSize = capr.GetRequiredBytes()
+		} else {
+			volumeSize = capr.GetRequiredBytes()
+		}
+
 		err = cp.d.CreateVolume(ctx, cp.pool, nvd, volumeSize)
 	}
 
+	switch jrest.ErrCode(err)  {
+	case jrest.RestErrorResourceBusy:
+		return 0, status.Error(codes.FailedPrecondition, err.Error())
+	case jrest.RestErrorResourceDNE:
+		return 0, status.Error(codes.NotFound, err.Error())
+	case jrest.RestErrorResourceExists:
+		l.Warn("Specified volume already exists.")
+		return 0, status.Errorf(codes.AlreadyExists, err.Error())
+	case jrest.RestErrorOutOfSpace:
+		emsg := fmt.Sprintf("Unable to create volume %s, storage out of space", nvd.Name())
+		l.Warn(emsg)
+		return 0, status.Errorf(codes.ResourceExhausted, emsg)
+	case jrest.RestErrorOk:
+		l.Debugf("Volume %s created", nvd.Name())
+		return volumeSize, nil
+	default:
+		return 0, status.Errorf(codes.Internal, err.Error())
+	}
+}
+
+// VolumeComply checks if volume with specified properties exists
+//
+// if volume with same name exists yet does not fall into requirments it fails with ALLREADY_EXISTS
+// if volume does not exists it fails with NOT_FOUND
+// if volume do exists and fit requirmnets it will return csi volume struct and nil as error
+func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDesc, caprage *csi.CapacityRange, source *csi.VolumeContentSource) (*int64, error ) {
+
+	l := jcom.LFC(ctx)
+	l = l.WithFields(log.Fields{
+		"func": "VolumeComply",
+		"section": "controller",
+	})
+
+	l.Debugf("Checking if volume %s exists and comply with requirments %+v %+v", vd.Name(), caprage, source)
+
+	vdata, jerr := cp.d.GetVolume(ctx, cp.pool, vd);
 	
-	if err != nil {
-		code := err.GetCode()
-		l.Debugln("Error code is", code)
-		switch code {
-		case jrest.RestErrorResourceBusy:
-			// According to specification from
-			return 0, status.Error(codes.ResourceExhausted, err.Error())
-		case jrest.RestErrorResourceDNE:
-			return 0, status.Error(codes.NotFound, err.Error())
-		case jrest.RestErrorResourceExists:
-			l.Warn("Specified volume already exists.")
-			return 0, status.Errorf(codes.AlreadyExists, err.Error())
-		default:
-			return 0, status.Errorf(codes.Internal, err.Error())
+	if jerr != nil {
+		if jerr.GetCode() == jrest.RestErrorResourceDNE {
+			return nil, status.Errorf(codes.NotFound, jerr.Error())
 		}
 	}
-	return volumeSize, nil
+	
+	s := vdata.GetSize()
+
+	if caprage != nil {
+		if minSize := caprage.GetRequiredBytes(); minSize > 0 && minSize > vdata.GetSize() {
+			return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Existing volume %s have size %d that is less then minimal requested limit %d", vd.Name(), caprage.GetRequiredBytes(), minSize))
+		}
+		
+		if maxSize := caprage.GetLimitBytes(); maxSize > 0 && maxSize < vdata.GetSize() {
+			return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Existing volume %s have size %d that is more then upper limit %d", vd.Name(), caprage.GetRequiredBytes(), maxSize))
+		}
+	}
+
+	if source != nil {
+		
+		if sv := source.GetVolume(); sv != nil {
+
+			if ov := vdata.OriginVolume(); ov != sv.GetVolumeId() {
+				if len(ov) == 0 && len(sv.GetVolumeId()) > 0 {
+					return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Volume with name %s exists and it is not derived from any volume", vd.Name()))
+				}
+				return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Existing volume %s is derived from volume %s that is different from requested volume %s", vd.Name(), vdata.OriginVolume(), sv.GetVolumeId()))
+			}
+		}
+
+		if sv := source.GetSnapshot(); sv != nil {
+
+			if vol, err := jdrvr.NewVolumeDescFromVDS(vdata.OriginVolume()); err != nil {
+				return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Volume %s exists, but driver is not able to identify correctly its origin %s", vd.Name(), vdata.OriginVolume()))
+			} else {
+				if snap, err := jdrvr.NewSnapshotDescFromSDS(vol, vdata.OriginSnapshot()); err != nil {
+					return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Volume %s exists, but driver is not able to identify correctly its origin snapshot %s", vd.Name(), vdata.OriginSnapshot()))
+				} else {
+					if snap.CSIID() != sv.GetSnapshotId() {
+						return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Existing volume %s is derived from snapshot %s, not from requested one %s", vd.Name(), snap.CSIID(), sv.GetSnapshotId()))
+					}
+				}
+			}
+		}
+	}
+
+	l.Debugf("Volume %s check done, volume comply", vd.Name())
+
+	return &s, status.Errorf(codes.OK, "")
 }
 
 // CreateVolume create volume with properties
@@ -575,10 +656,8 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		},
 	}
 
-	//sourceSnapshot := ""
-	//sourceVolume := ""
 	///////////////////////////////////////////////////////////////////////
-	/// Checks
+	/// Check capability
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME) {
 		err = status.Errorf(codes.Internal, "Capability is not supported.")
 		l.Warnf("Unable to create volume req: %v", req)
@@ -598,7 +677,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 	//volumeSize := req.GetCapacityRange().GetRequiredBytes()
 	maxVSize := req.GetCapacityRange().GetLimitBytes()
-	
+
 	if maxVSize > 0 {
 		if maxVSize < minSupportedVolumeSize {
 			return nil, status.Error(codes.OutOfRange, fmt.Sprintf("Volume size must be at least %d bytes", minSupportedVolumeSize))
@@ -606,18 +685,25 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	l.Debugf("Create volume capability check done")
-	///////////////////////////////////////////////////////////////////////
-	// Create volume
-	
-	vSource := req.GetVolumeContentSource()
 
-	if vSource != nil {
-		err = cp.VolumeExists(ctx, req.GetName() req.GetCapacityRange(), req.GetVolumeContentSource())
-		err !=
+
+	// Check if volume exists and comply with requirments 
+	vsize, err := cp.VolumeComply(ctx, nvid, req.GetCapacityRange(), req.GetVolumeContentSource())
+	switch status.Code(err) {
+		case codes.AlreadyExists:
+			return nil, err
+		case codes.OK:
+			l.Debugf("Volume %s already exist and comply with requirmnets", nvid.Name())
+			out.Volume.VolumeId = nvid.VDS()
+			out.Volume.CapacityBytes = *vsize
+			return &out, nil
+		case codes.NotFound:
+			l.Debugf("Volume %s do not exists, creating", nvid.Name())
+		default:
+			return nil, status.Error(codes.Unknown, fmt.Sprintf("Unable to identify if volume exists or not: %s", err.Error()))
 	}
 
-	// TODO: implement case of checking if volume exists and fit in requirmnets
-	if vSize, err := cp.createNewVolume(ctx, nvid, req.CapacityRange, vSource); err != nil {
+	if vSize, err := cp.createNewVolume(ctx, nvid, req.GetCapacityRange(), req.GetVolumeContentSource()); err != nil {
 		return nil, err
 	} else {
 		out.Volume.VolumeId = nvid.VDS()
@@ -853,7 +939,7 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 		} else {
 			switch err.GetCode() {
 			case jrest.RestErrorResourceBusy:
-				return nil, status.Error(codes.FailedPrecondition, "In order to delete a volume, you must delete all of its clones first")
+				return nil, status.Error(codes.FailedPrecondition, err.Error())
 			case jrest.RestErrorResourceDNE:
 				l.Warnf("Volume %s was deleted before", vd)
 				return &csi.DeleteVolumeResponse{}, nil
@@ -862,8 +948,7 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 			}
 		}
 	} else {
-		return nil, status.Error(codes.FailedPrecondition, fmt.Sprintf("Incorent volume id %s", req.VolumeId))
-
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Volume id %s has wrong name format", req.VolumeId))
 	}
 }
 

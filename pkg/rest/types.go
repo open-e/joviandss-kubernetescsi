@@ -18,6 +18,7 @@ under the License.
 package rest
 
 import (
+	"encoding/json"
 	"time"
 	"regexp"
 	"strconv"
@@ -25,7 +26,10 @@ import (
 
 const resourceNamePattern = `/([\w\-\/]+)`
 
+const originNamePattern = `(?P<pool>[\w\-\.]+)/(?P<volume>[\w\-\.]+)@(?P<snapshot>[\w\-\.]+)`
+
 var resourceNameRegexp = regexp.MustCompile(resourceNamePattern)
+var originNameRegexp = regexp.MustCompile(originNamePattern)
 
 
 type GeneralResponse struct {
@@ -130,32 +134,128 @@ func (v *ResourceVolume)GetSize() int64 {
 	}
 }
 
+func (v *ResourceVolume)OriginVolume() string {
+	if len(v.Origin) > 0 {
+		if originNameRegexp.MatchString(v.Origin) {
+			match := originNameRegexp.FindStringSubmatch(v.Origin)
+			volume := originNameRegexp.SubexpIndex("volume")
+			return match[volume]
+		}
+	}
+	return ""
+}
+
+func (v *ResourceVolume)OriginSnapshot() string {
+	if len(v.Origin) > 0 {
+		if originNameRegexp.MatchString(v.Origin) {
+			match := originNameRegexp.FindStringSubmatch(v.Origin)
+			snapshot := originNameRegexp.SubexpIndex("snapshot")
+			return match[snapshot]
+		}
+	}
+	return ""
+}
+
 type ResourceSnapshot struct {
-	Referenced		int		`json:"referenced,omitempty"`
-	UserRefs          	int       	`json:"userrefs,omitempty"`
+	Referenced		string		`json:"referenced,omitempty"`
+	UserRefs          	string       	`json:"userrefs,omitempty"`
 	PrimaryCache      	string    	`json:"primarycache,omitempty"`
 	Creation          	time.Time 	`json:"creation,omitempty"`
-	VolSize           	int       	`json:"volsize,omitempty"`
-	CreateTxg         	int       	`json:"createtxg,omitempty"`
+	VolSize           	int64       	`json:"volsize,omitempty"`
+	CreateTxg         	string       	`json:"createtxg,omitempty"`
 	GUID              	string    	`json:"guid,omitempty"`
 	CompressRatio     	string   	`json:"compressratio,omitempty"`
 	RootContext       	string    	`json:"rootcontext,omitempty"`
 	Encryption        	string    	`json:"encryption,omitempty"`
 	DefContext        	string    	`json:"defcontext,omitempty"`
-	Written           	int       	`json:"written,omitempty"`
+	Written           	string       	`json:"written,omitempty"`
 	Type              	string    	`json:"type,omitempty"`
 	SecondaryCache    	string    	`json:"secondarycache,omitempty"`
-	Used              	int       	`json:"used,omitempty"`
+	Used              	string       	`json:"used,omitempty"`
 	RefCompressRatio  	string   	`json:"refcompressratio,omitempty"`
 	FSContext         	string    	`json:"fscontext,omitempty"`
-	ObjSetID          	int       	`json:"objsetid,omitempty"`
+	ObjSetID          	string       	`json:"objsetid,omitempty"`
 	Name              	string    	`json:"name,omitempty"`
 	DeferDestroy      	string    	`json:"defer_destroy,omitempty"`
 	SANVolumeID       	string    	`json:"san:volume_id,omitempty"`
 	MLSLabel          	string    	`json:"mlslabel,omitempty"`
-	LogicalReferenced 	int       	`json:"logicalreferenced,omitempty"`
+	LogicalReferenced 	string       	`json:"logicalreferenced,omitempty"`
 	Context           	string    	`json:"context,omitempty"`
 	Clones			string		`json:"clones,omitempty"`
+}
+
+func (m *ResourceSnapshot) UnmarshalJSON(data []byte) error {
+
+	type Alias ResourceSnapshot
+    	aux := &struct {
+		Creation	string `json:"creation,omitempty"`
+		VolSize		string `json:"volsize,omitempty"`
+		*Alias
+    	}{
+    	    Alias: (*Alias)(m), // Point Alias to ResourceSnapshot to reuse JSON tags
+    	}
+    	if err := json.Unmarshal(data, aux); err != nil {
+    	    return err
+    	}
+	const layout = "2006-01-02 15:04:05"
+	if aux.Creation != "" { // Only parse if non-empty
+		parsedTime, err := time.Parse(layout, aux.Creation)
+		if err != nil {
+			return err
+		}
+		m.Creation = parsedTime
+	}
+	
+	if aux.VolSize != "" { // Only parse if non-empty
+		parsedVolSize, err := strconv.ParseInt(aux.VolSize, 10, 64)
+		if err != nil {
+			return err
+		}
+		m.VolSize = parsedVolSize
+	}
+
+
+	// var aux struct {
+	// 	Referenced		int		`json:"referenced,omitempty"`
+	// 	UserRefs          	int       	`json:"userrefs,omitempty"`
+	// 	PrimaryCache      	string    	`json:"primarycache,omitempty"`
+	// 	Creation		string		`json:"creation,omitempty"`
+	// 	VolSize           	int       	`json:"volsize,omitempty"`
+	// 	CreateTxg         	int       	`json:"createtxg,omitempty"`
+	// 	GUID              	string    	`json:"guid,omitempty"`
+	// 	CompressRatio     	string   	`json:"compressratio,omitempty"`
+	// 	RootContext       	string    	`json:"rootcontext,omitempty"`
+	// 	Encryption        	string    	`json:"encryption,omitempty"`
+	// 	DefContext        	string    	`json:"defcontext,omitempty"`
+	// 	Written           	int       	`json:"written,omitempty"`
+	// 	Type              	string    	`json:"type,omitempty"`
+	// 	SecondaryCache    	string    	`json:"secondarycache,omitempty"`
+	// 	Used              	int       	`json:"used,omitempty"`
+	// 	RefCompressRatio  	string   	`json:"refcompressratio,omitempty"`
+	// 	FSContext         	string    	`json:"fscontext,omitempty"`
+	// 	ObjSetID          	int       	`json:"objsetid,omitempty"`
+	// 	Name              	string    	`json:"name,omitempty"`
+	// 	DeferDestroy      	string    	`json:"defer_destroy,omitempty"`
+	// 	SANVolumeID       	string    	`json:"san:volume_id,omitempty"`
+	// 	MLSLabel          	string    	`json:"mlslabel,omitempty"`
+	// 	LogicalReferenced 	int       	`json:"logicalreferenced,omitempty"`
+	// 	Context           	string    	`json:"context,omitempty"`
+	// 	Clones			string		`json:"clones,omitempty"`
+	// }
+
+	//if err := json.Unmarshal(data, &aux); err != nil {
+	//	return err
+	//}
+    
+    // Parse the time string manually
+    // const layout = "2006-01-02 15:04:05"
+    // parsedTime, err := time.Parse(layout, aux.Creation)
+    // if err != nil {
+    //     return err
+    // }
+    // 
+    // m.Creation = parsedTime
+    return nil
 }
 
 func (s *ResourceSnapshot)ClonesNames() (clones []string) {
@@ -169,7 +269,7 @@ func (s *ResourceSnapshot)ClonesNames() (clones []string) {
 	return clones
 }
 
-func (s *ResourceSnapshot)GetSize() int {
+func (s *ResourceSnapshot)GetSize() int64 {
 	return s.VolSize
 }
 

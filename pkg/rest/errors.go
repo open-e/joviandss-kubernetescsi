@@ -22,11 +22,13 @@ import (
 	"fmt"
 	"strings"
 	"regexp"
+	"runtime/debug"
 
 	"github.com/sirupsen/logrus"
 )
 
 const (
+	RestErrorOk				= 0
 	RestErrorFailureUnknown			= 1
 	RestErrorResourceBusy			= 2
 	RestErrorResourceExists			= 3
@@ -39,6 +41,7 @@ const (
 	RestErrorArgumentIncorrect		= 10
 	RestErrorResourceBusySnapshotHasClones	= 11
 	RestErrorResourceBusyVolumeHasSnapshots	= 12
+	RestErrorOutOfSpace			= 13
 )
 
 type RestError interface {
@@ -49,6 +52,13 @@ type RestError interface {
 type restError struct {
 	code int
 	msg  string
+}
+
+func ErrCode(err RestError) int {
+	if err != nil {
+		return err.GetCode()
+	}
+	return RestErrorOk
 }
 
 //TODO: Refactor to move logging of error message in this func
@@ -66,14 +76,15 @@ const (
 	// resourceExistsMsgPattern = `.*`
 	resourceIsBusyMsgPattern = `In order to delete a zvol, you must delete all of its clones first.`
 	resourceDneMsgPattern = `Zfs resource: (.+\/.+) not found in this collection`
-	snapshotDneMsgPatterm = `cannot open '([\w\-\/]+@[\w\-]+)': dataset does not exist`
+	snapshotDneMsgPatterm = `cannot open '([\w\-\/\.]+@[\w\-\.]+)': dataset does not exist`
 	resourceHasClonesMsgPattern = `^In order to delete a zvol, you must delete all of its clones first\.$`
-	volumeHasChildrenMsgPattern = `^cannot destroy '(?P<volume>[\w\-/]+)': volume has children[\s\S]use '-r' to destroy the following datasets:(?P<datasets>[.\s\S]*)`
-	snapshotHasClonesMsgPattern = `^cannot destroy '(?P<snapshot>[\w\-/]+@[\w\-]+)': snapshot has dependent clones[\s\S]use '-R' to destroy the following datasets(?P<datasets>[.\s\S]*)`
+	volumeHasChildrenMsgPattern = `^cannot destroy '(?P<volume>[\w\-/\.]+)': volume has children[\s\S]use '-r' to destroy the following datasets:(?P<datasets>[.\s\S]*)`
+	snapshotHasClonesMsgPattern = `^cannot destroy '(?P<snapshot>[\w\-/\.]+@[\w\-\.]+)': snapshot has dependent clones[\s\S]use '-R' to destroy the following datasets(?P<datasets>[.\s\S]*)`
 					//`^cannot destroy '([\w\-\/]+@[\w\-]+)': snapshot has dependent clones\nuse '-R' to destroy the following datasets:(.*)`
 	resourceHasClonesClassPattern = `^opene.storage.zfs.ZfsOeError$`
 	resourceHasSnapshotsClassPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
 	zfsCmdErrorPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
+	storageResourceExhaustedPattern = `New zvol size\(([\d]+)\) exceeds available space on pool ([\w\-\.]+)\(([\d]+)\).`
 )
 
 var resourceExistsMsgRegexp = regexp.MustCompile(resourceExistsMsgPattern)
@@ -87,6 +98,7 @@ var snapshotHasClonesMsgRegexp = regexp.MustCompile(snapshotHasClonesMsgPattern)
 var resourceHasClonesClassRegexp = regexp.MustCompile(resourceHasClonesClassPattern)
 var resourceHasSnapshotsClassRegexp = regexp.MustCompile(resourceHasSnapshotsClassPattern)
 var zfsCmdErrorRegexp = regexp.MustCompile(zfsCmdErrorPattern)
+var storageResourceExhaustedRegexp = regexp.MustCompile(storageResourceExhaustedPattern)
 
 
 func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restError {
@@ -96,9 +108,13 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 		"section": "rest",
 	})
 
-	//if err, ok := errC.(*ErrorT); ok {
-	//	return &restError{code: RestFailureUnknown, msg: *errC.Message}
-	//}
+	if err == nil {
+		l.Warn("Code is trying to get Error for No error case")
+
+		stackTrace := debug.Stack()
+		le.Warnln("Manual stack trace log:")
+		le.Warnln(string(stackTrace))
+	}
 
 	l.Debugf("ErrorT data %+v", err)
 	if err.Errno != nil {
@@ -190,6 +206,8 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 				}
 				l.Warn("Resource not found")
 				return &restError { code: RestErrorResourceDNE, msg: *err.Message }
+			} else if storageResourceExhaustedRegexp.MatchString(*err.Message) {
+				return &restError { code: RestErrorOutOfSpace, msg: *err.Message }
 			}
 		}
 	}

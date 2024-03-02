@@ -3,6 +3,7 @@ package driver
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -143,44 +144,6 @@ func (d *CSIDriver) CreateVolumeFromVolume(ctx context.Context, pool string, vd 
 		if code == jrest.RestErrorResourceExists {
 		
 			d.deleteIntermediateSnapshot(ctx, pool, vd.VDS(), nvd.VDS()) 
-
-			// snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUnmount:true}
-			// // Just in case lets delete this snapshot and do everything from groud up
-			// if err = d.re.DeleteSnapshot(ctx, pool, vd.VDS(), nvd.VDS(), snapdeldata); err != nil {
-			// 	code := err.GetCode()
-			// 	// Removing this snapshot is not possible
-
-
-			// 	// May be somebody is using this snapshot already to make volumes from it
-			// 	if code == jrest.RestErrorResourceBusySnapshotHasClones {
-			// 		// We gona check if volume name is exactly volume that we have to create before returning success
-			// 		if snap, errGS := d.re.GetVolumeSnapshot(ctx, pool, vd.VDS(), nvd.VDS()); errGS != nil {
-			// 			// That is a weird, previously we failed because snapshot existed and now it is gone
-			// 			// looks like some king of race condition
-			// 			if errGS.GetCode() == jrest.RestErrorResourceDNE {
-			// 				return  jrest.GetError(jrest.RestErrorStorageFailureUnknown,
-			// 							fmt.Sprintf("It looks like volume %s is in process of creation by other processat", nvd.Name()))
-			// 			}
-			// 			return jrest.GetError(jrest.RestErrorStorageFailureUnknown,
-			// 						fmt.Sprintf("Unable to create intermediate snapshot %s in order to create volume %s, snapshot is not responsive: %s",
-			// 						nvd.VDS(), nvd.Name(), errGS.Error()))
-			// 		} else {
-			// 			// Target volume already created
-			// 			if clones := snap.ClonesNames(); len(clones) == 1 {
-			// 				if clones[0] == nvd.VDS() {
-			// 					return jrest.GetError(jrest.RestErrorResourceExists, fmt.Sprintf("Volume %s created from %s already exists", nvd.Name(), vd.Name()))
-			// 				}
-			// 			} else {
-			// 				return jrest.GetError(jrest.RestErrorStorageFailureUnknown, fmt.Sprintf("Intermediate snapshot have multiple clones: %+v, that should never happen", clones))
-			// 			}
-			// 		}
-			// 	} else {
-			// 		// some unexpected error
-			// 		return jrest.GetError(
-			// 			jrest.RestErrorStorageFailureUnknown,
-			// 			fmt.Sprintf("Unablet to clear intermediate snapshot %s, please delete it manualy for Volume. Error %+v ", nvd.Name(), vd.Name(), err.Error()))
-			// 	}
-			// }
 		}
 		return err
 	}
@@ -201,13 +164,22 @@ func (d *CSIDriver) CreateVolumeFromVolume(ctx context.Context, pool string, vd 
 //
 //	return list of snapshots that does not contain 'handing' one or error
 func (d *CSIDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (snaps []jrest.ResourceSnapshot, err jrest.RestError) {
+	
+	l := jcom.LFC(ctx)
+	l = l.WithFields(logrus.Fields{
+		"func": "cleanIntermediateSnapshots",
+		"section": "driver",
+	})
+
 	snaps, _, gserr := d.ListVolumeSnapshots(ctx, pool, vd, nil, nil)
 
+	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
 	if gserr != nil {
+		l.Debugf("Unable to get list of snapshots for volume %s", vd.Name())
 		return nil, gserr
 	}
 
-	out := make([]jrest.ResourceSnapshot, len(snaps))
+	var out []jrest.ResourceSnapshot
 
 	for _, snap := range snaps {
 		if IsVDS(snap.Name) {
@@ -242,26 +214,18 @@ func (d *CSIDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) 
 	var deldata = jrest.DeleteVolumeDescriptor{ ForceUmount: true, RecursivelyChildren: true }
 	err = d.re.DeleteVolume(ctx, pool, vd.VDS(), deldata)
 
-	l.Debugf("Error value %+v", err)
-
-	if err == nil {
-		return nil
-	}
-
-	l.Debugf("Got error %+v", err)
-
-	switch err.GetCode() {
-	case jrest.RestErrorResourceBusy:
-	case jrest.RestErrorResourceBusyVolumeHasSnapshots:
-		l.Debugf("Volume %s is busy", vd.Name())
+	switch jrest.ErrCode(err) {
+	case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusyVolumeHasSnapshots:
 		break
 	case jrest.RestErrorResourceDNE:
+		return nil
+	case jrest.RestErrorOk:
 		return nil
 	default:
 		l.Debugf("Unable to delete lun %s, error had happaned %+v", vd.Name(), err.Error())
 		return err
 	}
-	l.Debugf("Volume %s is busy, indentifying relaying resources", vd.VDS())
+	l.Debugf("Volume %s is busy, indentifying relaying resources", vd.Name())
 
 	if err.GetCode() == jrest.RestErrorResourceBusy {
 		snaps, gserr := d.cleanIntermediateSnapshots(ctx, pool, vd)
@@ -276,11 +240,14 @@ func (d *CSIDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) 
 				return err
 			}
 		}
-
+		l.Debugf("Snapshots after cleaning intermediate one %+v", snaps)
 		// Looks like this volume is busy and we are not able to delete it
 
 		var dvols []string
 		var dsnaps []string
+		var ncsi[]string
+		msg := fmt.Sprintf("Volume %s is dependent upon by", vd.Name())
+
 		for _, snap := range snaps {
 			if IsSDS(snap.Name) {
 				dsnaps = append(dsnaps, snap.Name)
@@ -288,17 +255,33 @@ func (d *CSIDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) 
 				clones := snap.ClonesNames()
 				dvols = append(dvols, clones...)
 			} else {
-				l.Warnf("Snapshot has bad name for CSI related resource %s", snap)
+				msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(dsnaps[:], ","))
 			}
 		}
-		msg := "Unable to delete volume because other resources depend on it"
-		err = jrest.GetError(jrest.RestErrorResourceBusy, fmt.Sprintf("%s %v %v", msg, dsnaps, dvols) )
+
+		if len(dvols) > 0 {
+			msg += fmt.Sprintf(" volumes: %s", strings.Join(dvols[:], ","))
+		}
+		if len(dsnaps) > 0 {
+			msg += fmt.Sprintf(" snapshots: %s", strings.Join(dsnaps[:], ","))
+		}
+		if len(ncsi) > 0 {
+			msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(ncsi[:], ","))
+		}
+		err = jrest.GetError(jrest.RestErrorResourceBusy, msg)
+			//fmt.Sprintf("%s %v %v", msg, dsnaps, dvols))
 	}
 
-	return nil
+	return err
 }
 
 func (d *CSIDriver) DeleteVolume(ctx context.Context, pool string, vid *VolumeDesc) jrest.RestError {
+
+	l := jcom.LFC(ctx)
+	l = l.WithFields(logrus.Fields{
+		"func": "DeleteVolume",
+		"section": "driver",
+	})
 
 	return d.deleteLUN(ctx, pool, vid)
 }

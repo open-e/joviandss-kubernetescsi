@@ -116,7 +116,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 		if err != nil {
 			return 0, nil, &restError{RestErrorRequestMalfunction, err.Error()}
 		}
-		l.Debugf("sending marshaled data %+v", data)
+		l.Debugf("sending marshaled data %s", jdata)
 		reader = strings.NewReader(string(jdata))
 	}
 
