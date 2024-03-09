@@ -315,11 +315,6 @@ type SnapshotProperties struct {
 }
 
 
-type ResultEntries struct {
-	Results		int64		`json:"results"`
-	Entries		interface{}	`json:"entries"`
-}
-
 // AllSnapshots structure
 type GetVolumeSnapshotsData struct {
 	Data  ResultEntries		`jsom:"data"`

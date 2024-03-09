@@ -31,11 +31,17 @@ const originNamePattern = `(?P<pool>[\w\-\.]+)/(?P<volume>[\w\-\.]+)@(?P<snapsho
 var resourceNameRegexp = regexp.MustCompile(resourceNamePattern)
 var originNameRegexp = regexp.MustCompile(originNamePattern)
 
-
 type GeneralResponse struct {
 	Data			interface{}	`json:"data,omitempty"`
 	Error			*ErrorT		`json:"error,ommitempty"`
 }
+
+type ResultEntries struct {
+	Results		int64		`json:"results"`
+	Entries		interface{}	`json:"entries"`
+}
+
+
 
 type ResourceVolume struct {
 	Name			string		`json:"name,omitempty"`
@@ -214,48 +220,7 @@ func (m *ResourceSnapshot) UnmarshalJSON(data []byte) error {
 		m.VolSize = parsedVolSize
 	}
 
-
-	// var aux struct {
-	// 	Referenced		int		`json:"referenced,omitempty"`
-	// 	UserRefs          	int       	`json:"userrefs,omitempty"`
-	// 	PrimaryCache      	string    	`json:"primarycache,omitempty"`
-	// 	Creation		string		`json:"creation,omitempty"`
-	// 	VolSize           	int       	`json:"volsize,omitempty"`
-	// 	CreateTxg         	int       	`json:"createtxg,omitempty"`
-	// 	GUID              	string    	`json:"guid,omitempty"`
-	// 	CompressRatio     	string   	`json:"compressratio,omitempty"`
-	// 	RootContext       	string    	`json:"rootcontext,omitempty"`
-	// 	Encryption        	string    	`json:"encryption,omitempty"`
-	// 	DefContext        	string    	`json:"defcontext,omitempty"`
-	// 	Written           	int       	`json:"written,omitempty"`
-	// 	Type              	string    	`json:"type,omitempty"`
-	// 	SecondaryCache    	string    	`json:"secondarycache,omitempty"`
-	// 	Used              	int       	`json:"used,omitempty"`
-	// 	RefCompressRatio  	string   	`json:"refcompressratio,omitempty"`
-	// 	FSContext         	string    	`json:"fscontext,omitempty"`
-	// 	ObjSetID          	int       	`json:"objsetid,omitempty"`
-	// 	Name              	string    	`json:"name,omitempty"`
-	// 	DeferDestroy      	string    	`json:"defer_destroy,omitempty"`
-	// 	SANVolumeID       	string    	`json:"san:volume_id,omitempty"`
-	// 	MLSLabel          	string    	`json:"mlslabel,omitempty"`
-	// 	LogicalReferenced 	int       	`json:"logicalreferenced,omitempty"`
-	// 	Context           	string    	`json:"context,omitempty"`
-	// 	Clones			string		`json:"clones,omitempty"`
-	// }
-
-	//if err := json.Unmarshal(data, &aux); err != nil {
-	//	return err
-	//}
-    
-    // Parse the time string manually
-    // const layout = "2006-01-02 15:04:05"
-    // parsedTime, err := time.Parse(layout, aux.Creation)
-    // if err != nil {
-    //     return err
-    // }
-    // 
-    // m.Creation = parsedTime
-    return nil
+	return nil
 }
 
 func (s *ResourceSnapshot)ClonesNames() (clones []string) {

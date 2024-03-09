@@ -1402,18 +1402,65 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 }
 
 // ListSnapshots return the list of valid snapshots
-func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (*csi.ListSnapshotsResponse, error) {
-	return nil, nil
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "ListSnapshots",
-	// })
-	// msg := fmt.Sprintf("List snapshots %+v", req)
-	// l.Tracef(msg)
-	// var err error
-	// maxEnt := int64(req.GetMaxEntries())
+func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (rsp *csi.ListSnapshotsResponse, err error) {
+	
+	var rErr jrest.RestError
+	var token *jdrvr.CSIListingToken
+	var resp csi.ListSnapshotsResponse
+	// {
+	// 	Entries: []*csi.ListSnapshotsResponse_Entry{
+	// 		{
+	// 			Snapshot: &csi.Snapshot{
+	// 				SnapshotId:     sname,
+	// 				SourceVolumeId: snameT[0],
+	// 				CreationTime:   &timeStamp,
+	// 			},
+	// 		},
+	// 	},
+	// }, nil
 
-	// ////////////////////////////////////////////////////////////////////////////////////////
-	// // Verify arguments
+
+	l := cp.l.WithFields(log.Fields{
+		"request": "ListSnapshtos",
+		"func": "ListSnapshots",
+		"section": "controller",
+	})
+	ctx = jcom.WithLogger(ctx, l)
+
+	l.Debugf("Request: %+v", req)
+
+	maxEnt := int64(req.GetMaxEntries())
+	sourceVolumeId := req.GetSourceVolumeId()
+	snapshotId := req.GetSnapshotId()
+	startingToken := req.GetStartingToken()
+	token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken)
+	if rErr != nil {
+		return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
+	}
+
+	if sourceVolumeId != "" {
+		l.Debugf("For volume %s", sourceVolumeId)
+	} else {
+		if snapshotId != "" {
+			l.Debugf("For snapshots %s", snapshotId)
+		} else {
+			if  snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, uint64(maxEnt), *token); err == nil {
+				return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error()) 
+			} else {
+				if ts != nil {
+					resp.NextToken = ts.Token()
+				}
+				if err = completeListResponseFromSnapshotShort(ctx, &resp, snapList); err != nil {
+					return nil, err
+				} else {
+					return &resp, nil
+				}
+			}
+		}
+	}
+	return nil, nil
+	////////////////////////////////////////////////////////////////////////////////////////
+	// Verify arguments
 
 	// if maxEnt < 0 {
 	// 	return nil, status.Errorf(codes.Internal, "Number of Entries must not be negative.")
@@ -1471,8 +1518,8 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	// }
 	// l.Trace("Verification done")
 
-	// //////////////////////////////////////////////////////////////////////////////
-	// var rErr rest.RestError
+	//////////////////////////////////////////////////////////////////////////////
+
 
 	// filter := func(s string) bool {
 	// 	snameT := strings.Split(s, "_")

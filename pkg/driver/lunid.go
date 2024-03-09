@@ -13,6 +13,10 @@ import (
 	jcom "joviandss-kubernetescsi/pkg/common"
 )
 
+type DataInstanceDesc interface {
+	CSIID() string	
+}
+
 type LunDesc interface {
 	Name() string 
 	VDS() string
@@ -40,68 +44,6 @@ func nameToID(name string) string {
     	})
 	return transformedString
 }
-
-// func NewSnapshotIdFromName(name string) (*SnapshotId, error) {
-// 
-// 	// Get universal volume ID
-// 	var sid SnapshotId
-// 
-// 	if len(name) == 0 {
-// 		return nil, status.Error(codes.InvalidArgument, "Name missing in request") 
-// 	}
-// 
-// 	if len(name) <= 240 {
-// 		if  allowedSymbolsRegexp.MatchString(name) {
-// 			sid.vds = "sp_" + name
-// 		}
-// 	}
-// 	sid.name = name
-// 	preID := []byte(name)
-// 	rawID := sha256.Sum256(preID)
-// 	id := strings.ToLower(fmt.Sprintf("%X", rawID))
-// 	sid.id = id
-// 
-// 	return &sid, nil
-// }
-// 
-// func NewSnapshotIdFromId(id string) (*SnapshotId, error) {
-// 
-// 	// Get universal volume ID
-// 	var sid SnapshotId
-// 
-// 	if len(id) != 64 {
-// 		return nil, status.Error(codes.InvalidArgument, "Incorrect snapshot ID") 
-// 	}
-// 	sid.name = ""
-// 	sid.id = id
-// 	sid.vid = "csi_s_" + sid.id
-// 	return &sid, nil
-// }
-
-//func (vid *SnapshotId)Name() string {
-//
-//	if len(vid.name) == 0 {
-//	 	panic(fmt.Sprintf("Unable to identify snapshot name %+v", vid))
-//	}
-//	return vid.name
-//}
-//
-//func (vid *SnapshotId)VID() string {
-//
-//	if len(vid.vid) == 0 {
-//	 	panic(fmt.Sprintf("Unable to identify snapshot sid %+v", vid))
-//	}
-//	return vid.vid
-//}
-//
-//func (vid *SnapshotId)ID() string {
-//
-//	if len(vid.id) == 0 {
-//	 	panic(fmt.Sprintf("Unable to identify snapshot id %+v", vid))
-//	}
-//	return vid.id
-//}
-
 
 type VolumeDesc struct {
 	name		string
@@ -216,3 +158,12 @@ func (vid *VolumeDesc)VDS() string {
 	}
 	return vid.vds
 }
+
+func (vid *VolumeDesc)CSIID() string {
+
+	if len(vid.vds) == 0 {
+	 	panic(fmt.Sprintf("Unable to identify volume sid and give proper CSIID %+v", vid))
+	}
+	return vid.vds
+}
+

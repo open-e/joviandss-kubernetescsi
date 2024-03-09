@@ -29,6 +29,8 @@ func IsSDS(vds string) bool {
 	return vds[0] == 's'
 }
 
+
+
 func NewSnapshotDescFromName(lid LunDesc, name string) (*SnapshotDesc) {
 
 	// Get universal volume ID

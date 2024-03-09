@@ -308,6 +308,153 @@ func (d *CSIDriver) findPageByToken(ctx context.Context, pool string, token *str
 // 	return nil, nil, nil
 // }
 
+// func (d *CSIDriver) processSlice[T any](s []T) {
+//     for _, item := range s {
+//         fmt.Println(item)
+//     }
+// }
+
+
+func getResourcesList[RestResource any](ctx context.Context, maxret uint64, token CSIListingToken, 
+	grf func(ctx context.Context, token CSIListingToken)(lres []RestResource, err jrest.RestError),
+	BasedID func(res RestResource) string) (lres []RestResource, nt *CSIListingToken, err jrest.RestError) {
+
+	l := jcom.LFC(ctx)
+	l = l.WithFields(logrus.Fields{
+		"func": "getResourceList",
+		"section": "driver",
+	})
+
+	l.Debugf("Processing %T", lres)
+
+	for {
+		if ent, err := grf(ctx, token); err != nil {
+			return nil, nil, err
+		} else {
+			// No new snapshots, return what we have so far
+			//data, ok := ent.Entries.()
+
+			if len(ent) == 0 {
+				return lres, nil, nil
+			}
+
+			if token.BasedID() <= BasedID(ent[0]) {
+				lres = append(lres, (ent)...)
+				token.DropBasedID()
+			} else {
+				for i, e := range ent {
+					if BasedID(e) ==  token.BasedID() {
+						lres = append(lres, ent[i:]...)
+						token.BasedID()
+						break
+					}
+				}
+			}
+		}
+
+		if maxret > 0 {
+			if uint64(len(lres)) >= maxret {
+				if newToken, err := NewCSIListingTokenFromBasedID(BasedID(lres[maxret]), token.Page(), token.DC()); err != nil {
+					return nil, nil, err
+				} else {
+					lres = lres[:maxret]
+					return lres, &newToken, nil
+				}
+			}
+		}
+		token.PageUp()
+	}
+}
+
+func (d *CSIDriver) ListAllSnapshots(ctx context.Context, pool string, maxret uint64, token CSIListingToken) (snaps []jrest.ResourceSnapshotShort, tnew *CSIListingToken, err jrest.RestError) {
+	
+	l := jcom.LFC(ctx)
+	l = l.WithFields(logrus.Fields{
+		"func": "ListAllSnapshots",
+		"section": "driver",
+	})
+
+	grf := func(ctx context.Context, token CSIListingToken)(lres []jrest.ResourceSnapshotShort, err jrest.RestError) {
+	 	entr, err := d.re.GetSnapshotsEntries(ctx, pool, token.Page(), token.DC())
+		
+		if err != nil {
+			return nil, err
+		}
+		
+		if entries, ok := entr.Entries.([]jrest.ResourceSnapshotShort); ok == true {
+			return entries, nil
+		}
+		l.Warnln("Unable to identify format of %+v, it have %T")
+		return nil, nil
+	}
+
+	//var token CSIListingToken
+	//if startToken != nil {
+	//	if t, err := NewCSIListingTokenFromTokenString(*startToken); err != nil {
+	//		return nil, nil, err
+	//	} else {
+	//		token = *t
+	//	}
+	//}else {
+	//	token = NewCSIListingToken()
+	//}
+
+	if entries, csitoken, err := getResourcesList(ctx, maxret, token,  grf, RestSnapshotShortEntryBasedID); err != nil {
+		return nil, nil, err
+	} else {
+		//ts := csitoken.Token()
+		return entries, csitoken , nil
+	}
+
+	//rsnaps := []jrest.ResourceSnapshot{}
+	//var token *snapshotToken
+	//if startToken != nil {
+	//	if token, err = NewSnapshotTokenFromStr(*startToken); err != nil {
+	//		return nil, nil, err
+	//	}
+	//} else {
+	//	token = NewSnapshotToken(0, rand.Int63(), "", "")
+	//}
+	//for {
+	//	if _, spage, err := d.re.GetVolumeSnapshots(ctx, pool, vid.VID(), &token.page, &token.dc); err != nil {
+	//		return nil, nil, err
+	//	} else {
+	//		// No new snapshots, return what we have so far
+	//		if len(*spage) == 0 {
+	//			return &rsnaps, nil, nil
+	//		}
+
+	//		if token.sid <= (*spage)[0].Name {
+	//			rsnaps = append(rsnaps, (*spage)...)
+	//			token.sid = ""
+	//			token.vid = ""
+	//		} else {
+	//			for i, snap := range *spage {
+	//				if snap.Name == token.sid  {
+	//					rsnaps = append(rsnaps, (*spage)[i:]...)
+	//					token.sid = ""
+	//					token.vid = ""
+	//					break
+	//				}
+	//			}
+	//		}
+	//	}
+
+	//	if maxret != nil {
+	//		if int64(len(*snaps)) >= *maxret {
+	//			newToken := NewSnapshotToken(token.page, token.dc, "", rsnaps[*maxret].Name)
+	//			rsnaps = rsnaps[:*maxret]
+	//			nts := newToken.String()
+	//			return &rsnaps, &nts, nil
+	//		}
+	//	}
+	//	token.page += 1
+	//}
+
+	//return nil
+}
+
+
 // func (d *CSIDriver) ListAllSnapshots(ctx context.Context, pool string, maxret *int64, startToken *string) (snaps *[]jrest.ResourceSnapshot, tnew *string, err jrest.RestError) {
 // 	
 // 	rsnaps := []jrest.ResourceSnapshot{}
