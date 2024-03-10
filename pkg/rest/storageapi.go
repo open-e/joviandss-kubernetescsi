@@ -21,7 +21,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
+	//"reflect"
 	//"strconv"
 	//"strings"
 	"time"
@@ -79,34 +79,33 @@ func (re *RestEndpoint) GetAddress() (string, int) {
 
 func (s *RestEndpoint) GetPool(pool string) (*Pool, RestError) {
 	log.WithFields(log.Fields{"pool": pool}).Debugf("geting pool")
-	return nil, nil
-	//l := s.l.WithFields(logrus.Fields{
-	//	"pool": pool,
-	//}).Debug("start")
-	//msg := fmt.Sprintf("Getting pool %s", s.pool)
-	//l.Trace(msg)
-	//addr := fmt.Sprintf("api/v3/pools/%s", pool)
-	//stat, body, err := s.rp.Send("GET", addr, nil, GetPoolRCode)
-	//if err != nil {
-	//	msg := fmt.Sprintf("Internal failure in communication with storage %s.", s.addr)
-	//	l.Warn(msg)
-	//	return nil, GetError(RestRequestMalfunction, msg)
-	//}
+	l := s.l.WithFields(logrus.Fields{
+		"pool": pool,
+	}).Debug("start")
+	msg := fmt.Sprintf("Getting pool %s", s.pool)
+	l.Trace(msg)
+	addr := fmt.Sprintf("api/v3/pools/%s", pool)
+	stat, body, err := s.rp.Send("GET", addr, nil, GetPoolRCode)
+	if err != nil {
+		msg := fmt.Sprintf("Internal failure in communication with storage %s.", s.addr)
+		l.Warn(msg)
+		return nil, GetError(RestRequestMalfunction, msg)
+	}
 
-	// switch stat {
-	// case 500:
-	// 	return nil, GetError(RestResourceDNE, addr)
-	// case GetPoolRCode:
-	// default:
-	// 	return nil, GetError(RestFailureUnknown, addr)
-	// }
+	 switch stat {
+	 case 500:
+	 	return nil, GetError(RestResourceDNE, addr)
+	 case GetPoolRCode:
+	 default:
+	 	return nil, GetError(RestFailureUnknown, addr)
+	 }
 
-	// var poolData GetPoolData
-	// if err := json.Unmarshal(body, &poolData); err != nil {
-	// 	return nil, GetError(RestRPM, fmt.Sprintf("Error %s for %s", err.Error(), string(body[:len(body)])))
-	// }
+	 var poolData GetPoolData
+	 if err := json.Unmarshal(body, &poolData); err != nil {
+	 	return nil, GetError(RestRPM, fmt.Sprintf("Error %s for %s", err.Error(), string(body[:len(body)])))
+	 }
 
-	// return &poolData.Data, nil
+	 return &poolData.Data, nil
 }
 
 // GetPools return list of pools
@@ -141,25 +140,11 @@ func (s *RestEndpoint) GetPools() ([]PoolShort, error) {
 ///////////////////////////////////////////////////////////////////////////////
 // Volumes
 
-func (s *RestEndpoint) VolumeExists(vname string) (bool, error) {
-	// l := s.l.WithFields(logrus.Fields{
-	// 	"func": "VolumeExists",
-	// })
-
-	// l.Trace("Get Existing volumes")
-	// addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s", s.pool, vname)
-
-	// stat, _, _ := s.rp.Send("GET", addr, nil, GetVolumeRCode)
-
-	// if stat == GetVolumeRCode {
-	// 	return true, nil
-	// }
-	return false, nil
-}
 
 func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string) (*ResourceVolume, RestError) {
 
-	var rsp = &GetVolumeData{}
+	var resvol ResourceVolume
+	var rsp = GeneralResponse{Data: &resvol}
 
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s", pool, vname)
 	
@@ -180,19 +165,12 @@ func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string)
 	if errU := s.unmarshal(body, &rsp); errU != nil {
 		return nil, errU
 	}
-
-	switch stat {
-
-	case 200, 201:
-		if rsp.Data != nil {
-			return rsp.Data, nil
-		}
-	default:
-		if rsp.Error != nil {
-			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
-		}
+	
+	if stat == CodeOK || stat == CodeNoContent {
+		return &resvol, nil
 	}
-	return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+
+	return  nil, getError(ctx, body)
 }
 
 func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol CreateVolumeDescriptor) RestError {
@@ -219,7 +197,7 @@ func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol Create
 	// TODO: we are requesting volume with particular size and JovianDSS returns description of the volume
 	// it has created, should we check that one is equal to another?
 	if stat == CodeOK || stat == CodeCreated {
-		l.Debug("VolumeCreation done")
+		l.Debugf("volume %s creation done", vol.Name)
 		return nil
 	}
 
@@ -356,52 +334,8 @@ func (s *RestEndpoint) CreateSnapshot(ctx context.Context, pool string, vid stri
 		l.Debugf("CreateSnapshot %s Done", desc.SnapshotName)
 		return nil
 	}
-	
+
 	return getError(ctx, body)
-
-	// if err != nil {
-	// 	return GetError(RestRequestMalfunction, addr)
-	// }
-
-	// // Request is OK, exiting
-	// if stat == CreateSnapshotRCode {
-	// 	return nil
-	// }
-
-	// // Extract error information
-	// if body == nil {
-	// 	msg := fmt.Sprintf("Unidentifiable error, code : %d.", stat)
-	// 	l.Warn(msg)
-	// 	return GetError(RestFailureUnknown, msg)
-	// }
-
-	// errData, er := s.getError(body)
-
-	// if er != nil {
-	// 	msg := fmt.Sprintf("Unable to extract err message %+v", er)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestRequestMalfunction, msg)
-	// }
-
-	// switch (*errData).Errno {
-	// case 1:
-	// 	msg := fmt.Sprintf("Snapshot %s doesn't exist", vname)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestResourceDNE, msg)
-	// case CreateSnapshotECodeExists:
-	// 	msg := fmt.Sprintf("Snapshot %s already exists", sname)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestObjectExists, msg)
-
-	// default:
-	// 	msg := fmt.Sprintf("Unknown error %d, %s",
-	// 		(*errData).Errno,
-	// 		(*errData).Message)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestStorageFailureUnknown, msg)
-
-	// }
-
 }
 
 func (s *RestEndpoint) DeleteSnapshot(ctx context.Context, pool string, vname string, sname string, data DeleteSnapshotDescriptor) (err RestError) {
@@ -488,67 +422,67 @@ func (s *RestEndpoint) ListAllSnapshots(f func(string) bool) ([]ResourceSnapshot
 	// return out, nil
 }
 
-func (s *RestEndpoint) GetPoolSnapshots(ctx context.Context, pool string, page *int64, dc *int64) (results *int64, entries *[]ResourceSnapshotShort, err RestError) {
-	
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/snapshots", pool)
-	
-	if page != nil || dc != nil {
-		addr += "?"
-	}
-
-	if page != nil {
-		addr += fmt.Sprintf("page=%d", *page)
-	}
-	
-	if dc != nil {
-		if page != nil {
-			addr += "&"
-		}
-		addr += fmt.Sprintf("_dc=%d", *dc)
-	}
-	
-	l := jcom.LFC(ctx)
-	l = l.WithFields(log.Fields{
-		"func": "GetPoolSnapshots",
-		"url": addr,
-	})
-
-	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetAllSnapshotsRCode)
-
-	if err != nil {
-		s.l.Warnln("Unable to get snapshot list for pool %s", pool)
-		return nil, nil, err
-	}
-
-	var rsp = GeneralResponse{}
-
-	if errU := s.unmarshal(body, rsp); errU != nil {
-		return nil, nil, errU
-	}
-
-	switch stat {
-	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-
-			data, ok := rsp.Data.(ResultEntries)
-
-			if ok {
-				switch snaps := data.Entries.(type) {
-				case []ResourceSnapshotShort:
-					return &data.Results, &snaps ,nil
-				default:
-				return  nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("Snapshot list is formated in bad format %+v", data.Entries))
-				}
-			}
-			return nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", data))
-		}
-	default:
-		if rsp.Error != nil {
-			return nil, nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
-		}
-	}
-	return nil, nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
-}
+// func (s *RestEndpoint) GetPoolSnapshots(ctx context.Context, pool string, page *int64, dc *int64) (results *int64, entries *[]ResourceSnapshotShort, err RestError) {
+// 	
+// 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/snapshots", pool)
+// 	
+// 	if page != nil || dc != nil {
+// 		addr += "?"
+// 	}
+// 
+// 	if page != nil {
+// 		addr += fmt.Sprintf("page=%d", *page)
+// 	}
+// 	
+// 	if dc != nil {
+// 		if page != nil {
+// 			addr += "&"
+// 		}
+// 		addr += fmt.Sprintf("_dc=%d", *dc)
+// 	}
+// 	
+// 	l := jcom.LFC(ctx)
+// 	l = l.WithFields(log.Fields{
+// 		"func": "GetPoolSnapshots",
+// 		"url": addr,
+// 	})
+// 
+// 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetAllSnapshotsRCode)
+// 
+// 	if err != nil {
+// 		s.l.Warnln("Unable to get snapshot list for pool %s", pool)
+// 		return nil, nil, err
+// 	}
+// 
+// 	var rsp = GeneralResponse{}
+// 
+// 	if errU := s.unmarshal(body, rsp); errU != nil {
+// 		return nil, nil, errU
+// 	}
+// 
+// 	switch stat {
+// 	case CodeOK, CodeCreated:
+// 		if rsp.Data != nil {
+// 
+// 			data, ok := rsp.Data.(ResultEntries)
+// 
+// 			if ok {
+// 				switch snaps := data.Entries.(type) {
+// 				case []ResourceSnapshotShort:
+// 					return &data.Results, &snaps ,nil
+// 				default:
+// 				return  nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("Snapshot list is formated in bad format %+v", data.Entries))
+// 				}
+// 			}
+// 			return nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", data))
+// 		}
+// 	default:
+// 		if rsp.Error != nil {
+// 			return nil, nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+// 		}
+// 	}
+// 	return nil, nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+// }
 
 
 func (s *RestEndpoint) getResultsEntries(data *GeneralResponse) (results *int64, entries interface{}) {
@@ -560,70 +494,101 @@ func (s *RestEndpoint) getResultsEntries(data *GeneralResponse) (results *int64,
 }
 
 
-func (s *RestEndpoint) GetVolumeSnapshots(ctx context.Context, pool string, vid string, page *int64, dc *int64) (results *int64, entries *[]ResourceSnapshot, err RestError) {
+// func (s *RestEndpoint) GetVolumeSnapshots(ctx context.Context, pool string, vid string, page *int64, dc *int64) (results *int64, entries *[]ResourceSnapshot, err RestError) {
+// 
+// 	// var addr string
+// 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots", pool, vid)
+// 	
+// 	if page != nil || dc != nil {
+// 		addr += "?"
+// 	}
+// 
+// 	if page != nil {
+// 		addr += fmt.Sprintf("page=%d", *page)
+// 	}
+// 	
+// 	if dc != nil {
+// 		if page != nil {
+// 			addr += "&"
+// 		}
+// 		addr += fmt.Sprintf("_dc=%d", *dc)
+// 	}
+// 
+// 	l := jcom.LFC(ctx)
+// 	l = l.WithFields(log.Fields{
+// 		"func": "GetVolumeSnapshots",
+// 		"url": addr,
+// 	})
+// 
+// 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetSnapshotRCode)
+// 
+// 	if err != nil {
+// 		s.l.Warnln("Unable run request to get snapshot list for volume %s, %+v", vid, err)
+// 		return nil, nil, err
+// 	}
+// 
+// 	switch stat {
+// 	case CodeOK, CodeCreated:
+// 		var snaps []ResourceSnapshot
+// 		entr := ResultEntries{ Entries: &snaps }
+// 		rsp := GeneralResponse{ Data: &entr }
+// 
+// 		if errU := s.unmarshal(body, &rsp); errU != nil {
+// 			return nil, nil, errU
+// 		}
+// 		l.Debugf("Unmarshaled data: rsp %+v\n entr %+v\n snaps %+v", rsp, entr, snaps)
+// 		if rsp.Data != nil {
+// 
+// 			data, ok := rsp.Data.(*ResultEntries)
+// 			l.Debugf("Type dereferencing\n data %+v\nok %+v", data, ok)
+// 			l.Debugf("Data type %s", reflect.TypeOf(rsp.Data))
+// 			if ok {
+// 				switch snaps := data.Entries.(type) {
+// 				case *[]ResourceSnapshot:
+// 					return &data.Results, snaps ,nil
+// 				default:
+// 					return  nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("Snapshot list is formated in bad format %+v", data.Entries))
+// 				}
+// 			}
+// 			return nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", data))
+// 		}
+// 	default:
+// 		return nil, nil, getError(ctx, body)
+// 	}
+// 	return nil, nil, getError(ctx, body)
+// }
 
-	// var addr string
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots", pool, vid)
+func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string, vds string, sds string) (clones []ResourceVolumeSnapshotClones, err RestError) {
+
+	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones", pool, vds, sds)
 	
-	if page != nil || dc != nil {
-		addr += "?"
-	}
-
-	if page != nil {
-		addr += fmt.Sprintf("page=%d", *page)
-	}
-	
-	if dc != nil {
-		if page != nil {
-			addr += "&"
-		}
-		addr += fmt.Sprintf("_dc=%d", *dc)
-	}
-
-	l := jcom.LFC(ctx)
-	l = l.WithFields(log.Fields{
-		"func": "GetVolumeSnapshots",
+	l := s.l.WithFields(log.Fields{
+		"func": "GetVolumeSnapshotClones",
+		"section": "rest",
 		"url": addr,
 	})
+	
+	var rsp = GeneralResponse{Data: &clones}
 
-	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetSnapshotRCode)
+	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumeRCode)
 
 	if err != nil {
-		s.l.Warnln("Unable run request to get snapshot list for volume %s, %+v", vid, err)
-		return nil, nil, err
+		msg := fmt.Sprintf("Unable to get list of clones for snap %s of vol %s ", sds, vds)
+		l.Warn(msg)
+		return nil, GetError(RestErrorRequestMalfunction, msg)
 	}
 
-	switch stat {
-	case CodeOK, CodeCreated:
-		var snaps []ResourceSnapshot
-		entr := ResultEntries{ Entries: &snaps }
-		rsp := GeneralResponse{ Data: &entr }
-
-		if errU := s.unmarshal(body, &rsp); errU != nil {
-			return nil, nil, errU
-		}
-		l.Debugf("Unmarshaled data: rsp %+v\n entr %+v\n snaps %+v", rsp, entr, snaps)
-		if rsp.Data != nil {
-
-			data, ok := rsp.Data.(*ResultEntries)
-			l.Debugf("Type dereferencing\n data %+v\nok %+v", data, ok)
-			l.Debugf("Data type %s", reflect.TypeOf(rsp.Data))
-			if ok {
-				switch snaps := data.Entries.(type) {
-				case *[]ResourceSnapshot:
-					return &data.Results, snaps ,nil
-				default:
-					return  nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("Snapshot list is formated in bad format %+v", data.Entries))
-				}
-			}
-			return nil, nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", data))
-		}
-	default:
-		return nil, nil, getError(ctx, body)
+	if errU := s.unmarshal(body, &rsp); errU != nil {
+		return nil, errU
 	}
-	return nil, nil, getError(ctx, body)
+	
+	if stat == CodeOK || stat == CodeNoContent {
+		return clones, nil
+	}
+
+	return  nil, getError(ctx, body)
+
 }
-
 // func (s *RestEndpoint) ListVolumeSnapshots(ctx context.Context, pool string, vname string, f func(string) bool) ([]SnapshotShort, RestError) {
 // 	//return nil, nil
 // 

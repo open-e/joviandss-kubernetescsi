@@ -86,9 +86,8 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	var res *http.Response
 	// var err restError
 	l := jcom.LFC(ctx)
-	
+	l.Debugf("Path %s", path)	
 	//l.Debugf("proto %+v, addr %+v, port %+v, url %+v", )
-	l.Debugf("Available addrs %+v", rp.addrs)
 
 	url := fmt.Sprintf("%s://%s:%d/%s", rp.prot, rp.addrs[rp.active_addr], rp.port, path)
 	
@@ -98,10 +97,12 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 		"method": method,
 		"url": url,
 	})
+	
+	l.Debugf("Available addrs %+v", rp.addrs)
 
-	rp.mu.Lock()
-	rp.requestID++
-	rp.mu.Unlock()
+	//rp.mu.Lock()
+	//rp.requestID++
+	//rp.mu.Unlock()
 
 
 

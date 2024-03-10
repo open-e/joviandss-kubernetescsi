@@ -17,7 +17,7 @@ import (
 	//"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	//"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -408,7 +408,7 @@ func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.R
 		case jrest.RestErrorResourceDNE:
 			err = status.Error(codes.NotFound, rErr.Error())
 		default:
-			err = status.Errorf(codes.Internal, rErr.Error())
+			err = status.Error(codes.Internal, rErr.Error())
 		}
 		return nil, err
 	}
@@ -932,7 +932,7 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	if vd, rerr := jdrvr.NewVolumeDescFromVDS(req.VolumeId); rerr == nil {
 
 		l.Debugf("Deleting volume %s", vd.Name())
-		
+
 		// Try to delete without recursiuon
 		if err := cp.d.DeleteVolume(ctx, cp.pool, vd); err == nil {
 			return &csi.DeleteVolumeResponse{}, nil
@@ -1176,229 +1176,127 @@ func (cp *ControllerPlugin) createConcealedSnapshot(vname string) (*string, erro
 
 // CreateSnapshot creates snapshot
 func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-	return nil, nil
+	
+	l := cp.l.WithFields(log.Fields{
+		"request": "CreateSnapshot",
+		"func": "CreateSnapshot",
+	})
 
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "CreateSnapshot",
-	// })
+	ctx = jcom.WithLogger(ctx, l)
 
-	// l.Trace("Create Snapshot")
-	// var err error
+	l.Debug("request: %+s", *req)
+	var err error
 
-	// //////////////////////////////////////////////////////////////////////////////
-	// /// Checks
+	//////////////////////////////////////////////////////////////////////////////
+	/// Checks
 
-	// if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT) {
-	// 	err = status.Errorf(codes.Internal, "Capability is not supported.")
-	// 	l.Warnf("Unable to create volume req: %v", req)
-	// 	return nil, err
-	// }
+	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT) {
+		err = status.Errorf(codes.Internal, "Capability is not supported.")
+		l.Warnf("Unable to create volume req: %v", req)
+		return nil, err
+	}
 
-	// vname := req.GetSourceVolumeId()
-	// if len(vname) == 0 {
-	// 	msg := "Volume name missing in request"
-	// 	l.Warn(msg)
-	// 	return nil, status.Error(codes.InvalidArgument, msg)
-	// }
-	// sNameRaw := req.GetName()
-	// // Get universal volume ID
+	//////////////////////////////////////////////////////////////////////////////
 
-	// if len(sNameRaw) == 0 {
-	// 	msg := "Snapshot name missing in request"
-	// 	l.Warn(msg)
-	// 	return nil, status.Error(codes.InvalidArgument, msg)
-	// }
+	vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetSourceVolumeId())
+	if err != nil {
+		return nil, err
+	}
 
-	// //////////////////////////////////////////////////////////////////////////////
+	sd := jdrvr.NewSnapshotDescFromName(vd, req.GetName())
 
-	// sID := cp.getStandardID(sNameRaw)
 
-	// sname := fmt.Sprintf("%s_%s", vname, sID)
+	rErr := cp.d.CreateSnapshot(ctx, cp.pool, vd, sd)
 
-	// bExists := cp.getSnapshotRecordExists(sID)
+	switch jrest.ErrCode(rErr)  {
+	case jrest.RestErrorResourceBusy:
+		return nil, status.Error(codes.Aborted, err.Error())
+	case jrest.RestErrorResourceDNE:
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
+	case jrest.RestErrorResourceExists:
+		l.Warn("Specified snapshot already exists.")
+	case jrest.RestErrorOutOfSpace:
+		emsg := fmt.Sprintf("Unable to create snapshot %s for volume %s, storage out of space", sd.Name(), vd.Name())
+		l.Warn(emsg)
+		return nil, status.Errorf(codes.ResourceExhausted, emsg)
+	case jrest.RestErrorOk:
+		l.Debugf("Snapshot %s was created", sd.Name())
+	default:
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
 
-	// if bExists == true {
-	// 	cp.l.Debugf("Snapshot record exists!")
-	// 	var lerr error
-	// 	if _, lerr = cp.getSnapshot(sname); codes.NotFound == status.Code(lerr) {
-	// 		return nil, status.Error(codes.AlreadyExists, "Exists.")
-	// 	}
-	// 	if lerr != nil {
-	// 		cp.l.Debugf("Err value of checking related property! %s", lerr.Error())
-	// 	}
-	// }
-
-	// // Check if volume exists
-	// // TODO: implement check if snapshot exists
-	// l.Debugf("Req: %+v ", req)
-
-	// // Get size of volume
-	// var v *rest.Volume
-	// v, err = cp.getVolume(vname)
-
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	// var vSize int64
-	// vSize, err = strconv.ParseInt((*v).Volsize, 10, 64)
-
-	// if err != nil {
-	// 	err = status.Errorf(codes.Internal, "Unable to extract volume size.")
-	// }
-
-	// rErr := (*cp.endpoints[0]).CreateSnapshot(vname, sname)
-
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 		return nil, err
-
-	// 	case rest.RestObjectExists:
-	// 		cp.l.Warn("Specified snapshot already exists.")
-
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return nil, err
-	// 	}
-	// }
-	// // Make record of created snapshot
-	// cp.putSnapshotRecord(sID)
-
-	// var s *rest.Snapshot // s for snapshot
-	// s, rErr = (*cp.endpoints[0]).GetSnapshot(vname, sname)
-
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		err = status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, "Unknown internal error")
-	// 	}
-	// }
-
-	// // Snapshot created successfully
-	// if rErr == nil {
-	// 	layout := "2006-1-2 15:4:5"
-	// 	t, err := time.Parse(layout, s.Creation)
-	// 	if err != nil {
-	// 		msg := fmt.Sprintf("Unable to get snapshot creation time: %s", err)
-	// 		cp.l.Warn(msg)
-	// 		return nil, status.Errorf(codes.Internal, msg)
-	// 	}
-	// 	creationTime := &timestamp.Timestamp{
-	// 		Seconds: t.Unix(),
-	// 	}
-
-	// 	rsp := csi.CreateSnapshotResponse{
-	// 		Snapshot: &csi.Snapshot{
-	// 			SnapshotId:     sname,
-	// 			SourceVolumeId: vname,
-	// 			CreationTime:   creationTime,
-	// 			ReadyToUse:     true,
-	// 			SizeBytes:      vSize,
-	// 		},
-	// 	}
-	// 	cp.l.Tracef("List snapshot resp %+v", rsp)
-	// 	return &rsp, nil
-
-	// }
-
-	// return nil, err
+	snap, rErr := cp.d.GetSnapshot(ctx, cp.pool, vd, sd)
+	
+	switch jrest.ErrCode(rErr)  {
+	case jrest.RestErrorResourceBusy:
+		return nil, status.Error(codes.Aborted, err.Error())
+	case jrest.RestErrorResourceDNE:
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
+	case jrest.RestErrorOk:
+		l.Debugf("Got snapshot %s info %+v", sd.Name(), *snap)
+	default:
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
+	creationTime := &timestamp.Timestamp{
+		Seconds: snap.Creation.Unix(),
+	}
+	
+	rsp := csi.CreateSnapshotResponse{
+		Snapshot: &csi.Snapshot{
+			SnapshotId:     sd.CSIID(),
+			SourceVolumeId: vd.CSIID(),
+			CreationTime:   creationTime,
+			ReadyToUse:     true,
+			SizeBytes:      snap.VolSize,
+		},
+	}
+	return &rsp, nil
 }
 
 // DeleteSnapshot deletes snapshot
 func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-	return nil, nil
-	// // Check arguments
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "DeleteSnapshot",
-	// })
 
-	// l.Tracef("Delete Snapshot req: %+v", req)
-	// var err error
+	l := cp.l.WithFields(log.Fields{
+		"request": "DeleteSnapshot",
+		"func": "DeleteSnapshot",
+	})
 
-	// //////////////////////////////////////////////////////////////////////////////
-	// /// Checks
-	// if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT) {
-	// 	err = status.Errorf(codes.Internal, "Capability is not supported.")
-	// 	l.Warnf("Unable to create volume req: %v", req)
-	// 	return nil, err
-	// }
+	ctx = jcom.WithLogger(ctx, l)
 
-	// sname := req.GetSnapshotId()
-	// if len(sname) == 0 {
-	// 	msg := "Snapshot id missing in request"
-	// 	l.Warn(msg)
-	// 	return nil, status.Error(codes.InvalidArgument, msg)
-	// }
+	l.Debug("request: %+s", *req)
+	var err error
+	
 
-	// snameT := strings.Split(sname, "_")
+	//////////////////////////////////////////////////////////////////////////////
+	/// Checks
+	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT) {
+		err = status.Errorf(codes.Internal, "Capability is not supported.")
+		l.Warnf("Unable to create volume req: %v", req)
+		return nil, err
+	}
+	//////////////////////////////////////////////////////////////////////////////
 
-	// if len(snameT) != 2 {
-	// 	msg := "Unable to obtain volume name from snapshot name"
-	// 	l.Warn(msg)
-	// 	return &csi.DeleteSnapshotResponse{}, nil
-	// 	// TODO: inspect this, according to csi-test
-	// 	// return nil, status.Error(codes.InvalidArgument, msg)
-	// }
+	sd, err := jdrvr.NewSnapshotDescFromCSIID(req.GetSnapshotId())
+	if err != nil {
+		return nil, err
+	}
 
-	// vname := snameT[0]
+	ld := sd.GetVD()
 
-	// //////////////////////////////////////////////////////////////////////////////
+	rErr := cp.d.DeleteSnapshot(ctx, cp.pool, ld, sd)
 
-	// snap, err := cp.getSnapshot(sname)
-	// if err != nil {
-	// 	if codes.NotFound == grpc.Code(err) {
-	// 		msg := fmt.Sprintf("Snapshot already deleted %s", sname)
+	switch jrest.ErrCode(rErr)  {
+	case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusySnapshotHasClones:
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
+	case jrest.RestErrorResourceDNE:
+		l.Warnf("snapshot %s do not exists", sd.Name())
+	case jrest.RestErrorOk:
+		l.Debugf("snapshot %s was deleted before", sd.Name())
+	default:
+		return nil, status.Errorf(codes.Internal, err.Error())
+	}
 
-	// 		l.Trace(msg)
-	// 		return &csi.DeleteSnapshotResponse{}, nil
-	// 	}
-	// }
-
-	// if len(snap.Clones) > 0 {
-	// 	msg := fmt.Sprintf("Snapshot %s is a parent of %s", sname, snap.Clones)
-	// 	return nil, status.Error(codes.FailedPrecondition, msg)
-	// }
-
-	// rErr := (*cp.endpoints[0]).DeleteSnapshot(vname, sname)
-
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 		return nil, err
-
-	// 	case rest.RestObjectExists:
-	// 		err = status.Errorf(codes.AlreadyExists, rErr.Error())
-	// 		return nil, err
-
-	// 	case rest.RestResourceDNE:
-
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return nil, err
-	// 	}
-	// }
-
-	// // Clean snapshot record
-	// cp.delSnapshotRecord(snameT[1])
-
-	// return &csi.DeleteSnapshotResponse{}, nil
+	return &csi.DeleteSnapshotResponse{}, nil
 }
 
 // ListSnapshots return the list of valid snapshots
@@ -1407,23 +1305,10 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	var rErr jrest.RestError
 	var token *jdrvr.CSIListingToken
 	var resp csi.ListSnapshotsResponse
-	// {
-	// 	Entries: []*csi.ListSnapshotsResponse_Entry{
-	// 		{
-	// 			Snapshot: &csi.Snapshot{
-	// 				SnapshotId:     sname,
-	// 				SourceVolumeId: snameT[0],
-	// 				CreationTime:   &timeStamp,
-	// 			},
-	// 		},
-	// 	},
-	// }, nil
-
 
 	l := cp.l.WithFields(log.Fields{
 		"request": "ListSnapshtos",
 		"func": "ListSnapshots",
-		"section": "controller",
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
@@ -1444,7 +1329,8 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		if snapshotId != "" {
 			l.Debugf("For snapshots %s", snapshotId)
 		} else {
-			if  snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, uint64(maxEnt), *token); err == nil {
+			l.Debugln("Listing all snapshots")
+			if  snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, uint64(maxEnt), *token); err != nil {
 				return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error()) 
 			} else {
 				if ts != nil {
@@ -1925,17 +1811,17 @@ func (cp *ControllerPlugin) ControllerGetVolume(ctx context.Context, in *csi.Con
 // GetCapacity gets storage capacity
 func (cp *ControllerPlugin) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
 	return nil, nil
-	// pool, rErr := (*cp.endpoints[0]).GetPool()
-	// if rErr != nil {
-	// 	return nil, status.Error(codes.Internal, rErr.Error())
-	// }
-	// var rsp csi.GetCapacityResponse
-	// var err error
-	// rsp.AvailableCapacity, err = strconv.ParseInt(pool.Available, 10, 64)
-	// if err != nil {
-	// 	return nil, status.Error(codes.Internal, err.Error())
-	// }
-	// return &rsp, nil
+	pool, rErr := *cp.d. .GetPool()
+	if rErr != nil {
+		return nil, status.Error(codes.Internal, rErr.Error())
+	}
+	var rsp csi.GetCapacityResponse
+	var err error
+	rsp.AvailableCapacity, err = strconv.ParseInt(pool.Available, 10, 64)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	return &rsp, nil
 }
 
 // capSupported check if capability is supported

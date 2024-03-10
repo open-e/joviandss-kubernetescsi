@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	jcom "joviandss-kubernetescsi/pkg/common"
-	jrest "joviandss-kubernetescsi/pkg/rest"
+	//jrest "joviandss-kubernetescsi/pkg/rest"
 )
 
 
@@ -60,8 +60,8 @@ func NewSnapshotDescFromName(lid LunDesc, name string) (*SnapshotDesc) {
 	}
 
 	sd.csiID = fmt.Sprintf("%s_%s",
-		base64.StdEncoding.EncodeToString([]byte(sd.ld.VDS())),
-		base64.StdEncoding.EncodeToString([]byte(sd.sds)))
+		sd.sds,
+		base64.StdEncoding.EncodeToString([]byte(sd.ld.VDS())))
 	return &sd
 }
 
@@ -114,36 +114,37 @@ func NewSnapshotDescFromSDS(ld LunDesc, sds string) (*SnapshotDesc, error) {
 	}
 
 	sd.csiID = fmt.Sprintf("%s_%s",
-		base64.StdEncoding.EncodeToString([]byte(sd.ld.VDS())),
-		base64.StdEncoding.EncodeToString([]byte(sd.sds)))
+		sd.sds,
+		base64.StdEncoding.EncodeToString([]byte(sd.ld.VDS())))
+
 	return &sd, nil
 }
 
 // NewSnapshotDescFromCSIID takes as argument csi snapshot id that is supplied to kubernetes and
 // initialize desctiptor with it
-func NewSnapshotDescFromCSIID(csiid string) (*SnapshotDesc, jrest.RestError) {
+func NewSnapshotDescFromCSIID(csiid string) (*SnapshotDesc, error) {
 	var sd SnapshotDesc
 
 	sd.csiID = csiid
 
 	csiidl	:= strings.Split(csiid, "_")
-	if len(csiidl) != 2 {
-		return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to process snapshot token %s", csiid))
+	if len(csiidl) <= 2 {
+		return nil, status.Errorf(codes.InvalidArgument, "Snapshot ID %s have bad format", csiid)
+		// return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to process snapshot token %s", csiid))
 	}
 
-	if vds, err := base64.StdEncoding.DecodeString(csiidl[0]); err != nil {
-		return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to process snapshot token %s, decoding failed %s", csiid, err.Error()))
+	if vds, err := base64.StdEncoding.DecodeString(csiidl[len(csiidl)-1:][0]); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Unable to decode volume section of snapshot ID %s have bad format, %s", csiid, err.Error())
+		//return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to process snapshot token %s, decoding failed %s", csiid, err.Error()))
 	} else {
 		if sd.ld, err = NewVolumeDescFromVDS(string(vds)); err != nil {
-			return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to restore voprocess snapshot token %s, decoding failed %s", csiid, err.Error())) 
+			return nil, status.Errorf(codes.InvalidArgument, "Volume section of snapshot ID %s have bad format, %s", csiid, err.Error())
+			//return nil, status.Errorf(codes.InvalidArgument, "Snapshot ID %s have bad format", csiid)
+			// return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to restore voprocess snapshot token %s, decoding failed %s", csiid, err.Error())) 
 		}
 	}
-	
-	if sdb , err := base64.StdEncoding.DecodeString(csiidl[1]); err != nil {
-		return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to process snapshot token %s, decoding failed %s", csiid, err.Error()))
-	} else {
-		sd.sds = string(sdb)
-	}
+
+	sd.sds = strings.Join(csiidl[:len(csiidl)-1], "_")
 
 	sd.parseSDS(sd.sds)
 	return &sd, nil
@@ -174,6 +175,9 @@ func (sd *SnapshotDesc)CSIID() string {
 	if len(sd.csiID) == 0 {
 	 	panic(fmt.Sprintf("Unable to identify snapshot csi id %+v", sd))
 	}
-	return sd.sds
+	return sd.csiID
 }
 
+func (sd *SnapshotDesc)GetVD() LunDesc {
+	return sd.ld
+}

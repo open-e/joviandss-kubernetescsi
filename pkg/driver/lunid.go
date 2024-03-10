@@ -14,12 +14,13 @@ import (
 )
 
 type DataInstanceDesc interface {
-	CSIID() string	
+	CSIID() string
 }
 
 type LunDesc interface {
-	Name() string 
-	VDS() string
+	Name()		string
+	VDS()		string
+	CSIID()		string
 }
 
 // type SnapshotId struct {
@@ -141,6 +142,10 @@ func NewVolumeDescFromVDS(vds string) (*VolumeDesc, error) {
 	}
 
 	return &vd, nil
+}
+
+func NewVolumeDescFromCSIID(csiid string) (*VolumeDesc, error) {
+	return NewVolumeDescFromVDS(csiid)
 }
 
 func (vid *VolumeDesc)Name() string {

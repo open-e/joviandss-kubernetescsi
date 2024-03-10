@@ -244,9 +244,40 @@ type ResourceSnapshotShortProperties struct {
 
 }
 
+func (m *ResourceSnapshotShortProperties) UnmarshalJSON(data []byte) error {
+
+	type Alias ResourceSnapshotShortProperties
+    	aux := &struct {
+		Creation	string `json:"creation,omitempty"`
+		*Alias
+    	}{
+    	    Alias: (*Alias)(m), // Point Alias to ResourceSnapshot to reuse JSON tags
+    	}
+    	if err := json.Unmarshal(data, aux); err != nil {
+    	    return err
+    	}
+
+	if len(aux.Creation) > 0 { // Only parse if non-empty
+		creationTime, err := strconv.ParseInt(aux.Creation, 10, 64)
+		if err != nil {
+			return nil
+		}
+		m.Creation = time.Unix(creationTime, 0)
+	}
+
+	return nil
+}
+
 type ResourceSnapshotShort struct {
 	Volume     string
 	Name       string
 	Properties ResourceSnapshotShortProperties
+}
+
+type ResourceVolumeSnapshotClones struct {
+	IsClone		string		`json:"is_clone,omitempty"`
+	FullName        string       	`json:"full_name,omitempty"`
+	Name      	string    	`json:"name,omitempty"`
+	Origin          string		`json:"origin,omitempty"`
 }
 
