@@ -66,87 +66,87 @@ type ErrorData struct {
 // /pools
 
 // IOStats data on input ourput statistics
-type IOStats struct {
-	Read   string `json:"read"`
-	Write  string `json:"write"`
-	Chksum string `json:"chksum"`
-}
-
-// Disk structure returned by server
-type Disk struct {
-	Name    string
-	Id      string
-	Sn      string
-	Model   string
-	Path    string
-	Health  string
-	Size    int64
-	Iostats IOStats
-	Led     string
-	Origin  string
-}
-
-// VDevice virtual device structure
-type VDevice struct {
-	Name    string
-	Type    string
-	Health  string
-	Iostats IOStats
-	Disks   []Disk
-}
-
-// Enabled flag
-type Enabled struct {
-	Enabled bool
-}
-
+//type IOStats struct {
+//	Read   string `json:"read"`
+//	Write  string `json:"write"`
+//	Chksum string `json:"chksum"`
+//}
+//
+//// Disk structure returned by server
+//type Disk struct {
+//	Name    string
+//	Id      string
+//	Sn      string
+//	Model   string
+//	Path    string
+//	Health  string
+//	Size    int64
+//	Iostats IOStats
+//	Led     string
+//	Origin  string
+//}
+//
+//// VDevice virtual device structure
+//type VDevice struct {
+//	Name    string
+//	Type    string
+//	Health  string
+//	Iostats IOStats
+//	Disks   []Disk
+//}
+//
+//// Enabled flag
+//type Enabled struct {
+//	Enabled bool
+//}
+//
 ///////////////////////////////////////////////////////////////////////////////
 /// Pool
 
-type PoolEnabled struct {
-	Enabled bool `enabled:"enabled"`
-}
-
-// Pool response structure
-type Pool struct {
-	Available  string      `json:"available"`
-	Status     int         `json:"status"`
-	Name       string      `json:"name"`
-	Scan       int         `json:"scan"`
-	Encryption PoolEnabled `json:"encryption"`
-	Iostats    IOStats     `json:"iostats"`
-	Vdevs      []VDevice   `json:"vdevs"`
-	Health     string      `json:"health"`
-	Operation  string      `json:"operation"`
-	ID         string      `json:"id"`
-	Size       string      `json:"size"`
-}
-
-// GetPoolData response mask
-type GetPoolData struct {
-	Data  Pool
-	Error ErrorT
-}
+//type PoolEnabled struct {
+//	Enabled bool `enabled:"enabled"`
+//}
+//
+//// Pool response structure
+//type Pool struct {
+//	Available  string      `json:"available"`
+//	Status     int         `json:"status"`
+//	Name       string      `json:"name"`
+//	Scan       int         `json:"scan"`
+//	Encryption PoolEnabled `json:"encryption"`
+//	Iostats    IOStats     `json:"iostats"`
+//	Vdevs      []VDevice   `json:"vdevs"`
+//	Health     string      `json:"health"`
+//	Operation  string      `json:"operation"`
+//	ID         string      `json:"id"`
+//	Size       string      `json:"size"`
+//}
+//
+//// GetPoolData response mask
+//type GetPoolData struct {
+//	Data  Pool
+//	Error ErrorT
+//}
 
 const GetPoolRCode = 200
 
 // PoolShort element of a pool list
-type PoolShort struct {
-	Name       string
-	Status     int
-	Health     string
-	Scan       int
-	Operation  string
-	Encryption Enabled
-	Iostats    IOStats
-	Vdevs      []VDevice
-}
+//type PoolShort struct {
+//	Name       string
+//	Status     int
+//	Health     string
+//	Scan       int
+//	Operation  string
+//	Encryption Enabled
+//	Iostats    IOStats
+//	Vdevs      []VDevice
+//}
 
 // GetPoolsData response mask
-type GetPoolsData struct {
-	Data  []PoolShort
-	Error ErrorT
-}
+//type GetPoolsData struct {
+//	Data  []PoolShort
+//	Error ErrorT
+//}
 
 // GetPoolsRCode success response code
 const GetPoolsRCode = 200

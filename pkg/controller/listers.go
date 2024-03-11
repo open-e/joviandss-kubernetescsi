@@ -59,3 +59,29 @@ func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSna
 
 	return nil
 }
+
+func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshot, ld jdrvr.LunDesc) (err error) {
+
+	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
+	lsr.Entries = entries
+	for i, s := range snaps {
+		ts := timestamppb.New(s.Creation)
+
+		sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
+		if err != nil {
+			return err
+		}
+
+		entries[i] = &csi.ListSnapshotsResponse_Entry{
+			Snapshot: &csi.Snapshot{
+				SnapshotId:     sd.CSIID(),
+				SourceVolumeId: ld.CSIID(),
+				CreationTime:   ts,
+				ReadyToUse:	true,
+			},
+		}
+	}
+
+	return nil
+}
+

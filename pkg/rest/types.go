@@ -281,3 +281,99 @@ type ResourceVolumeSnapshotClones struct {
 	Origin          string		`json:"origin,omitempty"`
 }
 
+
+type ResourcePool struct {
+	Available         int64				`json:"available,omitempty"`
+	Status            int				`json:"status,omitempty"`
+	ImportStatus      ResourcePoolImportStatus	`json:"import_status,omitempty"`
+	Scan              *interface{}			`json:"scan,omitempty"`
+	Encryption        ResourcePoolEncryption	`json:"encryption,omitempty"`
+	DeduplicationRate string			`json:"deduplication_rate,omitempty"`
+	SysvolUpgrade     string			`json:"sysvol_upgrade,omitempty"`
+	Vdevs             []ResourcePoolVdev		`json:"vdevs,omitempty"`
+	ID                string			`json:"id,omitempty"`
+	Health            string			`json:"health,omitempty"`
+	IOStats           ResourcePoolIOStats		`json:"iostats,omitempty"`
+	Operation         string			`json:"operation,omitempty"`
+	Size              string			`json:"size,omitempty"`
+	AutoTrim          bool				`json:"autotrim,omitempty"`
+	Name              string			`json:"name,omitempty"`
+}
+
+func (m *ResourcePool) UnmarshalJSON(data []byte) error {
+
+	type Alias ResourcePool
+    	aux := &struct {
+		Available	string `json:"available,omitempty"`
+		*Alias
+    	}{
+    	    Alias: (*Alias)(m), // Point Alias to ResourceSnapshot to reuse JSON tags
+    	}
+    	if err := json.Unmarshal(data, aux); err != nil {
+    	    return err
+    	}
+
+	if len(aux.Available) > 0 { // Only parse if non-empty
+		available, err := strconv.ParseInt(aux.Available, 10, 64)
+		if err != nil {
+			return nil
+		}
+		m.Available = available
+	}
+	return nil
+}
+
+type ResourcePoolImportStatus struct {
+	ImportSteps      ResourcePoolImportSteps	`json:"import_steps,omitempty"`
+	ImportSuccessful bool				`json:"import_successful,omitempty"`
+}
+
+type ResourcePoolImportSteps struct {
+	SanSetup          bool `json:"san_setup,omitempty"`
+	VipSetup          bool `json:"vip_setup,omitempty"`
+	ZfsImport         bool `json:"zfs_import,omitempty"`
+	MountSystemVolume bool `json:"mount_system_volume,omitempty"`
+	NasSetup          bool `json:"nas_setup,omitempty"`
+}
+
+type ResourcePoolEncryption struct {
+	Enabled bool `json:"enabled,omitempty"`
+}
+
+type ResourcePoolVdev struct {
+	Name             string			`json:"name,omitempty"`
+	IOStats          ResourcePoolIOStats	`json:"iostats,omitempty"`
+	Disks            []Disk			`json:"disks,omitempty"`
+	Health           string			`json:"health,omitempty"`
+	VdevReplacings   []string		`json:"vdev_replacings,omitempty"`
+	VdevSpares       []string		`json:"vdev_spares,omitempty"`
+	Type             string			`json:"type,omitempty"`
+}
+
+type Disk struct {
+	Origin    string		`json:"origin,omitempty"`
+	Slot      string   		`json:"slot,omitempty"`
+	Led       string   		`json:"led,omitempty"`
+	Name      string   		`json:"name,omitempty"`
+	IOStats   ResourcePoolIOStats	`json:"iostats,omitempty"`
+	Alias     string		`json:"alias,omitempty"`
+	Health    string   		`json:"health,omitempty"`
+	SN        string   		`json:"sn,omitempty"`
+	TrimData  ResourcePoolTrimData	`json:"trim_data,omitempty"`
+	Path      *string		`json:"path,omitempty"` // Using *string to handle null values
+	Model     string   		`json:"model,omitempty"`
+	ID        string   		`json:"id,omitempty"`
+	Size      int64    		`json:"size,omitempty"`
+}
+
+type ResourcePoolTrimData struct {
+	Status   string		`json:"status,omitempty"`
+	Progress *interface{}	`json:"progress,omitempty"` // Using *interface{} to handle null values
+	TrimTime *interface{}	`json:"trim_time,omitempty"` // Using *interface{} to handle null values
+}
+
+type ResourcePoolIOStats struct {
+	Read   string `json:"read,omitempty"`
+	Write  string `json:"write,omitempty"`
+	Chksum string `json:"chksum,omitempty"`
+}

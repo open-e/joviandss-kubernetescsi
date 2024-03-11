@@ -51,12 +51,12 @@ func pagedcSuffix(addr string, page *int64, dc *int64) (out string) {
 	return addr
 }
 
-func (s *RestEndpoint) GetVolumeSnapshotsEntry(ctx context.Context, pool string, vname string, page *int64, dc *int64) (ent ResultEntries, err RestError) {
+func (s *RestEndpoint) GetVolumeSnapshotsEntries(ctx context.Context, pool string, vname string, page int64, dc int64) (ent ResultEntries, err RestError) {
 
 	return ent, nil
 }
 
-func (s *RestEndpoint) GetVolumesEntry(ctx context.Context, pool string, page *int64, dc *int64) (ent ResultEntries, err RestError) {
+func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page int64, dc int64) (ent ResultEntries, err RestError) {
 
 	return ent, nil
 }

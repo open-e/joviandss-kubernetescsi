@@ -18,12 +18,16 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/protobuf/ptypes/timestamp"
+
+	//"github.com/golang/protobuf/ptypes/wrappers"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
 	// "google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	jcom "joviandss-kubernetescsi/pkg/common"
 	// "joviandss-kubernetescsi/pkg/driver"
@@ -1301,7 +1305,7 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 
 // ListSnapshots return the list of valid snapshots
 func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (rsp *csi.ListSnapshotsResponse, err error) {
-	
+
 	var rErr jrest.RestError
 	var token *jdrvr.CSIListingToken
 	var resp csi.ListSnapshotsResponse
@@ -1323,24 +1327,61 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
 	}
 
-	if sourceVolumeId != "" {
-		l.Debugf("For volume %s", sourceVolumeId)
-	} else {
-		if snapshotId != "" {
-			l.Debugf("For snapshots %s", snapshotId)
+	if len(sourceVolumeId) > 0 && len(snapshotId) == 0 {
+		l.Debugf("for volume %s", sourceVolumeId)
+		if vd, err := jdrvr.NewVolumeDescFromCSIID(sourceVolumeId); err != nil {
+			return nil, err
 		} else {
-			l.Debugln("Listing all snapshots")
-			if  snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, uint64(maxEnt), *token); err != nil {
+			if  snapList, ts, rErr := cp.d.ListVolumeSnapshots(ctx, cp.pool, vd, int(maxEnt), *token); err != nil {
 				return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error()) 
 			} else {
 				if ts != nil {
 					resp.NextToken = ts.Token()
 				}
-				if err = completeListResponseFromSnapshotShort(ctx, &resp, snapList); err != nil {
+				if err = completeListResponseFromVolumeSnapshot(ctx, &resp, snapList, vd); err != nil {
 					return nil, err
 				} else {
 					return &resp, nil
 				}
+			}
+		}
+	} else if len(snapshotId) > 0 && len(sourceVolumeId) == 0 {
+		if sd, err := jdrvr.NewSnapshotDescFromCSIID(snapshotId); err != nil {
+			return nil, err
+		} else {
+			ld := sd.GetVD()
+			if snap, rErr := cp.d.GetSnapshot(ctx, cp.pool, ld, sd); rErr != nil {
+				if jrest.ErrCode(rErr) == jrest.RestErrorResourceDNE {
+					return nil, status.Error(codes.InvalidArgument, rErr.Error())
+				}
+
+				entry := csi.ListSnapshotsResponse_Entry{
+					Snapshot: &csi.Snapshot{
+						SnapshotId:     sd.CSIID(),
+						SourceVolumeId: ld.CSIID(),
+						CreationTime:   timestamppb.New(snap.Creation),
+						ReadyToUse:	true,
+					},
+				}
+				resp.Entries = append(resp.Entries, &entry)
+			}
+		}
+
+		l.Debugf("get snapshot %s", snapshotId)
+	} else if len(snapshotId) > 0 && len(sourceVolumeId) > 0{
+		l.Debugf("get snapshot %s of volume %s", snapshotId, sourceVolumeId)
+	} else {
+		l.Debugln("listing all snapshots")
+		if  snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, int(maxEnt), *token); err != nil {
+			return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error()) 
+		} else {
+			if ts != nil {
+				resp.NextToken = ts.Token()
+			}
+			if err = completeListResponseFromSnapshotShort(ctx, &resp, snapList); err != nil {
+				return nil, err
+			} else {
+				return &resp, nil
 			}
 		}
 	}
@@ -1810,17 +1851,16 @@ func (cp *ControllerPlugin) ControllerGetVolume(ctx context.Context, in *csi.Con
 
 // GetCapacity gets storage capacity
 func (cp *ControllerPlugin) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-	return nil, nil
-	pool, rErr := *cp.d. .GetPool()
+
+	// TODO: add capability check
+	pool, rErr := cp.d.GetPool(ctx, cp.pool)
 	if rErr != nil {
 		return nil, status.Error(codes.Internal, rErr.Error())
 	}
 	var rsp csi.GetCapacityResponse
-	var err error
-	rsp.AvailableCapacity, err = strconv.ParseInt(pool.Available, 10, 64)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
+
+	rsp.AvailableCapacity = pool.Available
+	rsp.MinimumVolumeSize = wrapperspb.Int64(minSupportedVolumeSize)
 	return &rsp, nil
 }
 

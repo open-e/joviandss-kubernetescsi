@@ -34,8 +34,8 @@ type StorageInterface interface {
 	GetAddress() (string, int)
 
 	// Pools
-	GetPool() (*Pool, RestError)
-	GetPools() ([]PoolShort, error)
+	GetPool() (*ResourcePool, RestError)
+	//GetPools() ([]PoolShort, error)
 
 	// Volumes
 	CreateVolume(poolName string, vol ResourceVolume) RestError
@@ -59,7 +59,7 @@ type StorageInterface interface {
 	AddUserToTarget(tname string, name string, pass string) RestError
 
 	CreateClone(vname string, sname string, cname string) RestError
-	DeleteClone(vname string, sname string, cname string, rChildren bool, rDependent bool) RestError
+	//DeleteClone(vname string, sname string, cname string, rChildren bool, rDependent bool) RestError
 	PromoteClone(vname string, sname string, cname string) RestError
 }
 
