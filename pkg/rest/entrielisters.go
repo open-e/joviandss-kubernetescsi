@@ -56,9 +56,52 @@ func (s *RestEndpoint) GetVolumeSnapshotsEntries(ctx context.Context, pool strin
 	return ent, nil
 }
 
-func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page int64, dc int64) (ent ResultEntries, err RestError) {
+func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
+	
+	addr := fmt.Sprintf("api/v3/pools/%s/volumes", pool)
 
-	return ent, nil
+	l := jcom.LFC(ctx)
+
+	l = l.WithFields(log.Fields{
+		"func": "GetVolumeEntries",
+		"addr": addr,
+		"section": "rest",
+	})
+
+	addr = pagedcSuffix(addr, &page, &dc)
+
+	l.Debugln("Sending")
+	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, CodeOK)
+
+	if err != nil {
+		s.l.Warnf("Unable to get snapshot list for pool %s", pool)
+		return  nil, err
+	}
+
+	var vols []ResourceVolume
+	var entries = ResultEntries{Entries: &vols}
+	var rsp = GeneralResponse{Data: &entries}
+
+	if errU := s.unmarshal(body, &rsp); errU != nil {
+		return nil, errU
+	}
+
+	switch stat {
+	case CodeOK, CodeCreated:
+		if rsp.Data != nil {
+			data, ok := rsp.Data.(*ResultEntries)
+
+			if ok {
+				return data, nil
+			}
+			return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", *data))
+		}
+	default:
+		if rsp.Error != nil {
+			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+		}
+	}
+	return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
 }
 
 func (s *RestEndpoint) GetSnapshotsEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {

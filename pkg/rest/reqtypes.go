@@ -100,8 +100,8 @@ type CreateVolumeDescriptor struct {
 }
 
 type DeleteVolumeDescriptor struct {
-	RecursivelyChildren	bool	`json:"recursively_children,omitempty"`
-	ForceUmount		bool	`json:"force_umount,omitempty"`
+	RecursivelyChildren	*bool	`json:"recursively_children,omitempty"`
+	ForceUmount		*bool	`json:"force_umount,omitempty"`
 }
 
 type CloneVolumeDescriptor struct {
@@ -119,11 +119,34 @@ type CreateSnapshotProperties struct {
 
 type CreateSnapshotDescriptor struct {
 	SnapshotName string			`json:"snapshot_name"` // string with name of the new snapshot.
-	Recursive    bool			`json:"recursive"` // boolean indicating if recursively create snapshots of all descendant datasets
-	Properties   CreateSnapshotProperties	`json:"properties,omitempty"` //object containing properties of new snapshot. 
+	Recursive    *bool			`json:"recursive"` // boolean indicating if recursively create snapshots of all descendant datasets
+	Properties   *CreateSnapshotProperties	`json:"properties,omitempty"` //object containing properties of new snapshot. 
 }
 
 type DeleteSnapshotDescriptor struct {
-	RecursivelyChildren	bool	`json:"recursively_children,omitempty"`
-        ForceUnmount		bool	`json:"force_umount,omitempty"`
+	RecursivelyChildren	*bool	`json:"recursively_children,omitempty"`
+        ForceUnmount		*bool	`json:"force_umount,omitempty"`
+}
+
+type CreateTargetDescriptor struct {
+	Name			string				`json:"name,omitempty"`
+	Active			*bool         			`json:"active,omitempty"`
+	IncomingUsersActive	*bool         			`json:"incoming_users_active,omitempty"`
+	OutgoingUser		*CreateTargetOutgoingUser	`json:"outgoing_user,omitempty"`
+	AllowIP			*[]string			`json:"allow_ip,omitempty"`
+	DenyIP			*[]string			`json:"deny_ip,omitempty"`
+}
+
+type CreateTargetOutgoingUser struct {
+	Password		*string				`json:"password,omitempty"`
+	Name			*string				`json:"name,omitempty"`
+}
+
+type TargetLunDescriptor struct {
+	Name      string	`json:"name,omitempty"`
+	SCSIID    *string	`json:"scsi_id,omitempty"`
+	LUN       *int		`json:"lun,omitempty"`
+	Mode      *string	`json:"mode,omitempty"`
+	BlockSize *int		`json:"block_size,omitempty"`
+	EUI	  *string	`json:"eui,omitempty"`
 }

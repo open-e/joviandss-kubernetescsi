@@ -42,6 +42,9 @@ const (
 	RestErrorResourceBusySnapshotHasClones	= 11
 	RestErrorResourceBusyVolumeHasSnapshots	= 12
 	RestErrorOutOfSpace			= 13
+	RestErrorResourceDNEVolume		= 14
+	RestErrorResourceDNETarget		= 15
+
 )
 
 type RestError interface {
@@ -76,6 +79,8 @@ const (
 	// resourceExistsMsgPattern = `.*`
 	resourceIsBusyMsgPattern = `In order to delete a zvol, you must delete all of its clones first.`
 	resourceDneMsgPattern = `Zfs resource: (.+\/.+) not found in this collection`
+	volumeDneMsgPattern = `Volume (?P<volume>[\w\-/\.]+) not found in pool (?P<pool>[\w\-/\.]+).`
+	itemNotFoundClassPattern = `opene.exceptions.ItemNotFoundError`
 	snapshotDneMsgPatterm = `cannot open '([\w\-\/\.]+@[\w\-\.]+)': dataset does not exist`
 	resourceHasClonesMsgPattern = `^In order to delete a zvol, you must delete all of its clones first\.$`
 	volumeHasChildrenMsgPattern = `^cannot destroy '(?P<volume>[\w\-/\.]+)': volume has children[\s\S]use '-r' to destroy the following datasets:(?P<datasets>[.\s\S]*)`
@@ -85,12 +90,19 @@ const (
 	resourceHasSnapshotsClassPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
 	zfsCmdErrorPattern = `^zfslib.wrap.zfs.ZfsCmdError$`
 	storageResourceExhaustedPattern = `New zvol size\(([\d]+)\) exceeds available space on pool ([\w\-\.]+)\(([\d]+)\).`
+	targetNameConflictClassPattern = `opene.san.target.base.iscsi.target.TargetNameConflictError`
+	targetExistsMsgPattern = `Target with name (?P<target>[a-z0-9\.:\-]*) is already present on`
+	targetDneMsgPattern = `Target iqn.20215:test2asd not exists.`
+	lunIdUsedMsgPattern = `LUN ([\d]+) is already used in (?P<target>[a-z0-9\.:\-]*).`
+	lunItemConflictClassPattern = `opene.exceptions.ItemConflictError`
 )
 
 var resourceExistsMsgRegexp = regexp.MustCompile(resourceExistsMsgPattern)
 var cloneCreateFailureDatasetExistsRegexp = regexp.MustCompile(cloneCreateFailureDatasetExistsPattern)
 var resourceIsBusyMsgRegexp = regexp.MustCompile(resourceIsBusyMsgPattern)
 var resourceDneMsgRegexp = regexp.MustCompile(resourceDneMsgPattern)
+var volumeDneMsgRegexp = regexp.MustCompile(volumeDneMsgPattern)
+var itemNotFoundClassRegexp = regexp.MustCompile(itemNotFoundClassPattern)
 var snapshotDneMsgRegexp = regexp.MustCompile(snapshotDneMsgPatterm)
 var resourceHasClonesMsgRegexp = regexp.MustCompile(resourceHasClonesMsgPattern)
 var volumeHasChildrenMsgRegexp = regexp.MustCompile(volumeHasChildrenMsgPattern)
@@ -99,7 +111,12 @@ var resourceHasClonesClassRegexp = regexp.MustCompile(resourceHasClonesClassPatt
 var resourceHasSnapshotsClassRegexp = regexp.MustCompile(resourceHasSnapshotsClassPattern)
 var zfsCmdErrorRegexp = regexp.MustCompile(zfsCmdErrorPattern)
 var storageResourceExhaustedRegexp = regexp.MustCompile(storageResourceExhaustedPattern)
-
+var targetNameConflictClassRegexp = regexp.MustCompile(targetNameConflictClassPattern)
+var targetExistsMsgRegexp = regexp.MustCompile(targetExistsMsgPattern)
+var targetDneMsgRegexp = regexp.MustCompile(targetDneMsgPattern)
+	
+var lunIdUsedMsgRegexp = regexp.MustCompile(lunIdUsedMsgPattern)
+var lunItemConflictClassRegexp = regexp.MustCompile(lunItemConflictClassPattern)
 
 func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restError {
 
@@ -194,6 +211,24 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 				}
 		}
 	} else {
+		if err.Class != nil {
+			if err.Message != nil {
+				if targetNameConflictClassRegexp.MatchString(*err.Class) && targetExistsMsgRegexp.MatchString(*err.Message) {
+					return &restError { code: RestErrorResourceExists }
+				}
+				if lunItemConflictClassRegexp.MatchString(*err.Class) && lunIdUsedMsgRegexp.MatchString(*err.Message) {
+					return &restError { code: RestErrorResourceExists, msg: *err.Message }
+				}
+				if itemNotFoundClassRegexp.MatchString(*err.Class) {
+					if volumeDneMsgRegexp.MatchString(*err.Message) {
+						return &restError { code: RestErrorResourceDNEVolume, msg: *err.Message }
+					}
+					if targetDneMsgRegexp.MatchString(*err.Message) {
+						return &restError { code: RestErrorResourceDNETarget, msg: *err.Message }
+					}
+				}
+			}
+		}
 		if err.Message != nil {
 			if resourceIsBusyMsgRegexp.MatchString(*err.Message) {
 				return &restError { code: RestErrorResourceBusy }

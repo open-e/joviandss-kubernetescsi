@@ -85,3 +85,53 @@ func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSn
 	return nil
 }
 
+func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesResponse, vols []jrest.ResourceVolume) (err error) {
+
+	entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
+	lsr.Entries = entries
+	for i, v := range vols {
+
+		vd, err := jdrvr.NewVolumeDescFromVDS(v.Name)
+		if err != nil {
+			return err
+		}
+		var contentSource *csi.VolumeContentSource
+		
+		osds := v.OriginSnapshot()
+		if len(osds) > 0 {
+			if jdrvr.IsSDS(osds) {
+				if sd, err := jdrvr.NewSnapshotDescFromSDS(vd,osds); err != nil {
+					contentSource = &csi.VolumeContentSource{
+						Type: &csi.VolumeContentSource_Snapshot{
+							Snapshot: &csi.VolumeContentSource_SnapshotSource{
+								SnapshotId: sd.CSIID(),
+							},
+						},
+					}
+				}
+			} else if jdrvr.IsVDS(osds) {
+				if vd, err := jdrvr.NewVolumeDescFromVDS(osds); err == nil {
+					contentSource = &csi.VolumeContentSource{
+						Type: &csi.VolumeContentSource_Volume{
+							Volume: &csi.VolumeContentSource_VolumeSource{
+								VolumeId: vd.CSIID(),
+							},
+						},
+					}
+				}
+
+			}
+		}
+
+		entries[i] = &csi.ListVolumesResponse_Entry{
+			Volume: &csi.Volume{
+				CapacityBytes:  v.GetSize(),
+				VolumeId:	vd.CSIID(),
+				ContentSource: contentSource,
+			},
+		}
+	}
+
+	return nil
+}
+

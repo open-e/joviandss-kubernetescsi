@@ -1,3 +1,20 @@
+/*
+Copyright (c) 2024 Open-E, Inc.
+All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License. You may obtain
+a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations
+under the License.
+*/
+
 package controller
 
 import (
@@ -66,7 +83,7 @@ var supportedVolumeCapabilities = []csi.VolumeCapability_AccessMode_Mode{
 	// VolumeCapability_AccessMode_UNKNOWN,
 	csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 	csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
-	// VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+	//csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
 	// VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
 	// VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 
@@ -318,33 +335,6 @@ func (cp *ControllerPlugin) getStandardID(name string) string {
 	l.Tracef("For %s id is %s", name, id)
 	return id
 }
-
-func (cp *ControllerPlugin) getIDFromName(name string) string {
-	l := cp.l.WithFields(log.Fields{
-		"func": "getIDFromName",
-	})
-
-	// Get universal volume ID
-	preID := []byte(name)
-	rawID := sha256.Sum256(preID)
-	id := strings.ToLower(fmt.Sprintf("%X", rawID))
-	l.Tracef("For %s id is %s", name, id)
-	return id
-}
-
-func (cp *ControllerPlugin) getVIDFromName(name string) string {
-	l := cp.l.WithFields(log.Fields{
-		"func": "getVIDfrom",
-	})
-
-	// Get universal volume ID
-	preID := []byte(name)
-	rawID := sha256.Sum256(preID)
-	id := strings.ToLower(fmt.Sprintf("%X", rawID))
-	l.Tracef("For %s id is %s", name, id)
-	return id
-}
-
 
 func (cp *ControllerPlugin) getRandomName(l int) (s string) {
 	var v int64
@@ -750,168 +740,6 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	// return nil, err
 //}
 
-// getVolumeConcealedSnapshots return array of concealed volume snapshots
-//func (cp *ControllerPlugin) getVolumeConcealedSnapshots(vname string) ([]jrest.SnapshotShort, error) {
-//	return nil, nil
-
-	// filter := func(s string) bool {
-	// 	if "c_" == s[:2] {
-	// 		return true
-	// 	}
-	// 	return false
-	// }
-	// snapshots, rErr := (*cp.endpoints[0]).ListVolumeSnapshots(vname, filter)
-	// if rErr == nil {
-	// 	return snapshots, nil
-	// }
-
-	// var err error
-	// switch code := rErr.GetCode(); code {
-	// case rest.RestResourceDNE:
-	// 	err = status.Error(codes.FailedPrecondition, rErr.Error())
-	// default:
-	// 	err = status.Errorf(codes.Internal, "Unknown internal error")
-	// }
-	// return nil, err
-//}
-
-// getVolumeAllSnapshots return array of concealed volume snapshots
-//func (cp *ControllerPlugin) getVolumeAllSnapshots(vname string) ([]jrest.SnapshotShort, error) {
-
-//	return nil, nil
-	
-	// filter := func(s string) bool {
-	// 	return true
-	// }
-	// snapshots, rErr := (*cp.endpoints[0]).ListVolumeSnapshots(vname, filter)
-	// if rErr == nil {
-	// 	return snapshots, nil
-	// }
-
-	// var err error
-	// switch code := rErr.GetCode(); code {
-	// case rest.RestResourceDNE:
-	// 	err = status.Error(codes.FailedPrecondition, rErr.Error())
-	// default:
-	// 	err = status.Errorf(codes.Internal, "Internal error %s", rErr.Error())
-	// }
-	// return nil, err
-//}
-
-//func (cp *ControllerPlugin) gcVolume(vname string) error {
-//	return nil
-	// if err := cp.lockVolume(vname); err != nil {
-	// 	return err
-	// }
-
-	// if vname[:2] != "c_" {
-	// 	cp.unlockVolume(vname)
-	// 	return nil
-	// }
-	// dvol, lErr := cp.getVolume(vname)
-	// if lErr != nil {
-	// 	cp.unlockVolume(vname)
-	// 	return lErr
-	// }
-
-	// cSnapshots, err := cp.getVolumeConcealedSnapshots(vname)
-	// if err != nil {
-	// 	cp.unlockVolume(vname)
-	// 	return err
-	// }
-
-	// for _, snapshot := range cSnapshots {
-	// 	if len(snapshot.Clones) > 0 {
-	// 		cp.unlockVolume(vname)
-	// 		return nil
-	// 	}
-	// }
-	// cp.unlockVolume(vname)
-
-	// lErr = (*cp.endpoints[0]).DeleteVolume(vname, true)
-	// if lErr != nil {
-	// 	return status.Errorf(codes.Internal, lErr.Error())
-	// }
-
-	// if dvol.IsClone {
-	// 	or, err := parseOrigin(dvol.Origin)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if or.Snapshot[:2] == "c_" {
-	// 		// volume is made of concealed snapshot
-	// 		rErr := (*cp.endpoints[0]).DeleteSnapshot(or.Volume, or.Snapshot)
-
-	// 		if rErr != nil {
-	// 			code := rErr.GetCode()
-	// 			switch code {
-	// 			case rest.RestResourceDNE:
-	// 			default:
-	// 				return status.Errorf(codes.Internal, rErr.Error())
-	// 			}
-	// 		}
-	// 		// Try to remove parents if they are concealed
-	// 		cp.gcVolume(or.Volume)
-	// 	}
-	// }
-
-	// return nil
-//}
-
-// concealVolume tryes to conceal volume
-//
-// return FailedPrecondition if volume have public snapshots
-// checks if volume have and public clones
-// conceal volume if it has public clones
-// deletes volume if it has no public clones and call concealVolume on its parrent
-//func (cp *ControllerPlugin) concealVolume(vID string) error {
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "concealVolume",
-	// })
-	// l.Tracef(" %s", vID)
-
-	// csl, err := cp.getVolumeAllSnapshots(vID)
-	// if err != nil {
-	// 	return status.Error(codes.Internal, err.Error())
-	// }
-
-	// latestSnapshot := csl[len(csl)-1].Name
-	// cvID := "c_" + vID // concealed volume ID
-	// err = cp.createVolumeFromSnapshot(latestSnapshot, "c_"+vID)
-	// if err != nil {
-	// 	return err
-	// }
-
-	// if rErr := (*cp.endpoints[0]).PromoteClone(vID, latestSnapshot, cvID); rErr != nil {
-	// 	(*cp.endpoints[0]).DeleteClone(vID, latestSnapshot, cvID, false, false)
-	// 	msg := fmt.Sprintf("Unable to substitute %s with %s", vID, cvID)
-	// 	return status.Error(codes.Internal, msg)
-	// }
-
-	// rErr := (*cp.endpoints[0]).DeleteClone(cvID, latestSnapshot, vID, false, false)
-
-	// if rErr != nil {
-	// 	eCode := rErr.GetCode()
-	// 	switch eCode {
-	// 	case rest.RestResourceDNE:
-	// 		return nil
-	// 	default:
-	// 		// Error in process try to recover back
-	// 		if rErr := (*cp.endpoints[0]).PromoteClone(cvID, latestSnapshot, vID); rErr != nil {
-	// 			(*cp.endpoints[0]).DeleteClone(vID, latestSnapshot, cvID, false, false)
-
-	// 			msg := fmt.Sprintf("Critical ERROR in process of  substitution  %s with %s", vID, cvID)
-	// 			l.Error(msg)
-	// 			return status.Error(codes.Internal, msg)
-	// 		}
-
-	// 	}
-	// 	msg := fmt.Sprintf("Unable to substitute %s with %s", vID, cvID)
-	// 	return status.Error(codes.Internal, msg)
-	// }
-
-//	return nil
-//}
 
 // DeleteVolume deletes volume or hides it for later deletion
 func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
@@ -958,7 +786,10 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 //ListVolumes return the list of volumes
 func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-	maxEnt := int64(req.GetMaxEntries())
+
+	var rErr jrest.RestError
+	var token *jdrvr.CSIListingToken
+	var resp csi.ListVolumesResponse
 
 	l := cp.l.WithFields(log.Fields{
 		"request": "ListVolumes",
@@ -966,216 +797,35 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 		"section": "controller",
 	})
 	ctx = jcom.WithLogger(ctx, l)
+	
+	l.Debugf("Request: %+v", req)
 
-	// return nil, nil
-	////////////////////////////////////////////////////////////////////////////////////////
-	// Verify arguments
+	maxEnt := int64(req.GetMaxEntries())
+	startingToken := req.GetStartingToken()
+	token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken)
+	
+	if rErr != nil {
+		return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
+	}
 
 	if maxEnt < 0 {
 		return nil, status.Errorf(codes.Internal, "Number of Entries must not be negative.")
 	}
 
-	// //////////////////////////////////////////////////////////////////////////////
-	
-	l.Debugf("Listing volumes by <%d> at a time starting with token %s", req.MaxEntries,req.StartingToken)
+	if  volList, ts, rErr := cp.d.ListAllVolumes(ctx, cp.pool, int(maxEnt), *token); rErr != nil {
+		return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error()) 
+	} else {
+		if ts != nil {
+			resp.NextToken = ts.Token()
+		}
 
-	var volumes []jrest.ResourceVolume
-	if err := cp.re.ListVolumes(ctx, cp.pool, &volumes); err != nil {
-		switch err.GetCode() {
-		case jrest.RestErrorUnableToConnect:
-			return nil, status.Errorf(codes.Internal, "Unable to connect.")
-
-		default:
-			return nil, status.Errorf(codes.Internal, err.Error())
+		if err := completeListResponseFromVolume(ctx, &resp, volList); err != nil {
+			return nil, err
+		} else {
+			return &resp, nil
 		}
 	}
 
-	// Just return all
-	if maxEnt == 0 {
-		entries := make([]*csi.ListVolumesResponse_Entry, len(volumes))
-		for i, vol := range volumes {
-			entries[i] = &csi.ListVolumesResponse_Entry{
-				Volume: &csi.Volume{VolumeId: vol.Name},
-			}
-		}
-
-		return &csi.ListVolumesResponse{
-			Entries: entries,
-		}, nil
-	}
-	return nil, nil
-	// var iToken int64
-	// if len(sToken) != 0 {
-	// 	iToken, _ = strconv.ParseInt(sToken, 10, 64)
-	// 	if int64(len(volumes)) < iToken {
-	// 		iToken = 0
-	// 	}
-	// }
-
-	// nextToken := ""
-
-	// if int64(len(volumes)) > iToken+maxEnt {
-	// 	nextToken = strconv.FormatInt(iToken+maxEnt, 10)
-	// 	volumes = volumes[iToken : iToken+maxEnt]
-
-	// } else if iToken+maxEnt > int64(len(volumes)) {
-	// 	volumes = volumes[iToken:]
-	// }
-
-	// entries := make([]*csi.ListVolumesResponse_Entry, len(volumes))
-
-	// for i, name := range volumes {
-	// 	entries[i] = &csi.ListVolumesResponse_Entry{
-	// 		Volume: &csi.Volume{VolumeId: name},
-	// 	}
-	// }
-
-	// return &csi.ListVolumesResponse{
-	// 	Entries:   entries,
-	// 	NextToken: nextToken,
-	// }, nil
-}
-
-func (cp *ControllerPlugin) putSnapshotRecord(sID string) error {
-	// rErr := (*cp.endpoints[0]).CreateSnapshot(cp.snapReg, sID)
-
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err := status.Errorf(codes.Internal, rErr.Error())
-	// 		return err
-
-	// 	case rest.RestObjectExists:
-	// 		cp.l.Warn("Specified snapshot record already exists.")
-	// 		return nil
-
-	// 	default:
-	// 		err := status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return err
-	// 	}
-	// }
-	return nil
-}
-
-func (cp *ControllerPlugin) getSnapshotRecordExists(sID string) bool {
-	// _, rErr := (*cp.endpoints[0]).GetSnapshot(cp.snapReg, sID)
-	// if rErr != nil {
-	// 	return false
-	// }
-	// cp.l.Infof("Specified snapshot %s exists.", sID)
-	return true
-}
-
-func (cp *ControllerPlugin) delSnapshotRecord(sID string) error {
-	// rErr := (*cp.endpoints[0]).DeleteSnapshot(cp.snapReg, sID)
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err := status.Errorf(codes.Internal, rErr.Error())
-	// 		return err
-	// 	case rest.RestObjectExists:
-	// 		err := status.Errorf(codes.AlreadyExists, rErr.Error())
-	// 		return err
-	// 	case rest.RestResourceDNE:
-	// 		return nil
-	// 	default:
-	// 		err := status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return err
-	// 	}
-	// }
-
-	return nil
-}
-
-// getSnapshot return snapshot datastructure
-func (cp *ControllerPlugin) getSnapshot(sID string) (*jrest.ResourceSnapshot, error) {
-	return nil, nil
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "getSnapshot",
-	// })
-
-	// l.Tracef("Get snapshot with id: %s", sID)
-	// var err error
-
-	// //////////////////////////////////////////////////////////////////////////////
-	// /// Checks
-
-	// if len(sID) == 0 {
-	// 	msg := "Snapshot name missing in request"
-	// 	l.Warn(msg)
-	// 	return nil, status.Error(codes.InvalidArgument, msg)
-	// }
-
-	// snameT := strings.Split(sID, "_")
-
-	// if len(snameT) != 2 {
-	// 	msg := "Unable to obtain volume name from snapshot name"
-	// 	l.Warn(msg)
-	// 	return nil, status.Error(codes.NotFound, msg)
-	// }
-
-	// //////////////////////////////////////////////////////////////////////////////
-
-	// s, rErr := (*cp.endpoints[0]).GetSnapshot(snameT[0], sID)
-
-	// if rErr != nil {
-	// 	switch rErr.GetCode() {
-	// 	case rest.RestRequestMalfunction:
-	// 		// TODO: correctly process error messages
-	// 		return nil, status.Error(codes.NotFound, rErr.Error())
-
-	// 	case rest.RestRPM:
-	// 		return nil, status.Error(codes.Internal, rErr.Error())
-	// 	case rest.RestResourceDNE:
-	// 		return nil, status.Error(codes.NotFound, rErr.Error())
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 	}
-	// 	return nil, err
-	// }
-	// return s, nil
-}
-
-// createConcealedSnapshot create intermediate snapshot for volume cloning
-func (cp *ControllerPlugin) createConcealedSnapshot(vname string) (*string, error) {
-	return nil, nil
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "createConcealedSnapshot",
-	// })
-
-	// var sname string
-
-	// for i := 0; true; i++ {
-	// 	sID := cp.getStandardID(cp.getRandomName(32))
-	// 	sname = fmt.Sprintf("c_%s_%s", vname, sID)
-
-	// 	if _, err := cp.getSnapshot(sname); status.Code(err) == codes.NotFound {
-	// 		l.Warn(err.Error())
-	// 		break
-	// 	}
-	// 	if i > 2 {
-	// 		return nil, status.Error(codes.Internal, "Unable to pick tmp snapshot name")
-	// 	}
-	// }
-
-	// l.Tracef("Snapshot %s", sname)
-
-	// rErr := (*cp.endpoints[0]).CreateSnapshot(vname, sname)
-	// if rErr != nil {
-	// 	(*cp.endpoints[0]).DeleteSnapshot(vname, sname)
-
-	// 	return nil, status.Error(codes.Internal, "Unable to create intermediate snapshot")
-	// }
-
-	// return &sname, nil
 }
 
 // CreateSnapshot creates snapshot
@@ -1323,8 +973,13 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	snapshotId := req.GetSnapshotId()
 	startingToken := req.GetStartingToken()
 	token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken)
+
 	if rErr != nil {
 		return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
+	}
+
+	if maxEnt < 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "Number of Entries must not be negative.")
 	}
 
 	if len(sourceVolumeId) > 0 && len(snapshotId) == 0 {
@@ -1332,7 +987,7 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		if vd, err := jdrvr.NewVolumeDescFromCSIID(sourceVolumeId); err != nil {
 			return nil, err
 		} else {
-			if  snapList, ts, rErr := cp.d.ListVolumeSnapshots(ctx, cp.pool, vd, int(maxEnt), *token); err != nil {
+			if  snapList, ts, rErr := cp.d.ListVolumeSnapshots(ctx, cp.pool, vd, int(maxEnt), *token); rErr != nil {
 				return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error()) 
 			} else {
 				if ts != nil {
@@ -1345,11 +1000,14 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 				}
 			}
 		}
-	} else if len(snapshotId) > 0 && len(sourceVolumeId) == 0 {
+	} else if len(snapshotId) > 0 {
 		if sd, err := jdrvr.NewSnapshotDescFromCSIID(snapshotId); err != nil {
 			return nil, err
 		} else {
 			ld := sd.GetVD()
+			if len(sourceVolumeId) > 0 && sourceVolumeId != ld.CSIID() {
+				return nil, status.Errorf(codes.FailedPrecondition, "Specified snapshot %s with id %s is not related to volume %s with id %s", sd.Name(), sd.CSIID(), ld.Name(), ld.CSIID())
+			}
 			if snap, rErr := cp.d.GetSnapshot(ctx, cp.pool, ld, sd); rErr != nil {
 				if jrest.ErrCode(rErr) == jrest.RestErrorResourceDNE {
 					return nil, status.Error(codes.InvalidArgument, rErr.Error())
@@ -1368,8 +1026,6 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		}
 
 		l.Debugf("get snapshot %s", snapshotId)
-	} else if len(snapshotId) > 0 && len(sourceVolumeId) > 0{
-		l.Debugf("get snapshot %s of volume %s", snapshotId, sourceVolumeId)
 	} else {
 		l.Debugln("listing all snapshots")
 		if  snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, int(maxEnt), *token); err != nil {
@@ -1386,195 +1042,42 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		}
 	}
 	return nil, nil
-	////////////////////////////////////////////////////////////////////////////////////////
-	// Verify arguments
-
-	// if maxEnt < 0 {
-	// 	return nil, status.Errorf(codes.Internal, "Number of Entries must not be negative.")
-	// }
-	// sToken := req.GetStartingToken()
-
-	// sname := req.GetSnapshotId()
-
-	// if len(sname) != 0 {
-	// 	s, err := cp.getSnapshot(sname)
-	// 	if err != nil {
-	// 		return &csi.ListSnapshotsResponse{
-	// 			Entries: []*csi.ListSnapshotsResponse_Entry{},
-	// 		}, nil
-	// 	}
-
-	// 	snameT := strings.Split(sname, "_")
-
-	// 	iTime, rErr := rest.GetTimeStamp(s.Creation)
-	// 	if rErr != nil {
-	// 		status.Errorf(codes.Internal, "%s", rErr.Error())
-	// 	}
-	// 	timeStamp := timestamp.Timestamp{
-	// 		Seconds: iTime,
-	// 	}
-
-	// 	return &csi.ListSnapshotsResponse{
-	// 		Entries: []*csi.ListSnapshotsResponse_Entry{
-	// 			{
-	// 				Snapshot: &csi.Snapshot{
-	// 					SnapshotId:     sname,
-	// 					SourceVolumeId: snameT[0],
-	// 					CreationTime:   &timeStamp,
-	// 				},
-	// 			},
-	// 		},
-	// 	}, nil
-	// }
-
-	// vname := req.GetSourceVolumeId()
-
-	// if len(vname) != 0 {
-	// 	_, err = cp.getVolume(vname)
-	// 	if err != nil {
-	// 		if codes.NotFound == grpc.Code(err) {
-	// 			msg := fmt.Sprintf("Unable to find volume %s, Err%s", vname, err.Error())
-	// 			cp.l.Warn(msg)
-
-	// 			return &csi.ListSnapshotsResponse{
-	// 				Entries: []*csi.ListSnapshotsResponse_Entry{},
-	// 			}, nil
-	// 		}
-	// 		return nil, status.Error(codes.Internal, err.Error())
-	// 	}
-	// }
-	// l.Trace("Verification done")
-
-	//////////////////////////////////////////////////////////////////////////////
-
-
-	// filter := func(s string) bool {
-	// 	snameT := strings.Split(s, "_")
-	// 	if len(snameT) != 2 {
-	// 		return false
-	// 	}
-	// 	return true
-	// }
-
-	// var snapshots []rest.SnapshotShort
-	// if len(vname) == 0 {
-	// 	snapshots, rErr = (*cp.endpoints[0]).ListAllSnapshots(filter)
-	// } else {
-	// 	snapshots, rErr = (*cp.endpoints[0]).ListVolumeSnapshots(vname, filter)
-	// }
-
-	// cp.l.Debugf("Obtained snapshots: %d", len(snapshots))
-	// for i, s := range snapshots {
-	// 	cp.l.Debugf("Snap %d, %s", i, s)
-	// }
-
-	// iToken, _ := strconv.ParseInt(sToken, 10, 64)
-
-	// if iToken > int64(len(snapshots)) {
-	// 	return &csi.ListSnapshotsResponse{
-	// 		Entries: []*csi.ListSnapshotsResponse_Entry{},
-	// 	}, nil
-	// }
-
-	// // TODO: case with zero snapshots
-	// if rErr != nil {
-	// 	switch rErr.GetCode() {
-	// 	case rest.RestUnableToConnect:
-	// 		return nil, status.Errorf(codes.Internal, "Unable to connect. Err: %s", rErr.Error())
-	// 	default:
-	// 		return nil, status.Errorf(codes.Internal, "Unidentified error: %s.", rErr.Error())
-	// 	}
-	// }
-
-	// nextToken := ""
-
-	// if maxEnt != 0 || len(sToken) != 0 {
-	// 	l.Trace("Listing snapshots of particular parameters")
-	// 	if maxEnt == 0 {
-	// 		maxEnt = int64(len(snapshots))
-	// 	}
-	// 	if len(sToken) != 0 {
-	// 		iToken, _ = strconv.ParseInt(sToken, 10, 64)
-	// 		if int64(len(snapshots)) < iToken {
-	// 			iToken = 0
-	// 		}
-	// 	}
-
-	// 	if int64(len(snapshots)) > iToken+maxEnt {
-	// 		nextToken = strconv.FormatInt(iToken+maxEnt, 10)
-	// 		snapshots = snapshots[iToken : iToken+maxEnt]
-
-	// 	} else {
-	// 		snapshots = snapshots[iToken:]
-	// 	}
-	// }
-
-	// entries := make([]*csi.ListSnapshotsResponse_Entry, len(snapshots))
-
-	// for i, s := range snapshots {
-	// 	cp.l.Debugf("Add snap %s", s.Name)
-	// 	timeInt, _ := strconv.ParseInt(s.Properties.Creation, 10, 64)
-	// 	timeStamp := timestamp.Timestamp{
-	// 		Seconds: timeInt,
-	// 	}
-	// 	entries[i] = &csi.ListSnapshotsResponse_Entry{
-	// 		Snapshot: &csi.Snapshot{
-	// 			SnapshotId:     s.Name,
-	// 			SourceVolumeId: s.Volume,
-	// 			CreationTime:   &timeStamp,
-	// 		},
-	// 	}
-	// }
-
-	// return &csi.ListSnapshotsResponse{
-	// 	Entries:   entries,
-	// 	NextToken: nextToken,
-	// }, nil
 }
 
 // ControllerPublishVolume create iscsi target for the volume
 func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	return nil, nil
+	
+	l := cp.l.WithFields(log.Fields{
+		"request": "ControllerPublishVolume",
+		"func": "ControllerPublishVolume",
+	})
+	ctx = jcom.WithLogger(ctx, l)
 
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "ControllerPublishVolume",
-	// })
+	var err error
+	
+	vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId())
+	if err != nil {
+		return nil, err
+	}
+	roMode := req.GetReadonly()
+	// Check node prefix
+	//nID := req.GetNodeId()
 
-	// l.Tracef("PublishVolume")
-	// var err error
+	//////////////////////////////////////////////////////////////////////////////
+	/// Checks
 
-	// //////////////////////////////////////////////////////////////////////////////
-	// /// Checks
-	// vname := req.GetVolumeId()
-	// if len(vname) == 0 {
-	// 	msg := "Volume id is missing in request"
-	// 	l.Warn(msg)
-	// 	return nil, status.Error(codes.InvalidArgument, msg)
-	// }
+	// TODO: verify capabiolity
+	caps := req.GetVolumeCapability()
+	if caps == nil {
+		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
+	}
 
-	// if len(vname) != 64 {
-	// 	msg := fmt.Sprintf("Volume id %s is incorrect", vname)
-	// 	l.Warn(msg)
-	// 	// Get universal volume ID
-	// 	vname = cp.getStandardID(vname)
+	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME) {
+		err = status.Errorf(codes.Internal, "Capability is not supported.")
+		l.Warnf("Unable to publish volume req: %v", req)
+		return nil, err
+	}
 
-	// }
-	// // TODO: verify capabiolity
-	// caps := req.GetVolumeCapability()
-	// if caps == nil {
-	// 	return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
-	// }
-
-	// if false == cp.capSupported(csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME) {
-	// 	err = status.Errorf(codes.Internal, "Capability is not supported.")
-	// 	l.Warnf("Unable to publish volume req: %v", req)
-	// 	return nil, err
-	// }
-
-	// roMode := req.GetReadonly()
-
-	// // Check node prefix
-	// nID := req.GetNodeId()
 
 	// if len(nID) == 0 {
 	// 	msg := "Node Id must be provided"
@@ -1582,204 +1085,107 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	// 	return nil, status.Error(codes.InvalidArgument, msg)
 	// }
 
-	// // if len(cp.cfg.Nodeprefix) > len(nID) {
-	// // 	msg := "Node Id is too short"
-	// // 	l.Warn(msg)
-	// // 	return nil, status.Error(codes.InvalidArgument, msg)
-	// // }
-	// // if strings.HasPrefix(nID, cp.cfg.Nodeprefix) == false {
-	// // 	msg := "Incorrect Node Id"
-	// // 	l.Warn(msg)
-	// // 	return nil, status.Error(codes.NotFound, msg)
+	//////////////////////////////////////////////////////////////////////////////
 
-	// // }
-	// //////////////////////////////////////////////////////////////////////////////
+	iscsiContext, rErr := cp.d.PublishVolume(ctx, cp.pool, vd, cp.iqn, roMode)
 
-	// // Check if volume exists
-	// _, err = cp.getVolume(vname)
+	switch jrest.ErrCode(rErr) {
+	case jrest.RestErrorOk:
+		resp := csi.ControllerPublishVolumeResponse{
+			PublishContext: *iscsiContext,
+		}
+		return &resp, nil
+	case jrest.RestErrorResourceBusy:
+		// According to specification from
+		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
+	case jrest.RestErrorFailureUnknown:
+		err = status.Errorf(codes.Internal, rErr.Error())
+		return nil, err
+	case jrest.RestErrorResourceExists:
+		// TODO: handle	FAILED_PRECONDITION
+		// Indicates that a volume corresponding to the specified volume_id has already been published at another node and does not have MULTI_NODE volume capability.
+		// If this error code is returned, the Plugin SHOULD specify the node_id of the node at which the volume is published as part of the gRPC status.message.
+		// TODO: handle ALREADY_EXISTS
+		// Indicates that a volume corresponding to the specified volume_id has already been published at the node corresponding to the specified node_id but is 
+		// incompatible with the specified volume_capability or readonly flag .
+		err = status.Errorf(codes.AlreadyExists, rErr.Error())
+		return nil, err
+	case jrest.RestErrorResourceDNE:
+		msg := fmt.Sprintf("Resource not found: %s", rErr.Error())
+		err = status.Errorf(codes.NotFound, msg)
+		return nil, err
 
-	// if err != nil {
-	// 	return nil, status.Error(codes.NotFound, err.Error())
-	// }
-
-	// // Create target
-
-	// tname := fmt.Sprintf("%s:%s", cp.iqn, vname)
-
-	// rErr := (*cp.endpoints[0]).CreateTarget(tname)
-
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 		return nil, err
-
-	// 	case rest.RestObjectExists:
-	// 		l.Error(rErr.Error())
-	// 		err = status.Errorf(codes.AlreadyExists, rErr.Error())
-	// 		return nil, err
-	// 	case rest.RestResourceDNE:
-	// 		msg := fmt.Sprintf("Resource not found: %s", rErr.Error())
-	// 		err = status.Errorf(codes.Internal, msg)
-	// 		return nil, err
-
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return nil, err
-	// 	}
-	// }
-
-	// // Set Password
-	// uname := cp.getRandomName(12)
-	// pass := cp.getRandomPassword(16)
-	// rErr = (*cp.endpoints[0]).AddUserToTarget(tname, uname, pass)
-
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 		return nil, err
-
-	// 	case rest.RestObjectExists:
-	// 		err = status.Errorf(codes.AlreadyExists, rErr.Error())
-	// 		return nil, err
-
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return nil, err
-	// 	}
-	// }
-
-	// // Attach to target
-	// var mode string
-	// if roMode == true {
-	// 	mode = "ro"
-	// } else {
-	// 	mode = "wt"
-	// }
-
-	// rErr = (*cp.endpoints[0]).AttachToTarget(tname, vname, mode)
-
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 		return nil, err
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return nil, err
-	// 	}
-	// }
-	// secrets := map[string]string{"name": uname, "pass": pass}
-
-	// secrets["iqn"] = cp.iqn
-	// secrets["target"] = strings.ToLower(vname)
-
-	// var target *rest.Target
-	// for i := 0; i < 3; i++ {
-	// 	target, rErr = (*cp.endpoints[0]).GetTarget(tname)
-	// 	if rErr != nil {
-	// 		code := rErr.GetCode()
-	// 		switch code {
-	// 		case rest.RestResourceDNE:
-	// 			// According to specification from
-	// 			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-	// 		default:
-	// 			return nil, status.Errorf(codes.Internal, rErr.Error())
-	// 		}
-	// 	}
-	// 	if target.Active == true {
-	// 		l.Tracef("Target %s is active", tname)
-	// 		break
-	// 	}
-	// 	time.Sleep(time.Second)
-	// }
-	// if target.Active == false {
-	// 	return nil, status.Errorf(codes.Internal, "Unable to make target ready")
-	// }
-	// // TODO: add target ip
-	// // target port
-	// resp := &csi.ControllerPublishVolumeResponse{
-	// 	PublishContext: secrets,
-	// }
-	// return resp, nil
+	default:
+		err = status.Errorf(codes.Internal, "Unknown internal error")
+		return nil, err
+	}
 }
 
 // ControllerUnpublishVolume remove iscsi target for the volume
 func (cp *ControllerPlugin) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-	return nil, nil
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "UnpublishVolume",
-	// })
 
-	// l.Tracef("UnpublishVolume req: %+v", req)
-	// var err error
+	l := cp.l.WithFields(log.Fields{
+		"request": "ControllerUnpublishVolume",
+		"func": "ControllerUnpublishVolume",
+	})
+	ctx = jcom.WithLogger(ctx, l)
 
-	// //////////////////////////////////////////////////////////////////////////////
-	// /// Checks
-	// vname := req.GetVolumeId()
-	// if len(vname) == 0 {
-	// 	msg := "Volume name missing in request"
-	// 	l.Warn(msg)
-	// 	return nil, status.Error(codes.InvalidArgument, msg)
-	// }
+	l.Debugf("UnpublishVolume req: %+v", req)
+	var err error
 
-	// //////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////
+	/// Checks
+	vname := req.GetVolumeId()
+	if len(vname) == 0 {
+		msg := "Volume name missing in request"
+		l.Warn(msg)
+		return nil, status.Error(codes.InvalidArgument, msg)
+	}
 
-	// tname := fmt.Sprintf("%s:%s", cp.iqn, vname)
-	// rErr := (*cp.endpoints[0]).DettachFromTarget(tname, vname)
+	//////////////////////////////////////////////////////////////////////////////
 
-	// if rErr != nil {
-	// 	c := rErr.GetCode()
-	// 	switch c {
-	// 	case rest.RestResourceDNE:
+	tname := fmt.Sprintf("%s:%s", cp.iqn, vname)
+	rErr := (*cp.endpoints[0]).DettachFromTarget(tname, vname)
 
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		status.Errorf(codes.Internal, rErr.Error())
-	// 	default:
-	// 		status.Errorf(codes.Internal, "Unknown internal error")
-	// 	}
-	// }
+	if rErr != nil {
+		c := rErr.GetCode()
+		switch c {
+		case rest.RestResourceDNE:
 
-	// rErr = (*cp.endpoints[0]).DeleteTarget(tname)
+		case rest.RestResourceBusy:
+			// According to specification from
+			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
+		case rest.RestFailureUnknown:
+			status.Errorf(codes.Internal, rErr.Error())
+		default:
+			status.Errorf(codes.Internal, "Unknown internal error")
+		}
+	}
 
-	// if rErr != nil {
-	// 	c := rErr.GetCode()
-	// 	switch c {
-	// 	case rest.RestResourceDNE:
+	rErr = (*cp.endpoints[0]).DeleteTarget(tname)
 
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 		return nil, err
+	if rErr != nil {
+		c := rErr.GetCode()
+		switch c {
+		case rest.RestResourceDNE:
 
-	// 	case rest.RestObjectExists:
-	// 		err = status.Errorf(codes.AlreadyExists, rErr.Error())
-	// 		return nil, err
+		case rest.RestResourceBusy:
+			// According to specification from
+			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
+		case rest.RestFailureUnknown:
+			err = status.Errorf(codes.Internal, rErr.Error())
+			return nil, err
 
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return nil, err
-	// 	}
-	// }
-	// return &csi.ControllerUnpublishVolumeResponse{}, nil
+		case rest.RestObjectExists:
+			err = status.Errorf(codes.AlreadyExists, rErr.Error())
+			return nil, err
+
+		default:
+			err = status.Errorf(codes.Internal, "Unknown internal error")
+			return nil, err
+		}
+	}
+	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 // ValidateVolumeCapabilities checks if volume have give capability

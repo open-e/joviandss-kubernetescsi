@@ -377,3 +377,13 @@ type ResourcePoolIOStats struct {
 	Write  string `json:"write,omitempty"`
 	Chksum string `json:"chksum,omitempty"`
 }
+
+type ResourceTarget struct {
+	Name			string				`json:"name,omitempty"`
+	Active			bool         			`json:"active,omitempty"`
+	Conflicted		bool				`json:"conflicted,omitempty"`
+	IncomingUsersActive	bool         			`json:"incoming_users_active,omitempty"`
+	OutgoingUser		*CreateTargetOutgoingUser	`json:"outgoing_user,omitempty"`
+	AllowIP			[]string			`json:"allow_ip,omitempty"`
+	DenyIP			[]string			`json:"deny_ip,omitempty"`
+}
