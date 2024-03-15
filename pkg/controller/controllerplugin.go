@@ -813,6 +813,7 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 	}
 
 	if  volList, ts, rErr := cp.d.ListAllVolumes(ctx, cp.pool, int(maxEnt), *token); rErr != nil {
+		l.Debugf("Unable to comlete listing %s", rErr.Error())
 		return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error()) 
 	} else {
 		if ts != nil {
@@ -1053,15 +1054,14 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
+	l.Debugf("Publish volume request %+v", req)
 	var err error
-	
+
 	vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId())
 	if err != nil {
 		return nil, err
 	}
 	roMode := req.GetReadonly()
-	// Check node prefix
-	//nID := req.GetNodeId()
 
 	//////////////////////////////////////////////////////////////////////////////
 	/// Checks
@@ -1077,13 +1077,6 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 		l.Warnf("Unable to publish volume req: %v", req)
 		return nil, err
 	}
-
-
-	// if len(nID) == 0 {
-	// 	msg := "Node Id must be provided"
-	// 	l.Warn(msg)
-	// 	return nil, status.Error(codes.InvalidArgument, msg)
-	// }
 
 	//////////////////////////////////////////////////////////////////////////////
 
@@ -1131,118 +1124,82 @@ func (cp *ControllerPlugin) ControllerUnpublishVolume(ctx context.Context, req *
 	ctx = jcom.WithLogger(ctx, l)
 
 	l.Debugf("UnpublishVolume req: %+v", req)
-	var err error
 
-	//////////////////////////////////////////////////////////////////////////////
-	/// Checks
-	vname := req.GetVolumeId()
-	if len(vname) == 0 {
-		msg := "Volume name missing in request"
-		l.Warn(msg)
-		return nil, status.Error(codes.InvalidArgument, msg)
-	}
-
-	//////////////////////////////////////////////////////////////////////////////
-
-	tname := fmt.Sprintf("%s:%s", cp.iqn, vname)
-	rErr := (*cp.endpoints[0]).DettachFromTarget(tname, vname)
-
-	if rErr != nil {
-		c := rErr.GetCode()
-		switch c {
-		case rest.RestResourceDNE:
-
-		case rest.RestResourceBusy:
-			// According to specification from
-			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-		case rest.RestFailureUnknown:
-			status.Errorf(codes.Internal, rErr.Error())
+	if vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId()); err != nil {
+		return nil, err
+	} else {
+		rErr := cp.d.UnpublishVolume(ctx, cp.pool, cp.iqn, vd); 
+		switch jrest.ErrCode(rErr) {
+		case jrest.RestErrorOk, jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNETarget:
+			return &csi.ControllerUnpublishVolumeResponse{}, nil
 		default:
-			status.Errorf(codes.Internal, "Unknown internal error")
+			return nil, status.Errorf(codes.Internal, "Unable to unpublish volume %s because of %s", vd.Name(), rErr.Error())
 		}
 	}
-
-	rErr = (*cp.endpoints[0]).DeleteTarget(tname)
-
-	if rErr != nil {
-		c := rErr.GetCode()
-		switch c {
-		case rest.RestResourceDNE:
-
-		case rest.RestResourceBusy:
-			// According to specification from
-			return nil, status.Error(codes.FailedPrecondition, rErr.Error())
-		case rest.RestFailureUnknown:
-			err = status.Errorf(codes.Internal, rErr.Error())
-			return nil, err
-
-		case rest.RestObjectExists:
-			err = status.Errorf(codes.AlreadyExists, rErr.Error())
-			return nil, err
-
-		default:
-			err = status.Errorf(codes.Internal, "Unknown internal error")
-			return nil, err
-		}
-	}
-	return &csi.ControllerUnpublishVolumeResponse{}, nil
 }
 
 // ValidateVolumeCapabilities checks if volume have give capability
-func (cp *ControllerPlugin) ValidateVolumeCapabilities(
-	ctx context.Context,
-	req *csi.ValidateVolumeCapabilitiesRequest) (
-	*csi.ValidateVolumeCapabilitiesResponse, error,
-) {
-	return nil, nil
-	// supported := true
-	// vname := req.GetVolumeId()
-	// if len(vname) == 0 {
-	// 	msg := "Volume name missing in request"
-	// 	cp.l.Warn(msg)
-	// 	return nil, status.Error(codes.InvalidArgument, msg)
-	// }
-	// _, err := cp.getVolume(vname)
-	// if err != nil {
-	// 	return nil, status.Error(codes.NotFound, err.Error())
-	// }
+func (cp *ControllerPlugin) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
 
-	// vcap := req.GetVolumeCapabilities()
+	l := cp.l.WithFields(log.Fields{
+		"request": "ValidateVolumeCapabilities",
+		"func": "ValidateVolumeCapabilitiese",
+	})
 
-	// if vcap == nil {
-	// 	return nil, status.Error(codes.InvalidArgument, "Volume capabilities where not specified")
-	// }
+	ctx = jcom.WithLogger(ctx, l)
+	supported := true
 
-	// for _, c := range vcap {
-	// 	m := c.GetAccessMode()
-	// 	pass := false
-	// 	for _, mode := range supportedVolumeCapabilities {
-	// 		if mode == m.Mode {
-	// 			pass = true
-	// 		}
-	// 	}
-	// 	if pass == false {
-	// 		supported = false
-	// 		break
-	// 	}
-	// }
+	vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId())
+	if err != nil {
+		return nil, err
+	}
 
-	// if supported != true {
-	// }
+	_, rErr := cp.d.GetVolume(ctx, cp.pool, vd)
+	switch jrest.ErrCode(rErr) {
+	case jrest.RestErrorOk:
+		l.Debugf("volume %s present", vd.Name())
+	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNEVolume:
+		return nil, status.Error(codes.NotFound, rErr.Error())
+	default:
+		return nil, status.Error(codes.Internal, fmt.Sprintf("Unable to verify volume %s because of %s ", vd.Name(), rErr.Error()))
+	}
 
-	// vCtx := req.GetVolumeContext()
-	// if vcap == nil {
-	// 	return nil, status.Error(codes.InvalidArgument, "Volume context where not specified")
-	// }
+	vcap := req.GetVolumeCapabilities()
 
-	// resp := &csi.ValidateVolumeCapabilitiesResponse{
-	// 	Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
-	// 		VolumeCapabilities: cp.vCap,
-	// 		VolumeContext:      vCtx,
-	// 	},
-	// }
+	if vcap == nil {
+		return nil, status.Error(codes.InvalidArgument, "Volume capabilities where not specified")
+	}
 
-	// return resp, nil
+	for _, c := range vcap {
+		m := c.GetAccessMode()
+		pass := false
+		for _, mode := range supportedVolumeCapabilities {
+			if mode == m.Mode {
+				pass = true
+			}
+		}
+		if pass == false {
+			supported = false
+			break
+		}
+	}
+
+	if supported != true {
+	}
+
+	vCtx := req.GetVolumeContext()
+	if vcap == nil {
+		return nil, status.Error(codes.InvalidArgument, "Volume context where not specified")
+	}
+
+	resp := &csi.ValidateVolumeCapabilitiesResponse{
+		Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
+			VolumeCapabilities: cp.vCap,
+			VolumeContext:      vCtx,
+		},
+	}
+
+	return resp, nil
 }
 
 // ControllerExpandVolume expands capacity of given volume

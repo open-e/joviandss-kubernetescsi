@@ -94,6 +94,7 @@ const (
 	targetExistsMsgPattern = `Target with name (?P<target>[a-z0-9\.:\-]*) is already present on`
 	targetDneMsgPattern = `Target iqn.20215:test2asd not exists.`
 	lunIdUsedMsgPattern = `LUN ([\d]+) is already used in (?P<target>[a-z0-9\.:\-]*).`
+	volumeAlreadyUsedPattern = `Volume (?P<volumesyspath>.*) is already used.`
 	lunItemConflictClassPattern = `opene.exceptions.ItemConflictError`
 )
 
@@ -116,6 +117,7 @@ var targetExistsMsgRegexp = regexp.MustCompile(targetExistsMsgPattern)
 var targetDneMsgRegexp = regexp.MustCompile(targetDneMsgPattern)
 	
 var lunIdUsedMsgRegexp = regexp.MustCompile(lunIdUsedMsgPattern)
+var volumeAlteadyUsedRegexp = regexp.MustCompile(volumeAlreadyUsedPattern)
 var lunItemConflictClassRegexp = regexp.MustCompile(lunItemConflictClassPattern)
 
 func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restError {
@@ -216,8 +218,13 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 				if targetNameConflictClassRegexp.MatchString(*err.Class) && targetExistsMsgRegexp.MatchString(*err.Message) {
 					return &restError { code: RestErrorResourceExists }
 				}
-				if lunItemConflictClassRegexp.MatchString(*err.Class) && lunIdUsedMsgRegexp.MatchString(*err.Message) {
-					return &restError { code: RestErrorResourceExists, msg: *err.Message }
+				if lunItemConflictClassRegexp.MatchString(*err.Class) {
+					if lunIdUsedMsgRegexp.MatchString(*err.Message) {
+						return &restError { code: RestErrorResourceExists, msg: *err.Message }
+					}
+					if volumeAlteadyUsedRegexp.MatchString(*err.Message) {
+						return &restError { code: RestErrorResourceExists, msg: *err.Message }
+					}
 				}
 				if itemNotFoundClassRegexp.MatchString(*err.Class) {
 					if volumeDneMsgRegexp.MatchString(*err.Message) {

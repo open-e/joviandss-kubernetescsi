@@ -51,7 +51,7 @@ func (s *RestEndpoint) GetTarget(ctx context.Context, pool string, tname string)
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, CodeOK)
 
 	if err != nil {
-		msg := fmt.Sprintf("Unable to get target information")
+		msg := fmt.Sprintf("Unable to get target %s information", tname)
 		l.Warn(msg)
 		return nil, GetError(RestErrorRequestMalfunction, msg)
 	}
@@ -84,12 +84,12 @@ func (s *RestEndpoint) CreateTarget(ctx context.Context, pool string, desc *Crea
 	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, CodeCreated)
 
 	if err != nil {
-		l.Warnln("Unable to create target %s because of %s", desc.Name, err.Error)
+		l.Warnf("Unable to create target %s because of %s", desc.Name, err.Error)
 		return err
 	}
 
-	if stat == CodeOK {
-		l.Debug("Target %s created", desc.Name)
+	if stat == CodeOK || stat == CodeAccepted {
+		l.Debugf("Target %s created", desc.Name)
 		return nil
 	}
 
@@ -111,17 +111,17 @@ func (s *RestEndpoint) DeleteTarget(ctx context.Context, pool string, tname stri
 	
 	if stat == 404 {
 		msg := fmt.Sprintf("Target do not exists %s", tname)
-		l.Debugf(msg)
+		l.Debug(msg)
 		return GetError(RestErrorResourceDNE, msg)
 	}
 	
 	if err != nil {
-		l.Warnln("Unable to delete target %s because of %s", tname, err.Error)
+		l.Warnf("Unable to delete target %s because of %s", tname, err.Error)
 		return err
 	}
 
 	if stat == CodeNoContent{
-		l.Debug("Target %s deleted", tname)
+		l.Debugf("Target %s deleted", tname)
 		return nil
 	}
 
@@ -149,12 +149,12 @@ func (s *RestEndpoint) AttachVolumeToTarget(ctx context.Context, pool string, tn
 	}
 
 	if err != nil {
-		l.Warnln("Unable to attach volume with id %s to target %s because of %s", desc.Name, tname, err.Error)
+		l.Warnf("Unable to attach volume with id %s to target %s because of %s", desc.Name, tname, err.Error)
 		return err
 	}
 
 	if stat == CodeOK || stat == CodeCreated {
-		l.Debug("Target %s created", desc.Name)
+		l.Debugf("Target %s created", desc.Name)
 		return nil
 	}
 

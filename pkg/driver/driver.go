@@ -5,6 +5,7 @@ import (
 	"fmt"
 	//"math/rand"
 	"strings"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -587,7 +588,7 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 	
 	// Create target
 
-	var iContext map[string]string 
+	iContext := map[string]string{} 
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
@@ -650,8 +651,10 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 		target, rErr := d.re.GetTarget(ctx, pool, tname)
 		switch jrest.ErrCode(rErr) {
 			case jrest.RestErrorOk:
-				return &iContext, nil
-			case jrest.RestResourceDNE:
+				if target.Active == true {
+					return &iContext, nil
+				}
+			case jrest.RestErrorResourceDNE:
 				// According to specification from
 				time.Sleep(time.Second)
 				continue
@@ -660,14 +663,10 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 		}
 	}
 
-	return nil
+	return nil, jrest.GetError(jrest.RestErrorRequestTimeout, fmt.Sprintf("Unable to ensure that target %s is up and running", iqn))
 }
 
-func (d *CSIDriver)UnpublishVolume(ctx context.Context, pool string, prefix string,  ld LunDesc) (iscsiContext *map[string]string, rErr jrest.RestError) {
-	
-	// Create target
-
-	var iContext map[string]string 
+func (d *CSIDriver)UnpublishVolume(ctx context.Context, pool string, prefix string,  ld LunDesc) (rErr jrest.RestError) {
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
@@ -676,72 +675,38 @@ func (d *CSIDriver)UnpublishVolume(ctx context.Context, pool string, prefix stri
 	})
 
 	// We want target name to be uniquee
-	iqn := TargetIQN(prefix, ld)
+	iqn, rErr := TargetIQN(prefix, ld)
 
-	
-
-	var ctDesc jrest.CreateTargetDescriptor
-	active := true
-	ctDesc.Name = tname
-	ctDesc.Active = &active
-
-	rErr = d.re.DeleteTarget(ctx, pool, &ctDesc)
-
-	switch jrest.ErrCode(rErr) {
-	case jrest.RestErrorOk:
-		l.Debugf("target %s created", iqn)
-	case jrest.RestErrorResourceExists:
-		l.Debugf("target %s already exists", iqn)
-	default:
-		return nil, rErr
+	if rErr != nil {
+		return rErr
 	}
 
-	// Attach to target
-	var mode string = "wt"
-	if readonly == true {
-		mode = "ro"
-	}
-
-	var attachLun jrest.TargetLunDescriptor
-	
-	attachLun.Name = ld.VDS()
-	attachLun.Mode = &mode
-
-	rErr = d.re.AttachVolumeToTarget(ctx, pool, iqn, &attachLun)
+	rErr = d.re.DettachVolumeFromTarget(ctx, pool, *iqn, ld.VDS())
 
 	if rErr != nil {
 		code := rErr.GetCode()
 		switch code {
-		case jrest.RestErrorResourceExists:
-			// According to specification from
-			// TODO: check that resource indeed properly assigned and continue if everything is ok
-			l.Debugf("Volume %s already attached", ld.Name())
+		case jrest.RestErrorOk:
+			l.Debugf("Volume %s was detached from target %s", ld.Name(), *iqn)
+		case jrest.RestErrorResourceDNEVolume, jrest.RestErrorResourceDNE:
+			l.Debugf("Volume %s is not attached from target %s", ld.Name(), *iqn)
+		case jrest.RestErrorResourceDNETarget:
+			return nil
 		default:
-			return nil, rErr
+			return rErr
 		}
 	}
 
-	iContext["iqn"] = iqn
-	iContext["target"] = tname
+	rErr = d.re.DeleteTarget(ctx, pool, *iqn)
 
-	for i := 0; i < 3; i++ {
-		target, rErr := d.re.GetTarget(ctx, pool, tname)
-		switch jrest.ErrCode(rErr) {
-			case jrest.RestErrorOk:
-				return &iContext, nil
-			case jrest.RestResourceDNE:
-				// According to specification from
-				continue
-			default:
-				continue
-			}
-		}
-		time.Sleep(time.Second)
+	switch jrest.ErrCode(rErr) {
+	case jrest.RestErrorOk:
+		l.Debugf("target %s deleted", iqn)
+	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNETarget:
+		l.Debugf("target %s do not exists", iqn)
+	default:
+		return rErr
 	}
-	
-	// TODO: add target ip
-	// target port
-
 	
 	return nil
 }

@@ -21,46 +21,68 @@ import (
 	//"fmt"
 	//"strings"
 	"context"
+	log "github.com/sirupsen/logrus"
+	
 	// "encoding/base64"
+
 	// "fmt"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 
-	//jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "joviandss-kubernetescsi/pkg/common"
 	jdrvr "joviandss-kubernetescsi/pkg/driver"
 	jrest "joviandss-kubernetescsi/pkg/rest"
 )
 
 func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshotShort) (err error) {
+	
+	l := jcom.LFC(ctx)
+	l = l.WithFields(log.Fields{
+		"func": "completeListResponseFromSnapshotShort",
+		"section" : "controller",
+	})
 
 	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
+	var i = 0
+
 	lsr.Entries = entries
-	for i, s := range snaps {
+	for _, s := range snaps {
 		ts := timestamppb.New(s.Properties.Creation)
 
 		vd, err := jdrvr.NewVolumeDescFromVDS(s.Volume)
 		if err != nil {
-			return err
+			l.Warnf("Volume name has incompatible format %s", s.Volume)
+			continue
 		}
 		sd, err := jdrvr.NewSnapshotDescFromSDS(vd, s.Name)
 		if err != nil {
-			return err
+			l.Warnf("Snapshot name has incompatible format %s", s.Name)
+			continue
 		}
 
 		entries[i] = &csi.ListSnapshotsResponse_Entry{
 			Snapshot: &csi.Snapshot{
 				SnapshotId:     sd.CSIID(),
-				SourceVolumeId: s.Volume,
+				SourceVolumeId: vd.CSIID(),
 				CreationTime:   ts,
 				ReadyToUse:	true,
 			},
 		}
+		i += 1
 	}
+	lsr.Entries = entries[:i]
 
 	return nil
 }
 
 func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshot, ld jdrvr.LunDesc) (err error) {
+	
+	l := jcom.LFC(ctx)
+	l = l.WithFields(log.Fields{
+		"func": "completeListResponseFromSnapshotShort",
+		"section" : "controller",
+	})
+	var i = 0
 
 	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
 	lsr.Entries = entries
@@ -69,7 +91,8 @@ func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSn
 
 		sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
 		if err != nil {
-			return err
+			l.Warnf("Snapshot name has incompatible format %s", s.Name)
+			continue
 		}
 
 		entries[i] = &csi.ListSnapshotsResponse_Entry{
@@ -80,20 +103,29 @@ func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSn
 				ReadyToUse:	true,
 			},
 		}
+		i += 1
 	}
+	lsr.Entries = entries[:i]
 
 	return nil
 }
 
 func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesResponse, vols []jrest.ResourceVolume) (err error) {
+	
+	l := jcom.LFC(ctx)
+	l = l.WithFields(log.Fields{
+		"func": "completeListResponseFromVolume",
+		"section" : "controller",
+	})
 
 	entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
-	lsr.Entries = entries
-	for i, v := range vols {
+	var i = 0
+	for _, v := range vols {
 
 		vd, err := jdrvr.NewVolumeDescFromVDS(v.Name)
 		if err != nil {
-			return err
+			l.Warnf("Volume name has incompatible format %s", v.Name)
+			continue
 		}
 		var contentSource *csi.VolumeContentSource
 		
@@ -130,7 +162,9 @@ func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesRes
 				ContentSource: contentSource,
 			},
 		}
+		i += 1
 	}
+	lsr.Entries = entries[:i]
 
 	return nil
 }
