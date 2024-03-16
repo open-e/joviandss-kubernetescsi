@@ -14,13 +14,18 @@ default: joviandss
 
 
 
-all:  joviandss joviandss-container
+all:  joviandss joviandss-container cli
+
+cli:
+	go mod tidy
+	go get ./app/joviandssplugin
+	CGO_ENABLED=0 GOOS=linux go build -a -o _output/jdss-csi-cli ./app/jdss-csi-cli
 
 joviandss:
 	go mod tidy
 	go get ./app/joviandssplugin
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X jovianDSS-kubernetescsi/pkg/joviandss.Version=$(IMAGE_VERSION) -extldflags "-static"' -o _output/jdss-csi-plugin ./app/joviandssplugin
-
+:q
 joviandss-container: joviandss
 	@echo Building Container
 	sudo podman build -t $(IMAGE_TAG_CENTOS) -f ./app/joviandssplugin/centos.Dockerfile .

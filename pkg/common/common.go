@@ -9,7 +9,8 @@ import (
 	"gopkg.in/yaml.v3"
 	
 	// "joviandss-kubernetescsi/pkg/rest"
-	
+	uuid "github.com/google/uuid"
+
 	"context"
 	"github.com/sirupsen/logrus"
 )
@@ -168,4 +169,15 @@ func JBase64ToStr(in string) (out string, err error) {
 	out = replacerfromjbase64.Replace(in)
 	bout, err := base64.StdEncoding.DecodeString(out)
 	return string(bout[:]), err
+}
+
+var (
+	ControllerConfigPath string
+)
+
+
+func GetContext(traceId string) context.Context {
+	ctxuuid := uuid.Must(uuid.NewRandom()).String()	
+	ctx := context.Background() 
+	return context.WithValue(ctx, "traceId", ctxuuid)
 }
