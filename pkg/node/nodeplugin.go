@@ -1,15 +1,17 @@
-package joviandss
+package node
 
 import (
 	"fmt"
 	"os"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/utils/mount"
+
+	jcom "joviandss-kubernetescsi/pkg/common"
 )
 
 var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
@@ -20,22 +22,22 @@ var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
 
 //NodePlugin responsible for attaching and detaching volumes to host
 type NodePlugin struct {
-	cfg *NodeCfg
-	l   *logrus.Entry
+	//cfg *NodeCfg
+	l   *log.Entry
 }
 
 //GetNodePlugin inits NodePlugin
-func GetNodePlugin(conf *NodeCfg, log *logrus.Entry) (np *NodePlugin, err error) {
-
-	lFields := logrus.Fields{
-		"node":   conf.Id,
-		"plugin": "Node",
-	}
+func GetNodePlugin(l *log.Entry) (np *NodePlugin, err error) {
+	
+	nid, err := GetNodeId(l)
+	l = log.WithFields(log.Fields{
+		"nodeid":   nid,
+		"section": "node",
+		})
 	np = &NodePlugin{
-		cfg: conf,
-		l:   log.WithFields(lFields),
+		l:   l,
 	}
-	log.Debug(fmt.Sprintf("Config: %+v", *conf))
+	log.Debug("Init node plugin")
 	return np, nil
 }
 
@@ -51,12 +53,20 @@ func (np *NodePlugin) NodeGetInfo(
 	ctx context.Context,
 	req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 
-	np.l.Tracef("NodeGetInfo: %+v", req)
+	l := np.l.WithFields(log.Fields{
+		"request": "NoneGetInfo",
+		"func": "NodeGetInfo",
+		"section": "node",
+	})
 
-	//TODO: Add node identification
-	return &csi.NodeGetInfoResponse{
-		NodeId: np.cfg.Id,
-	}, nil
+	if nid, err := GetNodeId(l); err != nil {
+		return nil, err
+	} else {
+		l.Debugf("NodeGetInfo for node %s", nid)
+		return &csi.NodeGetInfoResponse{
+			NodeId: nid,
+		}, nil
+	}
 }
 
 //NodeStageVolume introduce volume to host
@@ -64,11 +74,18 @@ func (np *NodePlugin) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest,
 ) (*csi.NodeStageVolumeResponse, error) {
+	
+	l := np.l.WithFields(log.Fields{
+		"request": "NoneStageVolume",
+		"func": "NodeStageVolume",
+		"section": "node",
+	})
+	ctx = jcom.WithLogger(ctx, l)
 
-	np.l.Tracef("Node Stage Volume")
+	l.Debug("Node Stage Volume")
 	var msg string
 
-	t, err := GetTargetFromReq(np.cfg, np.l, *req)
+	t, err := GetTargetFromReq(l, *req)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +101,6 @@ func (np *NodePlugin) NodeStageVolume(
 		if err = os.MkdirAll(t.STPath, 0640); err != nil {
 			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", t.TPath, err.Error())
 			return nil, status.Error(codes.Internal, msg)
-
 		}
 	}
 
@@ -94,7 +110,7 @@ func (np *NodePlugin) NodeStageVolume(
 		return nil, err
 	}
 
-	err = t.StageVolume()
+	err = t.StageVolume(ctx)
 
 	if err != nil {
 		t.DeleteSerialization()
@@ -112,33 +128,40 @@ func (np *NodePlugin) NodeUnstageVolume(
 ) (*csi.NodeUnstageVolumeResponse, error) {
 	// Log out from specified target
 	var msg string
-	np.l.Tracef("Node Unstage Volume %s", req.GetVolumeId())
+	l := np.l.WithFields(log.Fields{
+		"request": "NoneUnstageVolume",
+		"func": "NodeUnstageVolume",
+		"section": "node",
+	})
+	ctx = jcom.WithLogger(ctx, l)
+
+	l.Debugf("Node Unstage Volume %s", req.GetVolumeId())
 
 	vname := req.GetVolumeId()
 	if len(vname) == 0 {
 		msg = fmt.Sprintf("Request do not contain volume id")
-		np.l.Warn(msg)
+		l.Warn(msg)
 		return nil, status.Error(codes.InvalidArgument, msg)
 	}
 
 	stp := req.GetStagingTargetPath()
 	if len(stp) == 0 {
 		msg = fmt.Sprintf("Request do not contain staging target path")
-		np.l.Warn(msg)
+		l.Warn(msg)
 		return nil, status.Error(codes.InvalidArgument, msg)
 	}
 
 	if GetStageStatus(stp) == false {
 		return &csi.NodeUnstageVolumeResponse{}, nil
 	}
-	t, err := GetTargetFromPath(np.cfg, np.l, stp)
+	t, err := GetTargetFromPath(np.l, stp)
 	// TODO: implement recovery using target path
 	if err != nil {
 		msg = fmt.Sprintf("Unable to get info about target: %s", err.Error())
-		np.l.Warn(msg)
+		l.Warn(msg)
 		return nil, err
 	}
-	err = t.UnStageVolume()
+	err = t.UnStageVolume(ctx)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -159,7 +182,7 @@ func (np *NodePlugin) NodePublishVolume(
 	block := false
 	var msg string
 
-	t, err := GetTargetFromReq(np.cfg, np.l, *req)
+	t, err := GetTargetFromReq(np.l, *req)
 	if err != nil {
 		return nil, err
 	}
@@ -184,8 +207,16 @@ func (np *NodePlugin) NodeUnpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
 ) (*csi.NodeUnpublishVolumeResponse, error) {
+	
+	l := np.l.WithFields(log.Fields{
+		"request": "NodeUnpublishVolume",
+		"func": "NodeUnpublishVolume",
+		"section": "node",
+	})
 
-	np.l.Tracef("Node Unpublish Volume %s", req.GetVolumeId())
+	ctx = jcom.WithLogger(ctx, l)
+
+	l.Debugf("Node Unpublish Volume %s", req.GetVolumeId())
 
 	block := false
 	//eq := false
@@ -194,17 +225,17 @@ func (np *NodePlugin) NodeUnpublishVolume(
 	tp := req.GetTargetPath()
 	if len(tp) == 0 {
 		msg = fmt.Sprintf("Request do not contain target path")
-		np.l.Warn(msg)
+		l.Warn(msg)
 		return nil, status.Error(codes.InvalidArgument, msg)
 	}
 
-	t, err := GetTarget(np.cfg, np.l, tp)
+	t, err := GetTarget(l, tp)
 	if err != nil {
 		return nil, err
 	}
 
 	if !block {
-		err = t.UnMountVolume()
+		err = t.UnMountVolume(ctx)
                 if err != nil {
 		    msg = fmt.Sprintf("Unable to clean up on volume unmounting: %s", err.Error())
 		    return nil, status.Error(codes.Aborted, msg)
@@ -213,7 +244,7 @@ func (np *NodePlugin) NodeUnpublishVolume(
 		return nil, status.Error(codes.Unimplemented, "Block detaching is not supported")
 	}
 
-	np.l.Tracef("Node Unpublish Volume %s Done.", req.GetVolumeId())
+	l.Tracef("Node Unpublish Volume %s Done.", req.GetVolumeId())
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }

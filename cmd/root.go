@@ -9,6 +9,8 @@ import (
 	"joviandss-kubernetescsi/cmd/controller"
 	"joviandss-kubernetescsi/cmd/node"
 	"github.com/spf13/cobra"
+	
+	jcom "joviandss-kubernetescsi/pkg/common"
 )
 
 
@@ -38,8 +40,6 @@ func Execute() {
 }
 
 var (
-	LogLevel string = ""
-	LogPath string = ""
 	ConfigPath string = ""
 )
 
@@ -58,8 +58,8 @@ func init() {
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-	rootCmd.PersistentFlags().StringVarP(&LogLevel, "loglevel", "l", "INFO", "Name of volume to create")
-	rootCmd.PersistentFlags().StringVarP(&LogPath, "logpath", "p", "/var/log/joviandss-csi-controller", "Help message for toggle")
+	rootCmd.PersistentFlags().StringVarP(&jcom.LogLevel, "loglevel", "l", "INFO", "Level of logging")
+	rootCmd.PersistentFlags().StringVarP(&jcom.LogPath, "logpath", "p", "/tmp/joviandss-csi", "File to store log information")
 
 	addSubCmds()
 }

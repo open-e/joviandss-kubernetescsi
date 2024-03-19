@@ -25,18 +25,14 @@ import (
 	//"encoding/json"
 	"os"
 
-	//"errors"
 	"fmt"
-	//"strconv"
 	"strings"
 	"sync"
 
-	//"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/protobuf/ptypes/timestamp"
 
-	//"github.com/golang/protobuf/ptypes/wrappers"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
@@ -409,89 +405,6 @@ func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.R
 	return v, nil
 }
 
-
-func (cp *ControllerPlugin) createVolumeFromSnapshot(sd jdrvr.SnapshotDesc, nvid jdrvr.VolumeDesc) error {
-//	l := cp.l.WithFields(logrus.Fields{
-//		"func": "createVolumeFromSnapshot",
-//	})
-//
-//	snameT := strings.Split(sname, "_")
-//	var vname string
-//	if len(snameT) == 2 {
-//		vname = snameT[0]
-//	} else if len(snameT) == 3 {
-//		vname = snameT[1]
-//	} else {
-//		msg := "Unable to obtain volume name from snapshot name"
-//		l.Warn(msg)
-//		return status.Error(codes.NotFound, msg)
-//	}
-//
-//	rErr := (*cp.endpoints[0]).CreateClone(vname, sname, nvname)
-//	var err error
-//	if rErr != nil {
-//		switch rErr.GetCode() {
-//		case rest.RestRequestMalfunction:
-//			// TODO: correctly process error messages
-//			err = status.Error(codes.NotFound, rErr.Error())
-//			// return nil, status.Error(codes.Internal, rErr.Error())
-//		case rest.RestObjectExists:
-//			err = status.Error(codes.FailedPrecondition, rErr.Error())
-//		case rest.RestRPM:
-//			err = status.Error(codes.Internal, rErr.Error())
-//		case rest.RestResourceDNE:
-//			err = status.Error(codes.NotFound, rErr.Error())
-//		default:
-//			err = status.Errorf(codes.Internal, rErr.Error())
-//		}
-//		return err
-//	}
-//
-	return nil
-}
-
-func (cp *ControllerPlugin) createVolumeFromVolume(sd jdrvr.SnapshotDesc, nvid jdrvr.VolumeDesc) error {
-	l := cp.l.WithFields(log.Fields{
-		"func": "createVolumeFromVolume",
-	})
-
-	msg := fmt.Sprintf("Create %s From %s", sd.Name(), nvid.Name())
-	l.Tracef(msg)
-
-	// csname, err := cp.createConcealedSnapshot(srcVol)
-	// if err != nil {
-	// 	return err
-	// }
-	err := cp.createVolumeFromSnapshot(sd, nvid)
-	return err
-}
-
-// getVolumeSize return size of a volume
-func (cp *ControllerPlugin) getVolumeSize(vname string) (int64, error) {
-	// l := cp.l.WithFields(logrus.Fields{
-	// 	"func": "getVolumeSize",
-	// })
-
-	// v, err := cp.getVolume(vname)
-	// if err != nil {
-
-	// 	msg := fmt.Sprintf("Internal error %s", err.Error())
-	// 	l.Warn(msg)
-	// 	err = status.Errorf(codes.Internal, msg)
-	// 	return 0, err
-	// }
-	// var vSize int64
-	// vSize, err = strconv.ParseInt((*v).Volsize, 10, 64)
-	// if err != nil {
-
-	// 	msg := fmt.Sprintf("Internal error %s", err.Error())
-	// 	l.Warn(msg)
-	// 	err = status.Errorf(codes.Internal, msg)
-	// 	return 0, err
-	// }
-	
-	return 0, nil
-}
 
 func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.VolumeDesc, capr *csi.CapacityRange, vSource *csi.VolumeContentSource) (volumeSize int64, csierr error) {
 

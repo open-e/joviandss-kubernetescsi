@@ -16,13 +16,21 @@ import (
 )
 
 // Version of plugin, should be filed during compilation
-var Version string
-
+var (
+	Version string
+	LogLevel string
+	LogPath string
+)
 // Plugin name
 var PluginName = "joviandss-csi-iscsi.open-e.com"
 
 var replacertojbase64 = strings.NewReplacer("+", "_", "/", "-", "=", ".")
 var replacerfromjbase64 = strings.NewReplacer("_", "+", "-", "/", ".", "=")
+
+var (
+	NodeConfigPath string
+	ControllerConfigPath string
+)
 
 type RestEndpointCfg struct {
 	Addrs        []string
@@ -81,7 +89,7 @@ func GetLogger(logLevel string, toFile string) (*logrus.Logger, error) {
 	}
 
 	log.SetLevel(lvl)
-	
+
 	return log, nil
 }
 
@@ -171,9 +179,7 @@ func JBase64ToStr(in string) (out string, err error) {
 	return string(bout[:]), err
 }
 
-var (
-	ControllerConfigPath string
-)
+
 
 
 func GetContext(traceId string) context.Context {

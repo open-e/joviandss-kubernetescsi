@@ -27,6 +27,14 @@ var (
 func createSnaposhot(cmd *cobra.Command, args []string) {
 	logrus.Debug("create snapshot")
 	
+	if err:= createVolumeCmd.MarkFlagRequired("sv"); err != nil {
+		fmt.Println(err)
+	}
+	
+	if err:= createVolumeCmd.MarkFlagRequired("csn"); err != nil {
+		fmt.Println(err)
+	}
+	
 	var cfg csi_common.JovianDSSCfg
 
 	var cp csi_controller.ControllerPlugin
@@ -101,13 +109,7 @@ func init() {
 	createSnapshotCmd.Flags().StringVarP(&snapshotName,"csn",	"", "", "snapshot name")
 	createSnapshotCmd.Flags().StringVarP(&volumeId,"sv",	"", "", "volume id")
 
-	if err:= createVolumeCmd.MarkFlagRequired("sv"); err != nil {
-		fmt.Println(err)
-	}
-	
-	if err:= createVolumeCmd.MarkFlagRequired("csn"); err != nil {
-		fmt.Println(err)
-	}
+
 	
 	//if err:= createVolumeCmd.MarkFlagRequired("size"); err != nil {
 	//	fmt.Println(err)

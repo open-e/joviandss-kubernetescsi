@@ -2,32 +2,38 @@ package identity
 
 import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	"joviandss-kubernetescsi/pkg/common"
+	jcom "joviandss-kubernetescsi/pkg/common"
 )
 
 type IdentityPlugin struct {
-	l   *logrus.Entry
+	l   *log.Entry
 }
 
 func (ip *IdentityPlugin) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	ip.l.Trace("Serving GetPluginInfo")
+	l := ip.l.WithFields(log.Fields{
+		"request": "GetPluginInfo",
+		"func": "GetPluginInfo",
+		"section": "identity",
+	})
+	ctx = jcom.WithLogger(ctx, l)
+	l.Debugf("Serving Plugin Info")
 
-	if common.Version == "" {
+	if jcom.Version == "" {
 		return nil, status.Error(codes.Unavailable, "Driver is missing version")
 	}
 
 	return &csi.GetPluginInfoResponse{
-		Name:          common.PluginName,
-		VendorVersion: common.Version,
+		Name:          jcom.PluginName,
+		VendorVersion: jcom.Version,
 	}, nil
 }
 
-func GetIdentityPlugin(log *logrus.Entry) (ip *IdentityPlugin, err error) {
+func GetIdentityPlugin(log *log.Entry) (ip *IdentityPlugin, err error) {
 	ip = &IdentityPlugin{l: log}
 	return ip, nil
 }

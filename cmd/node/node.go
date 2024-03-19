@@ -6,24 +6,34 @@ package node
 
 import (
 	"fmt"
+	//"os"
 
 	"github.com/spf13/cobra"
+	//cli_common "joviandss-kubernetescsi/pkg/common"
+	
+	cliGetInfo "joviandss-kubernetescsi/cmd/node/getinfo"
+
 )
 
 // nodeCmd represents the node command
 var NodeCmd = &cobra.Command{
 	Use:   "node",
-	Short: "Comand line interface to running node commands",
-	Long: `A long description of node command goes here
-and continue here.`,
+	Short: "Comand line interface to node commands",
+	Long: `That is general sub command that stores all node related commands.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("node called")
 	},
 }
 
+func addSubCmds() {
+	NodeCmd.AddCommand(cliGetInfo.NodeGetInfoCmd)
+	//NodeCmd.AddCommand(cliPublishVolume.UnpublishVolumeCmd)
+}
 
 
 func init() {
+	
+	addSubCmds()
 	//rootCmd.AddCommand(nodeCmd)
 
 	// Here you will define your flags and configuration settings.

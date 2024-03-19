@@ -30,7 +30,6 @@ func IsSDS(vds string) bool {
 }
 
 
-
 func NewSnapshotDescFromName(lid LunDesc, name string) (*SnapshotDesc) {
 
 	// Get universal volume ID
@@ -135,12 +134,9 @@ func NewSnapshotDescFromCSIID(csiid string) (*SnapshotDesc, error) {
 
 	if vds, err := base64.StdEncoding.DecodeString(csiidl[len(csiidl)-1:][0]); err != nil {
 		return nil, status.Errorf(codes.InvalidArgument, "Unable to decode volume section of snapshot ID %s have bad format, %s", csiid, err.Error())
-		//return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to process snapshot token %s, decoding failed %s", csiid, err.Error()))
 	} else {
 		if sd.ld, err = NewVolumeDescFromVDS(string(vds)); err != nil {
 			return nil, status.Errorf(codes.InvalidArgument, "Volume section of snapshot ID %s have bad format, %s", csiid, err.Error())
-			//return nil, status.Errorf(codes.InvalidArgument, "Snapshot ID %s have bad format", csiid)
-			// return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Unable to restore voprocess snapshot token %s, decoding failed %s", csiid, err.Error())) 
 		}
 	}
 
