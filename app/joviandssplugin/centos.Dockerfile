@@ -1,4 +1,4 @@
-FROM centos:latest
+FROM centos:stream9
 LABEL maintainers="Andrei Perapiolkin"
 LABEL description="JovianDSS CSI Plugin"
 
