@@ -20,7 +20,7 @@ var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
 	csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 }
 
-//NodePlugin responsible for attaching and detaching volumes to host
+// NodePlugin responsible for attaching and detaching volumes to host
 type NodePlugin struct {
 	//cfg *NodeCfg
 	l   *log.Entry
@@ -41,14 +41,14 @@ func GetNodePlugin(l *log.Entry) (np *NodePlugin, err error) {
 	return np, nil
 }
 
-//NodeExpandVolume responsible for update of file system on volume
+// NodeExpandVolume responsible for update of file system on volume
 func (np *NodePlugin) NodeExpandVolume(ctx context.Context, in *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	np.l.Trace("Expanding Volume")
 	out := new(csi.NodeExpandVolumeResponse)
 	return out, nil
 }
 
-//NodeGetInfo returns node info
+// NodeGetInfo returns node info
 func (np *NodePlugin) NodeGetInfo(
 	ctx context.Context,
 	req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
@@ -69,7 +69,7 @@ func (np *NodePlugin) NodeGetInfo(
 	}
 }
 
-//NodeStageVolume introduce volume to host
+// NodeStageVolume introduce volume to host
 func (np *NodePlugin) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest,
@@ -121,7 +121,7 @@ func (np *NodePlugin) NodeStageVolume(
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-//NodeUnstageVolume remove volume from host
+// NodeUnstageVolume remove volume from host
 func (np *NodePlugin) NodeUnstageVolume(
 	ctx context.Context,
 	req *csi.NodeUnstageVolumeRequest,
@@ -169,7 +169,7 @@ func (np *NodePlugin) NodeUnstageVolume(
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-//NodePublishVolume mount volume to target
+// NodePublishVolume mount volume to target
 func (np *NodePlugin) NodePublishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
@@ -202,7 +202,7 @@ func (np *NodePlugin) NodePublishVolume(
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-//NodeUnpublishVolume unmount volume
+// NodeUnpublishVolume unmount volume
 func (np *NodePlugin) NodeUnpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
@@ -249,7 +249,7 @@ func (np *NodePlugin) NodeUnpublishVolume(
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
-//NodeGetServiceCapability provides service capabilities
+// NodeGetServiceCapability provides service capabilities
 func NodeGetServiceCapability(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeServiceCapability {
 	return &csi.NodeServiceCapability{
 		Type: &csi.NodeServiceCapability_Rpc{
@@ -260,7 +260,7 @@ func NodeGetServiceCapability(cap csi.NodeServiceCapability_RPC_Type) *csi.NodeS
 	}
 }
 
-//NodeGetCapabilities provides node capabilities
+// NodeGetCapabilities provides node capabilities
 func (ns *NodePlugin) NodeGetCapabilities(
 	ctx context.Context,
 	req *csi.NodeGetCapabilitiesRequest,

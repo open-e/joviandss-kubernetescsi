@@ -14,6 +14,14 @@ spec:
       volumeMounts:
         - mountPath: /usr/share/nginx/html
           name: persistent-volume
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
   volumes:
     - name: persistent-volume
       persistentVolumeClaim:

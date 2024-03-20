@@ -8,4 +8,4 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: joviandss-persisten-volume-sc
+  storageClassName: joviandss-persistent-volume-sc
