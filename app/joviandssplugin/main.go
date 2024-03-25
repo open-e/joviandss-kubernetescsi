@@ -12,6 +12,8 @@ import (
 	//"joviandss-kubernetescsi/pkg/joviandss"
 )
 
+var Version string
+
 func init() {
 	flag.Set("logtostderr", "true")
 }
@@ -38,6 +40,7 @@ func main() {
 
 	cfg := handleArgs()
 
+
 	// TODO: check if logging parametrs a properly parse
 	var l *logrus.Entry
 	if cfg != nil {
@@ -45,6 +48,7 @@ func main() {
 	} else {
 		l = initLogging(logLevel, logPath)
 	}
+	l.Debugf("Version %s", common.Version)
 
 	routine(cfg, l)
 	os.Exit(0)

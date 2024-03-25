@@ -129,7 +129,7 @@ func (s *PluginServer) grpcErrorHandler(
 	resp, err := handler(ctx, req)
 	if err != nil {
 		s.l.WithFields(logrus.Fields{
-			"func": "grpcErrorhandler"}).Warn(err)
+			"func": "grpcErrorhandler"}).Warn(err.Error())
 	}
 	return resp, err
 }

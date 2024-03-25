@@ -26,7 +26,7 @@ cli:
 joviandss:
 	go mod tidy
 	go get ./app/joviandssplugin
-	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X jovianDSS-kubernetescsi/pkg/joviandss.Version=$(IMAGE_VERSION) -extldflags "-static"' -o _output/jdss-csi-plugin ./app/joviandssplugin
+	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X joviandss-kubernetescsi/pkg/common.Version=$(IMAGE_VERSION) -extldflags "-static"' -o _output/jdss-csi-plugin ./app/joviandssplugin
 	#chmod +x _output/jdss-csi-plugin
 
 container: joviandss
@@ -38,7 +38,7 @@ container: joviandss
 containerdev: joviandss
 	@echo Building Container
 	podman build -t docker.io/$(IMAGE_TAG_DEV) -f ./deploy/docker/centos.Dockerfile .
-	podman build -t docker.io/$(IMAGE_TAG_DEV) -f ./deploy/docker/centos.Dockerfile .
+	podman build -t docker.io/$(IMAGE_TAG_DEV_LATEST) -f ./deploy/docker/centos.Dockerfile .
 	#podman build -t $(IMAGE_TAG_UBUNTU) -f ./app/joviandssplugin/ubuntu.Dockerfile .
 
 clean:
