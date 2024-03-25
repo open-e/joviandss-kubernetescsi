@@ -132,10 +132,12 @@ spec:
             - --csi-address=/csi/csi.sock
             - --soc-type=unix
             - --config=$(JOVIANDSS_CONFIG)
+            - --controller
+            - --identity
           env:
             - name: JOVIANDSS_CONFIG
               value: /config/controller-cfg.yaml
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           securityContext:
             privileged: true
           volumeMounts:
