@@ -18,6 +18,7 @@ import (
 // Version of plugin, should be filed during compilation
 var (
 	Version string
+	NodeID string
 	LogLevel string
 	LogPath string
 )

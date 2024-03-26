@@ -3,6 +3,7 @@ kind: ServiceAccount
 metadata:
   name: joviandss-csi-node-service-account
   namespace: joviandss-csi
+
 ---
 
 kind: ClusterRole
@@ -28,6 +29,7 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch", "update"]
+
 ---
 
 kind: ClusterRoleBinding
@@ -43,8 +45,8 @@ roleRef:
   kind: ClusterRole
   name: joviandss-csi-node-cluster-role
   apiGroup: rbac.authorization.k8s.io
----
 
+---
 
 kind: DaemonSet
 apiVersion: apps/v1
@@ -94,8 +96,11 @@ spec:
           args:
             - --csi-address=/csi/csi.sock
             - --soc-type=unix
-            - --config=/config/node-cfg.yaml
             - --nodeid=$(KUBE_NODE_NAME)
+            - --node
+            - --loglevel=DEBUG
+              #- --config=/config/node-cfg.yaml
+
           env:
             - name: KUBE_NODE_NAME
               valueFrom:
@@ -104,8 +109,8 @@ spec:
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
-            - name: config
-              mountPath: /config
+            #- name: config
+            #  mountPath: /config
             - name: mount-dir
               mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
@@ -140,7 +145,6 @@ spec:
         - name: config
           secret:
             secretName: jdss-node-cfg
-
         - name: iscsi-config-dir
           hostPath:
             path: /usr/local/etc/iscsi

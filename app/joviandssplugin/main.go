@@ -97,10 +97,11 @@ func handleArgs() *common.JovianDSSCfg {
 	flag.BoolVar(&startController, "controller", false, "Start controller plugin")
 	flag.BoolVar(&startNode, "node", false, "Start node plugin")
 	flag.BoolVar(&startIdentity, "identity", false, "Start identity plugin")
-	
+
+	flag.StringVar(&common.NodeID, "nodeid", "", "Id of the kubernetes node")
 	flag.StringVar(&configPath, "config", "", "Path to configuration file")
 	flag.StringVar(&logLevel, "loglevel", "WARNING", "Log Level, default is Warning")
-	flag.StringVar(&logPath, "logpath", "/tmp/joviandsscsi", "Log file location")
+	flag.StringVar(&logPath, "logpath", "", "Log file location")
 	flag.Parse()
 
 	if len(configPath) > 0 {

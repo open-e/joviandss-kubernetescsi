@@ -10,15 +10,19 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	
+	"joviandss-kubernetescsi/pkg/common"
 	//"golang.org/x/net/context"
 )
 
-var nodeId = ""
+//var nodeId = ""
 
 func GetNodeId(l *log.Entry) (string, error) {
 
-	if len(nodeId) > 0 {
-		return nodeId, nil
+	if len(common.NodeID) > 0 {
+		l.Debugf("Node id identified %s", common.NodeID)
+
+		return common.NodeID, nil
 	}
 
 	infostr := ""
@@ -35,9 +39,9 @@ func GetNodeId(l *log.Entry) (string, error) {
 	}
 	l.Debugf("Node id %s", infostr)
 	rawID := sha256.Sum256([]byte(infostr))
-	nodeId := base64.StdEncoding.EncodeToString(rawID[:])
+	common.NodeID = base64.StdEncoding.EncodeToString(rawID[:])
 
 	//nodeId = string(rawID[:])
 
-	return nodeId, nil
+	return common.NodeID, nil
 }
