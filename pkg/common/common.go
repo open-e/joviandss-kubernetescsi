@@ -3,7 +3,7 @@ package common
 import (
 	"fmt"
 	"os"
-	"encoding/base64"
+	"encoding/base32"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -25,8 +25,11 @@ var (
 // Plugin name
 var PluginName = "iscsi.csi.joviandss.open-e.com"
 
-var replacertojbase64 = strings.NewReplacer("+", "_", "/", "-", "=", ".")
-var replacerfromjbase64 = strings.NewReplacer("_", "+", "-", "/", ".", "=")
+var replacertojbase32 = strings.NewReplacer("=", "-")
+var replacerfromjbase32 = strings.NewReplacer("-", "=")
+
+// var replacertojbase64 = strings.NewReplacer("+", "_", "/", "-", "=", ".")
+// var replacerfromjbase64 = strings.NewReplacer("_", "+", "-", "/", ".", "=")
 
 var (
 	NodeConfigPath string
@@ -167,20 +170,18 @@ func LFC(ctx context.Context) *logrus.Entry {
 }
 
 //Takes inut string and converts it to JBase64 string
-func JBase64FromStr(in string) (out string) {
-	out = base64.StdEncoding.EncodeToString([]byte(in))
-	out = replacertojbase64.Replace(out)
+func JBase32FromStr(in string) (out string) {
+	out = base32.StdEncoding.EncodeToString([]byte(in))
+	out = replacertojbase32.Replace(out)
 	return out
 }
 
 //Takes JBase64 input and extracts original string
-func JBase64ToStr(in string) (out string, err error) {
-	out = replacerfromjbase64.Replace(in)
-	bout, err := base64.StdEncoding.DecodeString(out)
+func JBase32ToStr(in string) (out string, err error) {
+	out = replacerfromjbase32.Replace(in)
+	bout, err := base32.StdEncoding.DecodeString(out)
 	return string(bout[:]), err
 }
-
-
 
 
 func GetContext(traceId string) context.Context {

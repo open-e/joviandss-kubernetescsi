@@ -31,7 +31,8 @@ type LunDesc interface {
 
 const MaxVolumeNameLength int = 248
 
-const allowedSymbolsPattern = "^[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_]+$"
+const allowedSymbolsPattern = `^[-\w]+$`
+
 var allowedSymbolsRegexp = regexp.MustCompile(allowedSymbolsPattern)
 
 func nameToID(name string) string {
@@ -65,7 +66,7 @@ func NewVolumeDescFromName(name string) (*VolumeDesc, error) {
 		if allowedSymbolsRegexp.MatchString(name) {
 			vid.vds = "vp_" + name
 			vid.idFormat = "vp"
-		} else if bname := jcom.JBase64FromStr(name); len(bname) <=240 {
+		} else if bname := jcom.JBase32FromStr(name); len(bname) <=240 {
 			vid.vds = "vb_" + bname
 			vid.idFormat = "vb"
 		} else {
@@ -123,7 +124,7 @@ func NewVolumeDescFromVDS(vds string) (*VolumeDesc, error) {
 		vd.name = strings.Join(parts[1:], "")
 	// Volume name in form of base52
 	case "vb":
-		if name, err := jcom.JBase64ToStr(strings.Join(parts[1:], "")); err != nil {
+		if name, err := jcom.JBase32ToStr(strings.Join(parts[1:], "")); err != nil {
 			return nil, err
 		} else {
 			vd.name = name

@@ -75,6 +75,8 @@ var supportedControllerCapabilities = []csi.ControllerServiceCapability_RPC_Type
 	// csi.ControllerServiceCapability_RPC_PUBLISH_READONLY,
 }
 
+// TODO: check https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
+//       and extend supported volume modes
 var supportedVolumeCapabilities = []csi.VolumeCapability_AccessMode_Mode{
 	// VolumeCapability_AccessMode_UNKNOWN,
 	csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
@@ -132,81 +134,7 @@ func parseOrigin(or string) (*origin, error) {
 	return &out, nil
 }
 
-// GetControllerPlugin get plugin information
-func GetControllerPlugin(cp * ControllerPlugin, cfg *jcom.JovianDSSCfg, l *log.Logger) (
-	err error,
-) {
-	os.Exit(1)
-	// lFields := logrus.Fields{
-	// 	"node":   "Controller",
-	// 	"plugin": "Controller",
-	// }
-
-	//cp.l = l.WithFields(lFields)
-
-	if len(cfg.ISCSIEndpointCfg.Iqn) == 0 {
-		cfg.ISCSIEndpointCfg.Iqn = "iqn.csi.2019-04"
-	}
-	// cp.iqn = cfg.ISCSIEndpointCfg.Iqn
-	// cp.iscsiEendpoint = cfg.ISCSIEndpointCfg
-
-	// cp.volumesInProcess = make(map[string]bool)
-
-	// // Init Storage endpoints
-	// re, err = rest.GetEndpoint(&cfg.RestEndpoint, nil)
-	// if err != nil {
-	// 	cp.l.Warnf("Creating Storage Endpoint failure %+v. Error %s",
-	// 		sConfig,
-	// 		err)
-	// 	continue
-	// }
-	// cp.re = append(cp.endpoints, &storage)
-	// cp.l.Tracef("Add Endpoint %s", sConfig.Name)
-	
-
-	// if len(cp.endpoints) == 0 {
-	// 	cp.l.Warn("No Endpoints provided in config")
-	// 	return errors.New("Unable to create a single endpoint")
-	// }
-
-	// cp.vCap = GetVolumeCapability(supportedVolumeCapabilities)
-
-	// Init tmp volume
-	// TODO: rethink snapReg
-	// cp.snapReg = "CSI-SnapshotRegister"
-	// _, err = cp.getVolume(cp.snapReg)
-	// if err == nil {
-	// 	return nil
-	// }
-	// vd := rest.CreateVolumeDescriptor{
-	// 	Name: cp.snapReg,
-	// 	Size: minVolumeSize,
-	// }
-	// rErr := (*cp.endpoints[0]).CreateVolume(vd)
-
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 		return err
-
-	// 	case rest.RestObjectExists:
-	// 		cp.l.Warn("Snapshot register already exists.")
-
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return err
-	// 	}
-	// }
-
-	return nil
-}
-
-// GetControllerPlugin get plugin information
+// SetupControllerPlugin set controller plugin struct with proper values
 func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err error) {
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 	var e error
@@ -230,57 +158,6 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
 	cp.iscsiEendpointCfg = cfg.ISCSIEndpointCfg
 	cp.pool = cfg.Pool
 	// cp.volumesInProcess = make(map[string]bool)
-
-	// // Init Storage endpoints
-	// re, err = rest.GetEndpoint(&cfg.RestEndpoint, nil)
-	// if err != nil {
-	// 	cp.l.Warnf("Creating Storage Endpoint failure %+v. Error %s",
-	// 		sConfig,
-	// 		err)
-	// 	continue
-	// }
-	// cp.re = append(cp.endpoints, &storage)
-	// cp.l.Tracef("Add Endpoint %s", sConfig.Name)
-	
-
-	// if len(cp.endpoints) == 0 {
-	// 	cp.l.Warn("No Endpoints provided in config")
-	// 	return errors.New("Unable to create a single endpoint")
-	// }
-
-	// cp.vCap = GetVolumeCapability(supportedVolumeCapabilities)
-
-	// Init tmp volume
-	// TODO: rethink snapReg
-	// cp.snapReg = "CSI-SnapshotRegister"
-	// _, err = cp.getVolume(cp.snapReg)
-	// if err == nil {
-	// 	return nil
-	// }
-	// vd := rest.CreateVolumeDescriptor{
-	// 	Name: cp.snapReg,
-	// 	Size: minVolumeSize,
-	// }
-	// rErr := (*cp.endpoints[0]).CreateVolume(vd)
-
-	// if rErr != nil {
-	// 	code := rErr.GetCode()
-	// 	switch code {
-	// 	case rest.RestResourceBusy:
-	// 		// According to specification from
-	// 		return status.Error(codes.FailedPrecondition, rErr.Error())
-	// 	case rest.RestFailureUnknown:
-	// 		err = status.Errorf(codes.Internal, rErr.Error())
-	// 		return err
-
-	// 	case rest.RestObjectExists:
-	// 		cp.l.Warn("Snapshot register already exists.")
-
-	// 	default:
-	// 		err = status.Errorf(codes.Internal, "Unknown internal error")
-	// 		return err
-	// 	}
-	// }
 
 	return nil
 }
@@ -555,6 +432,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
+	l.Debugf("Receiver create volume request with context %+v", ctx)
 	var err error
 	out := csi.CreateVolumeResponse{
 		Volume: &csi.Volume{

@@ -42,7 +42,7 @@ func NewSnapshotDescFromName(lid LunDesc, name string) (*SnapshotDesc) {
 		if allowedSymbolsRegexp.MatchString(name) && len(name) < 240 {
 			sd.sds = "sp_" + name
 			sd.idFormat = "sp"
-		} else if bname := jcom.JBase64FromStr(name); len(bname) <=240 {
+		} else if bname := jcom.JBase32FromStr(name); len(bname) <=240 {
 			sd.sds = "sb_" + bname
 			sd.idFormat = "sb"
 		} else {
@@ -82,7 +82,7 @@ func (sd *SnapshotDesc)parseSDS(sds string) (error) {
 		sd.name = strings.Join(parts[1:], "")
 	// Volume name in form of base52
 	case "sb":
-		if name, err := jcom.JBase64ToStr(strings.Join(parts[1:], "")); err != nil {
+		if name, err := jcom.JBase32ToStr(strings.Join(parts[1:], "")); err != nil {
 			return err
 		} else {
 			sd.name = name
