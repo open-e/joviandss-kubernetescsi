@@ -23,7 +23,7 @@ var (
 	LogPath string
 )
 // Plugin name
-var PluginName = "joviandss-csi-iscsi.open-e.com"
+var PluginName = "iscsi.csi.joviandss.open-e.com"
 
 var replacertojbase64 = strings.NewReplacer("+", "_", "/", "-", "=", ".")
 var replacerfromjbase64 = strings.NewReplacer("_", "+", "-", "/", ".", "=")

@@ -62,8 +62,8 @@ If everything is OK, you should see something like:
 ```bash
 [kub@kub-master /]$ kubectl get csidrivers
 
-NAME                       CREATED AT
-com.open-e.joviandss.csi   2019-06-07T22:52:01Z
+NAME                             CREATED AT
+iscsi.csi.joviandss.open-e.com   2019-06-07T22:52:01Z
 ```
 and 
 

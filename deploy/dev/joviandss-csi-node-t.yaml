@@ -92,12 +92,13 @@ spec:
               add: ['SYS_ADMIN']
             allowPrivilegeEscalation: true
           image: opene/joviandss-csi-dev:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - --csi-address=/csi/csi.sock
             - --soc-type=unix
             - --nodeid=$(KUBE_NODE_NAME)
             - --node
+            - --identity
             - --loglevel=DEBUG
               #- --config=/config/node-cfg.yaml
 

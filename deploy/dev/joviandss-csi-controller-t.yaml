@@ -1,7 +1,7 @@
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
-  name: com.open-e.joviandss.csi
+  name: iscsi.csi.joviandss.open-e.com
 spec:
   attachRequired: true
   podInfoOnMount: true
@@ -111,8 +111,6 @@ spec:
           args:
             - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
             - --volume-name-prefix=pvc-ns
-            #- --provisioner=com.open-e.joviandss.csi
-            #- --connection-timeout=25s
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy
