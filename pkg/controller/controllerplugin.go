@@ -498,39 +498,6 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	return &out, nil
 }
 
-// getVolumeSnapshots return array of public volume snapshots
-//func (cp *ControllerPlugin) getVolumeSnapshots(vname string) ([]jrest.SnapshotShort, error) {
-//	return nil, nil
-	// filter := func(s string) bool {
-	// 	snameT := strings.Split(s, "_")
-	// 	if "c_" == s[:2] {
-	// 		return false
-	// 	}
-	// 	if len(snameT) != 2 {
-	// 		return false
-	// 	}
-	// 	return true
-	// }
-	// var snapshots []rest.SnapshotShort
-
-	// snapshots, rErr := (*cp.endpoints[0]).ListVolumeSnapshots(
-	// 	vname,
-	// 	filter)
-
-	// if rErr == nil {
-	// 	return snapshots, nil
-	// }
-
-	// var err error
-	// switch code := rErr.GetCode(); code {
-	// case rest.RestResourceDNE:
-	// 	err = status.Error(codes.FailedPrecondition, rErr.Error())
-	// default:
-	// 	err = status.Errorf(codes.Internal, "Unknown internal error")
-	// }
-	// return nil, err
-//}
-
 
 // DeleteVolume deletes volume or hides it for later deletion
 func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
@@ -838,7 +805,7 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 // ControllerPublishVolume create iscsi target for the volume
 func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-	
+
 	l := cp.l.WithFields(log.Fields{
 		"request": "ControllerPublishVolume",
 		"func": "ControllerPublishVolume",
@@ -875,6 +842,10 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 
 	switch jrest.ErrCode(rErr) {
 	case jrest.RestErrorOk:
+
+		(*iscsiContext)["addrs"] = fmt.Sprintf(strings.Join(cp.iscsiEendpointCfg.Addrs, ","))
+		(*iscsiContext)["port"] = fmt.Sprintf("%d", cp.iscsiEendpointCfg.Port)
+
 		resp := csi.ControllerPublishVolumeResponse{
 			PublishContext: *iscsiContext,
 		}

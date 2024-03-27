@@ -577,12 +577,8 @@ func (d* CSIDriver)GetPool(ctx context.Context, pool string) (out *jrest.Resourc
 
 	l.Debugf("Get pool with id: %s", pool)
 
-	return d.re.GetPool(ctx, pool) // v for Volume
+	return d.re.GetPool(ctx, pool)
 }
-
-//func (d *CSIDriver)targetName(iqn string, name string) string {
-//	if name
-//}
 
 func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, iqn string, readonly bool) (iscsiContext *map[string]string, rErr jrest.RestError) {
 	

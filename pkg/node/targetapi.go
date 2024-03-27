@@ -110,13 +110,16 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 		}
 	}
 
-	var p string
-	if len(pubContext["addr"]) > 0 {
-		l.Debugf("addr %s", pubContext)
-		p = pubContext["addr"]
+	var addrs []string
+	if len(pubContext["addrs"]) > 0 {
+		l.Debugf("addrs %s", pubContext["addrs"])
+		addrs = strings.Split(pubContext["addrs"], ",")
+		if len(addrs) == 0 {
+			return nil, status.Errorf(codes.InvalidArgument, "Addrs are empty. No addresses provided.")
+		}
 	} else {
 		l.Errorf("No JovianDSS address provideed in context %+v", pubContext)
-		return nil, status.Errorf(codes.InvalidArgument, "Unable to identify storage address from request")
+		return nil, status.Errorf(codes.InvalidArgument, "Request context does not contain joviandss addresses")
 	}
 
 	var pp string
@@ -156,7 +159,7 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 
 	tname := iqn
 
-	fullPortal := p + ":" + pp
+	fullPortal := addrs[0] + ":" + pp
 
 	dPath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", tname, "lun", lun}, "-")
 
@@ -165,7 +168,7 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 		STPath:     sTPath,
 		TPath:      tPath,
 		DPath:      dPath,
-		Portal:     p,
+		Portal:     addrs[0],
 		PortalPort: pp,
 		Iqn:        iqn,
 		Tname:      vID,

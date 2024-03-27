@@ -88,11 +88,21 @@ func (s *RestEndpoint) CreateTarget(ctx context.Context, pool string, desc *Crea
 		return err
 	}
 
-	if stat == CodeOK || stat == CodeAccepted {
+	if stat == CodeOK || stat == CodeCreated {
 		l.Debugf("Target %s created", desc.Name)
 		return nil
 	}
 
+	if stat == CodeAccepted {
+		var rErr RestError
+		for i := 0; i <10 ; i ++{
+			_, rErr = s.GetTarget(ctx, pool, desc.Name)
+			if rErr == nil {
+				l.Debugf("Target %s created", desc.Name)
+			}
+		}
+		return rErr
+	}
 	return getError(ctx, body)
 }
 

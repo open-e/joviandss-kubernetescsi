@@ -37,20 +37,22 @@ var (
 )
 
 type RestEndpointCfg struct {
-	Addrs        []string
-	Port        int
-	Prot        string
-	User        string
-	Pass        string
-	IdleTimeOut string // See time Duration
-	Tries       int
+	Addrs       []string		`json:"addrs,omitempty"`
+	Port        int			`json:"port,omitempty"`
+	Prot        string		`json:"prot,omitempty"`
+	User        string		`json:"user,omitempty"`
+	Pass        string		`json:"pass,omitempty"`
+	IdleTimeOut string		`json:"idletimeout,omitempty"`
+	Tries       int			`json:"tries,omitempty"`
 }
 
 
 type ISCSIEndpointCfg struct {
-        Vnamelen         int
-        Vpasslen         int
-        Iqn              string
+	Vnamelen        int		`json:"namelen,omitempty"`
+	Vpasslen        int		`json:"passlen,omitempty"`
+	Iqn		string		`json:"iqn,omitempty"`
+	Addrs		[]string	`json:"addrs,omitempty"`
+	Port		int		`json:"port,omitempty"`
 }
 
 //ControllerCfg stores configaration properties of controller instance
@@ -150,8 +152,22 @@ const loggerKey JDSSLoggerContextID = iota
 
 func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
 
+	var traceId string
+
+	id := ctx.Value("traceId")
+
+	switch t := id.(type){
+
+	case string:
+		traceId = t
+	case nil:
+		traceId = uuid.Must(uuid.NewRandom()).String()
+	default:
+		traceId = uuid.Must(uuid.NewRandom()).String()
+	}
+
 	l := logger.WithFields(logrus.Fields{
-		"traceId": ctx.Value("traceId"),
+		"traceId": traceId,
 	})
 
 	return context.WithValue(ctx, loggerKey, l)
