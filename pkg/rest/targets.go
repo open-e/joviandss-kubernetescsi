@@ -155,7 +155,9 @@ func (s *RestEndpoint) AttachVolumeToTarget(ctx context.Context, pool string, tn
 	if stat == 404 {
 		msg := fmt.Sprintf("Target do not exists %s", tname)
 		l.Debugf(msg)
-		return GetError(RestErrorResourceDNETarget, msg)
+		return getError(ctx, body)
+
+		//return GetError(RestErrorResourceDNETarget, msg)
 	}
 
 	if err != nil {

@@ -182,7 +182,7 @@ func (np *NodePlugin) NodePublishVolume(
 	block := false
 	var msg string
 
-	t, err := GetTargetFromReq(np.l, *req)
+	t, err := GetTargetFromReq(np.l, req)
 	if err != nil {
 		return nil, err
 	}

@@ -1,3 +1,23 @@
+/*
+Copyright © 2023 NAME HERE <EMAIL ADDRESS>
+*/
+/*
+Copyright (c) 2024 Open-E, Inc.
+All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License. You may obtain
+a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations
+under the License.
+*/
+
 package driver
 
 import (
@@ -631,6 +651,9 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 	if rErr != nil {
 		code := rErr.GetCode()
 		switch code {
+		case jrest.RestErrorResourceDNEVolume:
+			d.re.DeleteTarget(ctx, pool, tname)
+			return nil, rErr
 		case jrest.RestErrorResourceExists:
 			// According to specification from
 			// TODO: check that resource indeed properly assigned and continue if everything is ok

@@ -1,0 +1,21 @@
+loglevel  : Debug
+logpath   : /tmp/csi-log
+pool      : Pool-0
+endpoint :
+  name: MainStorage
+  addrs:
+    - 172.29.0.172 # 192.168.0.3
+  port: 82 # 82
+  user: admin
+  pass: admin
+  prot: https
+  pool: Pool-0  # Pool-0
+  tries: 3
+  idletimeout: 30s
+iscsi:
+  namelen : 12
+  passlen : 16
+  iqn : iqn.csi.2019-04 
+  addrs:
+    - 172.29.0.172
+  port: 3260

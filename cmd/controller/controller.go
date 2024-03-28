@@ -59,7 +59,7 @@ createVolume`,
 
 func addSubCmds() {
 	ControllerCmd.AddCommand(cliPublishVolume.PublishVolumeCmd)
-	//ControllerCmd.AddCommand(cliPublishVolume.UnpublishVolumeCmd)
+	ControllerCmd.AddCommand(cliPublishVolume.UnpublishVolumeCmd)
 }
 
 func init() {

@@ -100,7 +100,7 @@ type ControllerPlugin struct {
 	pool			string
 	d			*jdrvr.CSIDriver
 	re			jrest.RestEndpoint
-	iscsiEendpointCfg	jcom.ISCSIEndpointCfg
+	iscsiEndpointCfg	jcom.ISCSIEndpointCfg
 	// TODO: add iscsi endpoint
 	//iscsiEndpoint    []*rest.StorageInterface
 	capabilities []*csi.ControllerServiceCapability
@@ -155,7 +155,8 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
 		cfg.ISCSIEndpointCfg.Iqn = "iqn.csi.2019-04"
 	}
 	cp.iqn = cfg.ISCSIEndpointCfg.Iqn
-	cp.iscsiEendpointCfg = cfg.ISCSIEndpointCfg
+	cp.iscsiEndpointCfg = cfg.ISCSIEndpointCfg
+	//cp.le.Debugf("Iscsi config %+v", cfg.ISCSIEndpointCfg)
 	cp.pool = cfg.Pool
 	// cp.volumesInProcess = make(map[string]bool)
 
@@ -843,12 +844,14 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	switch jrest.ErrCode(rErr) {
 	case jrest.RestErrorOk:
 
-		(*iscsiContext)["addrs"] = fmt.Sprintf(strings.Join(cp.iscsiEendpointCfg.Addrs, ","))
-		(*iscsiContext)["port"] = fmt.Sprintf("%d", cp.iscsiEendpointCfg.Port)
+		(*iscsiContext)["addrs"] = fmt.Sprintf(strings.Join(cp.iscsiEndpointCfg.Addrs, ","))
+		(*iscsiContext)["port"] = fmt.Sprintf("%d", cp.iscsiEndpointCfg.Port)
 
 		resp := csi.ControllerPublishVolumeResponse{
 			PublishContext: *iscsiContext,
 		}
+		// TODO: Delete this log
+		l.Debugf("Publish Response %+v", resp)
 		return &resp, nil
 	case jrest.RestErrorResourceBusy:
 		// According to specification from
@@ -865,7 +868,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 		// incompatible with the specified volume_capability or readonly flag .
 		err = status.Errorf(codes.AlreadyExists, rErr.Error())
 		return nil, err
-	case jrest.RestErrorResourceDNE:
+	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNEVolume:
 		msg := fmt.Sprintf("Resource not found: %s", rErr.Error())
 		err = status.Errorf(codes.NotFound, msg)
 		return nil, err
