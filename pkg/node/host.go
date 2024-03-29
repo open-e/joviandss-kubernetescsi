@@ -37,7 +37,7 @@ func GetNodeId(l *log.Entry) (string, error) {
 	if len(infostr) == 0 {
 		return "", status.Errorf(codes.Internal, "Unable to identify node")
 	}
-	l.Debugf("Node id %s", infostr)
+	//l.Debugf("Node id %s", infostr)
 	rawID := sha256.Sum256([]byte(infostr))
 	common.NodeID = base64.StdEncoding.EncodeToString(rawID[:])
 

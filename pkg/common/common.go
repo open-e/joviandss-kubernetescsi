@@ -68,6 +68,8 @@ type JovianDSSCfg struct {
 
 func GetLogger(logLevel string, toFile string) (*logrus.Logger, error) {
 	log := logrus.New()
+	
+	// fmt.Printf("Getting logger with loglevel %s and logfile path %s", logLevel, toFile)
 
 	formater := logrus.TextFormatter{
 
@@ -75,6 +77,7 @@ func GetLogger(logLevel string, toFile string) (*logrus.Logger, error) {
 		FullTimestamp: true,
 	}
 	logrus.SetFormatter(&formater)
+	
 
 	if len(toFile) > 0 {
 		file, err := os.OpenFile(toFile, os.O_CREATE|os.O_WRONLY, 0o640)
@@ -85,6 +88,7 @@ func GetLogger(logLevel string, toFile string) (*logrus.Logger, error) {
 			return nil, err
 		}
 	} else {
+		fmt.Println("Print log to stdout")
 		log.Out = os.Stdout
 	}
 

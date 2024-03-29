@@ -60,7 +60,7 @@ func stageVolume(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 	l := log.NewEntry(logger)
-	l.Debug("publish volume")
+	l.Debug("stage volume command")
 
 	np, err := csi_node.GetNodePlugin(l)
 	if err != nil {

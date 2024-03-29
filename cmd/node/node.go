@@ -12,6 +12,7 @@ import (
 	//cli_common "joviandss-kubernetescsi/pkg/common"
 	
 	cliGetInfo "joviandss-kubernetescsi/cmd/node/getinfo"
+	cliStageVolume "joviandss-kubernetescsi/cmd/node/stagevolume"
 
 )
 
@@ -27,7 +28,7 @@ var NodeCmd = &cobra.Command{
 
 func addSubCmds() {
 	NodeCmd.AddCommand(cliGetInfo.NodeGetInfoCmd)
-	//NodeCmd.AddCommand(cliPublishVolume.UnpublishVolumeCmd)
+	NodeCmd.AddCommand(cliStageVolume.NodeStageVolumeCmd)
 }
 
 

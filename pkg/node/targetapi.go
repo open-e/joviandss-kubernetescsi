@@ -78,10 +78,10 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 	sTPath := ""
 	tPath := ""
 
-	l.Trace("Processing request")
+	l.Debug("Processing request")
 	if d, ok := r.(csi.NodeStageVolumeRequest); ok {
 
-		l.Trace("Processing Stage request")
+		l.Debug("Processing Stage request")
 		pubContext = d.GetPublishContext()
 		sTPath = d.GetStagingTargetPath()
 		if len(sTPath) == 0 {
@@ -105,7 +105,7 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 
 	if d, ok := r.(csi.NodePublishVolumeRequest); ok {
 
-		l.Trace("Processing Publish request")
+		l.Debug("Processing Publish request")
 
 		pubContext = d.GetPublishContext()
 		tPath = d.GetTargetPath()
@@ -200,6 +200,7 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 		MountFlags: make([]string, 0),
 	}
 
+	l.Debugf("Target %+v", *t)
 	if len(fsType) > 0 {
 		t.FsType = fsType
 	}

@@ -27,18 +27,21 @@ type NodePlugin struct {
 }
 
 //GetNodePlugin inits NodePlugin
-func GetNodePlugin(l *log.Entry) (np *NodePlugin, err error) {
-	
+func GetNodePlugin(l *log.Entry) (*NodePlugin, error) {
+	//TODO: rework getting node ID	
 	nid, err := GetNodeId(l)
-	l = log.WithFields(log.Fields{
-		"nodeid":   nid,
+	if err != nil {
+		return nil, err
+	}
+	var np NodePlugin
+
+	np.l = l.WithFields(log.Fields{
+		"nodeid": nid,
 		"section": "node",
 		})
-	np = &NodePlugin{
-		l:   l,
-	}
-	log.Debug("Init node plugin")
-	return np, nil
+
+	l.Debug("Init node plugin")
+	return &np, nil
 }
 
 // NodeExpandVolume responsible for update of file system on volume
@@ -86,6 +89,8 @@ func (np *NodePlugin) NodeStageVolume(
 	var msg string
 
 	t, err := GetTargetFromReq(l, *req)
+	l.Debugf("Target %+v", t)
+	return nil, nil
 	if err != nil {
 		return nil, err
 	}
