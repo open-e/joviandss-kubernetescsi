@@ -116,7 +116,7 @@ spec:
               mountPath: /var/lib/kubelet/pods
               mountPropagation: Bidirectional
             - mountPath: /var/lib/iscsi
-              readOnly: true
+              #  readOnly: true
               name: var-lib-iscsi
             - mountPath: /etc/iscsi
               name: system-iscsi

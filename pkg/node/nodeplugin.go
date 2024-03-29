@@ -90,7 +90,7 @@ func (np *NodePlugin) NodeStageVolume(
 
 	t, err := GetTargetFromReq(l, *req)
 	l.Debugf("Target %+v", t)
-	return nil, nil
+
 	if err != nil {
 		return nil, err
 	}

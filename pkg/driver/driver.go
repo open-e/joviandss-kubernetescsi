@@ -600,7 +600,7 @@ func (d* CSIDriver)GetPool(ctx context.Context, pool string) (out *jrest.Resourc
 	return d.re.GetPool(ctx, pool)
 }
 
-func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, iqn string, readonly bool) (iscsiContext *map[string]string, rErr jrest.RestError) {
+func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, iqnPrefix string, readonly bool) (iscsiContext *map[string]string, rErr jrest.RestError) {
 	
 	// Create target
 
@@ -613,7 +613,8 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 	})
 
 	// We want target name to be uniquee
-	tname := fmt.Sprintf("%s:%x", iqn, sha256.Sum256([]byte(ld.VDS())))
+	tname := fmt.Sprintf("%x", sha256.Sum256([]byte(ld.VDS())))
+	iqn := fmt.Sprintf("%s:%s", iqnPrefix, tname)
 
 	if len(tname) > 255 {
 		return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Resulting target name is too long %s", tname))
@@ -642,9 +643,11 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 	}
 
 	var attachLun jrest.TargetLunDescriptor
-	
+
 	attachLun.Name = ld.VDS()
 	attachLun.Mode = &mode
+	var lunID = 0
+	attachLun.LUN = &lunID
 
 	rErr = d.re.AttachVolumeToTarget(ctx, pool, tname, &attachLun)
 
@@ -665,6 +668,7 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 
 	iContext["iqn"] = iqn
 	iContext["target"] = tname
+	iContext["lun"] = fmt.Sprintf("%d", lunID)
 
 	for i := 0; i < 3; i++ {
 		target, rErr := d.re.GetTarget(ctx, pool, tname)

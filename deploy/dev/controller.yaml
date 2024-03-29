@@ -126,6 +126,9 @@ spec:
 
         - name: csi-controller
           image: opene/joviandss-csi-dev:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
           args:
             - --csi-address=/csi/csi.sock
             - --soc-type=unix
@@ -134,7 +137,7 @@ spec:
             - --identity
           env:
             - name: JOVIANDSS_CONFIG
-              value: /config/controller-cfg.yaml
+              value: /config/cfg.yaml
           imagePullPolicy: Always
           securityContext:
             privileged: true

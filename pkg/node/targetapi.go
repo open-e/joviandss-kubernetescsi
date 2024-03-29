@@ -156,6 +156,13 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 		l.Error(msg)
 		return nil, status.Error(codes.InvalidArgument, msg)
 	}
+	
+	targetName := pubContext["target"]
+	if len(targetName) == 0 {
+		msg = fmt.Sprintf("Context do not contain target value")
+		l.Error(msg)
+		return nil, status.Error(codes.InvalidArgument, msg)
+	}
 
 	// coUser := ctx["name"]
 	// if len(coUser) == 0 {
@@ -177,11 +184,9 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 		lun = "0"
 	}
 
-	tname := iqn
-
 	fullPortal := addrs[0] + ":" + pp
 
-	dPath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", tname, "lun", lun}, "-")
+	dPath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", targetName, "lun", lun}, "-")
 
 	// TODO: Provide default file system selection
 	t = &Target{
@@ -191,7 +196,7 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 		Portal:     addrs[0],
 		PortalPort: pp,
 		Iqn:        iqn,
-		Tname:      vID,
+		Tname:      targetName,
 		Lun:        lun,
 		//CoUser:     coUser, // Chap outgoing password
 		//CoPass:     coPass, // Chap outgoing Password
@@ -453,15 +458,15 @@ func (t *Target) StageVolume(ctx context.Context) error {
 		"section": "node",
 	})
 
-	tname := t.Iqn + ":" + t.Tname
+	//tname := t.Iqn // + ":" + t.Tname
 
 	fullPortal := t.Portal + ":" + t.PortalPort
 
-	devicePath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", tname, "lun", t.Lun}, "-")
+	devicePath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", t.Iqn, "lun", t.Lun}, "-")
 
-	out, err := exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "new").Output()
+	out, err := exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "-o", "new").Output()
 	if err != nil {
-		msg := fmt.Sprintf("Unable to add targetation %s error: %s", tname, err.Error())
+		msg := fmt.Sprintf("Unable to add targetation %s error: %s", t.Iqn, err.Error())
 		return errors.New(msg)
 	}
 
@@ -474,10 +479,10 @@ func (t *Target) StageVolume(ctx context.Context) error {
 	// }
 
 	//Attach Target
-	out, err = exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "--login").Output()
+	out, err = exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "--login").Output()
 	if err != nil {
 		//t.ClearChapCred()
-		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "delete").Run()
+		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "-o", "delete").Run()
 		msg := fmt.Sprintf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
 		return status.Errorf(codes.Internal, msg)
 	}
@@ -485,7 +490,7 @@ func (t *Target) StageVolume(ctx context.Context) error {
 	if exist := waitForPathToExist(&devicePath, 10, t.TProtocol); !exist {
 		l.Errorf("Could not attach disk to the path %s: Timeout after 10s", devicePath)
 		//t.ClearChapCred()
-		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "delete").Run()
+		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "-o", "delete").Run()
 		msg := "Could not attach disk: Timeout after 10s"
 		return status.Errorf(codes.Internal, msg)
 	}
@@ -507,12 +512,12 @@ func (t *Target) UnStageVolume(ctx context.Context) error {
 		"section": "node",
 	})
 
-	tname := t.Iqn + ":" + t.Tname
+	//tname := t.Iqn // + ":" + t.Tname
 
 	portal := t.Portal + ":" + t.PortalPort
 
-	if len(tname) == 0 {
-		msg = fmt.Sprintf("Unable to get device target %s", tname)
+	if len(t.Iqn) == 0 {
+		msg = fmt.Sprintf("Unable to get device target %s", t.Iqn)
 		return errors.New(msg)
 	}
 
@@ -522,8 +527,8 @@ func (t *Target) UnStageVolume(ctx context.Context) error {
 	//	return errors.New(msg)
 	//}
 
-	exec.Command("iscsiadm", "-m", "node", "-p", portal, "-T", tname, "--logout").Run()
-	exec.Command("iscsiadm", "-m", "node", "-p", portal, "-T", tname, "-o", "delete").Run()
+	exec.Command("iscsiadm", "-m", "node", "-p", portal, "-T", t.Iqn, "--logout").Run()
+	exec.Command("iscsiadm", "-m", "node", "-p", portal, "-T", t.Iqn, "-o", "delete").Run()
 
 	return nil
 }
