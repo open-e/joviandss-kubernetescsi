@@ -44,7 +44,7 @@ import (
 )
 
 const (
-	deviceIPPath = "/dev/disk/by-path/ip"
+	deviceIPPath = "/host/dev/disk/by-path/ip"
 )
 
 // GetTarget constructs basic Target structure
@@ -62,10 +62,12 @@ func GetTarget(l *log.Entry, tp string) (t *Target, err error) {
 }
 
 // GetTargetFromReq constructs Target structure from request data
-func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
-
+func GetTargetFromReq(ctx context.Context, r interface{}) (t *Target, err error) {
+	
+	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func":  "GetTargetFromReq",
+		"func": "GetTargetFromReq",
+		"section" : "target",
 	})
 
 	var pubContext map[string]string
@@ -186,7 +188,7 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 
 	fullPortal := addrs[0] + ":" + pp
 
-	dPath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", targetName, "lun", lun}, "-")
+	dPath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", iqn, "lun", lun}, "-")
 
 	// TODO: Provide default file system selection
 	t = &Target{
@@ -373,7 +375,6 @@ func (t *Target) FormatMountVolume(req *csi.NodePublishVolumeRequest) error {
 		if err = os.MkdirAll(t.TPath, 0640); err != nil {
 			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", t.TPath, err.Error())
 			return status.Error(codes.Internal, msg)
-
 		}
 	}
 
@@ -479,9 +480,12 @@ func (t *Target) StageVolume(ctx context.Context) error {
 	// }
 
 	//Attach Target
+	// iscsiadm --mode discovery --op update --type sendtargets --portal targetIP
+	// iscsiadm -m node -p 172.29.0.1 -T someiqn --login
 	out, err = exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "--login").Output()
 	if err != nil {
 		//t.ClearChapCred()
+		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "--logout").Run()
 		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "-o", "delete").Run()
 		msg := fmt.Sprintf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
 		return status.Errorf(codes.Internal, msg)

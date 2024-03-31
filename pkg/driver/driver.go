@@ -622,7 +622,7 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 
 	var ctDesc jrest.CreateTargetDescriptor
 	active := true
-	ctDesc.Name = tname
+	ctDesc.Name = iqn
 	ctDesc.Active = &active
 
 	rErr = d.re.CreateTarget(ctx, pool, &ctDesc)
@@ -649,7 +649,7 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 	var lunID = 0
 	attachLun.LUN = &lunID
 
-	rErr = d.re.AttachVolumeToTarget(ctx, pool, tname, &attachLun)
+	rErr = d.re.AttachVolumeToTarget(ctx, pool, iqn, &attachLun)
 
 	if rErr != nil {
 		code := rErr.GetCode()
@@ -671,7 +671,7 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 	iContext["lun"] = fmt.Sprintf("%d", lunID)
 
 	for i := 0; i < 3; i++ {
-		target, rErr := d.re.GetTarget(ctx, pool, tname)
+		target, rErr := d.re.GetTarget(ctx, pool, iqn)
 		switch jrest.ErrCode(rErr) {
 			case jrest.RestErrorOk:
 				if target.Active == true {

@@ -31,7 +31,6 @@ import (
 
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/protobuf/ptypes/timestamp"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -40,6 +39,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	// "google.golang.org/protobuf/ptypes/timestamp"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	jcom "joviandss-kubernetescsi/pkg/common"
@@ -92,7 +92,7 @@ type ControllerPlugin struct {
 	l			*log.Logger
 	le			*log.Entry
 	cfg			*ControllerCfg
-	iqn			string
+	iqnPrefix		string
 	snapReg			string
 	volumesAccess		sync.Mutex
 	volumesInProcess	map[string]bool
@@ -154,7 +154,7 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
 	if len(cfg.ISCSIEndpointCfg.Iqn) == 0 {
 		cfg.ISCSIEndpointCfg.Iqn = "iqn.csi.2019-04"
 	}
-	cp.iqn = cfg.ISCSIEndpointCfg.Iqn
+	cp.iqnPrefix = cfg.ISCSIEndpointCfg.Iqn
 	cp.iscsiEndpointCfg = cfg.ISCSIEndpointCfg
 	//cp.le.Debugf("Iscsi config %+v", cfg.ISCSIEndpointCfg)
 	cp.pool = cfg.Pool
@@ -651,7 +651,7 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	default:
 		return nil, status.Errorf(codes.Internal, err.Error())
 	}
-	creationTime := &timestamp.Timestamp{
+	creationTime := &timestamppb.Timestamp{
 		Seconds: snap.Creation.Unix(),
 	}
 	
@@ -839,7 +839,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 
 	//////////////////////////////////////////////////////////////////////////////
 
-	iscsiContext, rErr := cp.d.PublishVolume(ctx, cp.pool, vd, cp.iqn, roMode)
+	iscsiContext, rErr := cp.d.PublishVolume(ctx, cp.pool, vd, cp.iqnPrefix, roMode)
 
 	switch jrest.ErrCode(rErr) {
 	case jrest.RestErrorOk:
@@ -893,7 +893,7 @@ func (cp *ControllerPlugin) ControllerUnpublishVolume(ctx context.Context, req *
 	if vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId()); err != nil {
 		return nil, err
 	} else {
-		rErr := cp.d.UnpublishVolume(ctx, cp.pool, cp.iqn, vd); 
+		rErr := cp.d.UnpublishVolume(ctx, cp.pool, cp.iqnPrefix, vd); 
 		switch jrest.ErrCode(rErr) {
 		case jrest.RestErrorOk, jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNETarget:
 			return &csi.ControllerUnpublishVolumeResponse{}, nil

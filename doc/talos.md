@@ -54,6 +54,9 @@ talosctl machineconfig patch node.yaml --patch @securitypatch.yaml -o node1.yaml
 
 2. Uploading config to Talos
 
-```yaml
+```bash
 talosctl apply-config -n node.mycluster.lan --file node1.yaml
+```
+```bash
+kubectl label ns joviandss-csi pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/warn=privileged
 ```

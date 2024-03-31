@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/container-storage-interface/spec v1.8.0
-	github.com/golang/protobuf v1.5.3
+	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/uuid v1.6.0
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/net v0.14.0

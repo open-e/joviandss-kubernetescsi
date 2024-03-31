@@ -108,6 +108,8 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
           volumeMounts:
+            - name: host
+              mountPath: /host
             - name: socket-dir
               mountPath: /csi
             #- name: config
@@ -131,6 +133,10 @@ spec:
               readOnly: true
 
       volumes:
+        - name: host
+          hostPath:
+            path: /
+            type: Directory
         - name: socket-dir
           hostPath:
             path: /var/lib/kubelet/plugins_registry/com.open-e.joviandss.csi

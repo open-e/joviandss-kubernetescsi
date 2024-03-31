@@ -31,15 +31,15 @@ joviandss:
 
 container: joviandss
 	@echo Building Container
-	podman build -t $(IMAGE_TAG_CENTOS) -f ./deploy/docker/centos.Dockerfile .
-	podman build -t $(IMAGE_TAG_UBUNTU) -f ./deploy/docker/ubuntu.Dockerfile .
+	podman build -t $(IMAGE_TAG_CENTOS) -f ./deploy/container/centos.Dockerfile .
+	podman build -t $(IMAGE_TAG_UBUNTU) -f ./deploy/container/ubuntu.Dockerfile .
 	#sudo podman build -t $(IMAGE_TAG_UBUNTU_16) -f ./app/joviandssplugin/ubuntu-16.Dockerfile .
 
 containerdev: joviandss
 	@echo Building Container
-	podman build -t docker.io/$(IMAGE_TAG_DEV) -f ./deploy/docker/centos.Dockerfile .
-	podman build -t docker.io/$(IMAGE_TAG_DEV_LATEST) -f ./deploy/docker/centos.Dockerfile .
-	#podman build -t $(IMAGE_TAG_UBUNTU) -f ./app/joviandssplugin/ubuntu.Dockerfile .
+	podman build -t docker.io/$(IMAGE_TAG_DEV) -f ./deploy/container/centos.Dockerfile .
+	podman build -t docker.io/$(IMAGE_TAG_DEV_LATEST) -f ./deploy/container/centos.Dockerfile .
+	#podman build -t docker.io/$(IMAGE_TAG_UBUNTU) -f ./deploy/docker/ubuntu.Dockerfile .
 
 clean:
 	go clean -r -x

@@ -86,9 +86,10 @@ func (np *NodePlugin) NodeStageVolume(
 	ctx = jcom.WithLogger(ctx, l)
 
 	l.Debug("Node Stage Volume")
+	l.Debugf("Stage Volume request %+v", *req)
 	var msg string
 
-	t, err := GetTargetFromReq(l, *req)
+	t, err := GetTargetFromReq(ctx, *req)
 	l.Debugf("Target %+v", t)
 
 	if err != nil {
@@ -182,12 +183,22 @@ func (np *NodePlugin) NodePublishVolume(
 
 	// TODO: ValidateCapability()
 
-	np.l.Tracef("Node Publish Volume %s", req.GetVolumeId())
+	l := np.l.WithFields(log.Fields{
+		"request": "NodePublishVolume",
+		"func": "NodePublishVolume",
+		"section": "node",
+	})
+
+	ctx = jcom.WithLogger(ctx, l)
+
+	l.Debugf("Node Publish Volume %s", req.GetVolumeId())
+	
+	l.Debugf("Publish Volume request %+v", *req)
 
 	block := false
 	var msg string
 
-	t, err := GetTargetFromReq(np.l, req)
+	t, err := GetTargetFromReq(ctx, *req)
 	if err != nil {
 		return nil, err
 	}
