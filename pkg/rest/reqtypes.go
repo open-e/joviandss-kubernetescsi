@@ -119,7 +119,7 @@ type CreateSnapshotProperties struct {
 
 type CreateSnapshotDescriptor struct {
 	SnapshotName string			`json:"snapshot_name"` // string with name of the new snapshot.
-	Recursive    *bool			`json:"recursive"` // boolean indicating if recursively create snapshots of all descendant datasets
+	Recursive    *bool			`json:"recursive,omitempty"` // boolean indicating if recursively create snapshots of all descendant datasets
 	Properties   *CreateSnapshotProperties	`json:"properties,omitempty"` //object containing properties of new snapshot. 
 }
 

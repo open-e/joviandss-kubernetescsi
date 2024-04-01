@@ -118,8 +118,8 @@ spec:
         - name: csi-snapshotter
           image: registry.k8s.io/sig-storage/csi-snapshotter:v6.2.3
           args:
-            - "--v=5"
-            - "--csi-address=$(ADDRESS)"
+            - --v=5
+            - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
             - "--leader-election=false"
           env:
             - name: ADDRESS
@@ -127,7 +127,7 @@ spec:
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: socket-dir
-              mountPath: /csi
+              mountPath: /var/lib/csi/sockets/pluginproxy
 
         - name: csi-attacher
           image: quay.io/k8scsi/csi-attacher:v3.1.0
