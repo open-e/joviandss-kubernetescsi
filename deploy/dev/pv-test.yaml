@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-test
+  labels:
+    name: pv-test
+spec:
+  capacity:
+    storage: 1Gi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: joviandss-sc
+  csi:
+    driver: iscsi.csi.joviandss.open-e.com
+    volumeHandle: vp_pv-test # This must be unique.
+    fsType: ext3
+    readOnly: false

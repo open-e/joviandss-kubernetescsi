@@ -5,11 +5,11 @@ metadata:
   labels:
     name: nginx-jdss-pv
 spec:
-  storageClassName: joviandss-persistent-volume-sc
+  storageClassName: joviandss-sc
   accessModes:
-    - ReadWriteMany
+    - ReadWriteOnce
   capacity:
     storage: 1Gi
   csi:
     driver: iscsi.csi.joviandss.open-e.com
-    volumeHandle: testpv
+      #volumeHandle: testpv
