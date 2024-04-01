@@ -972,6 +972,11 @@ func (cp *ControllerPlugin) ControllerExpandVolume(ctx context.Context, in *csi.
 	return nil, status.Error(codes.Unimplemented, "")
 }
 
+// ControllerModifyVolume allows to change mutable key attributes of a volume
+func (cp *ControllerPlugin) ControllerModifyVolume(ctx context.Context, in *csi.ControllerModifyVolumeRequest) (*csi.ControllerModifyVolumeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "")
+}
+
 // ControllerGetVolume provides current information about the volume
 func (cp *ControllerPlugin) ControllerGetVolume(ctx context.Context, in *csi.ControllerGetVolumeRequest) (*csi.ControllerGetVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "")
