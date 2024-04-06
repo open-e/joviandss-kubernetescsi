@@ -15,10 +15,10 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: nginx
+  name: nginx-1
 spec:
   containers:
-    - image: nginx
+    - image: nginxinc/nginx-unprivileged
       imagePullPolicy: IfNotPresent
       name: nginx
       ports:
@@ -29,6 +29,7 @@ spec:
           name: persistent-volume
       securityContext:
         allowPrivilegeEscalation: false
+          #runAsNonRoot: true
         capabilities:
           drop:
             - ALL

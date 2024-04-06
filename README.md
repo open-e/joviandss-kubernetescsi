@@ -3,79 +3,24 @@
 [![Build Status](https://travis-ci.org/open-e/JovianDSS-KubernetesCSI.svg?branch=master)](https://travis-ci.org/open-e/JovianDSS-KubernetesCSI)
 [![Go Report Card](https://goreportcard.com/badge/github.com/open-e/joviandss-kubernetescsi)](https://goreportcard.com/report/github.com/open-e/joviandss-kubernetescsi)
 
-## Deployment
+This repo provide plugin source code along side with the resource deffinitions and instructions on how to use [Jovian Data Storage Solution](https://www.open-e.com/products/jovian-data-storage-software/general-information/) as a storage for containers running in Kubernetes cluster.
 
-### Configuring
+## Supported platforms
 
-Plugin has 2 config files. Controller and node configs. Controller is responsible for a management of particular volumes on JovianDSS storage. When nodes responsibility is limited to connecting particular volume to particular host. Configuration file examples can be found in 'deploy/cfg/' folder.
-
- - **llevel** the logging level of the plugin
-
- - **plugins** specify the services that should be run in the plugin.
-    Possible values: *IDENTITY_SERVICE*, *CONTROLLER_SERVICE*, *NODE_SERVICE*
-    + **IDENTITY_SERVICE** - starts identity service, expected to run on each physical node with plugin
-    + **CONTROLLER_SERVICE** - starts controller service, cluster should have only one instance of this service in running at a time
-    + **NODE_SERVICE** - starts node service, this service is responsible for attaching physical volumes stored on JovianDSS
-        This service should be running on every physical host that is expected to have containers with such feature.
- - **controller** - describes properties of controller service
-    + **name** - name of JovianDSS storage, not used at the moment
-    + **addr** - ip address of JovianDSS storage
-    + **port** - port of JovianDSS storage, the port that is asigned to REST interface
-    + **user** - user to execute REST requests
-    + **pass** - password for the user specified above
-    + **prot** - protocol that is gona be used for sending REST
-    + **pool** - name of the pool created on JovianDSS
-    + **tries** - number of attempts to send REST request if network related failure occured
-    + **iddletimeout** - time maintain iddle session
- - **node** - describes properties of node service
-    + **id** - prefix for a node name
-    + **addr** - ip address of JovianDSS storage
-    + **port** - port of JovianDSS storage, the port that is asigned to iSCSI volume sharing    
+JovianDSS CSI plugin been tested on following platforms: Talos OS 1.6
 
 
-Add config files as secrets:
+## Plugin installation
 
-``` bash
-kubectl create secret generic jdss-controller-cfg --from-file=./deploy/cfg/controller-cfg.yaml
+[Here is a guide](doc/install.md) on how user can install plugin using `kubectl`.
 
-kubectl create secret generic jdss-node-cfg --from-file=./deploy/cfg/node-cfg.yaml
-```
-Node config do not provides nothing but storage address and request to create proper services.
+`Helm` charts are comming...
 
-### Deploy plugin
+## Plugin configuration
 
-Make sure that you have iscsi\_tcp module installed on the machines running node plugin.
-
-If you change confing names from the previous step. Dont forget to modify  *joviandss-csi-controller.yaml* and *joviandss-csi-node.yaml* accordingly.
-To deploy plugins to a cluster:
-
-``` bash
-kubectl apply -f ./deploy/joviandss/joviandss-csi-controller.yaml
-
-kubectl apply -f ./deploy/joviandss/joviandss-csi-node.yaml 
-
-kubectl apply -f ./deploy/joviandss/joviandss-csi-sc.yaml
-```
-
-If everything is OK, you should see something like:
-
-```bash
-[kub@kub-master /]$ kubectl get csidrivers
-
-NAME                             CREATED AT
-iscsi.csi.joviandss.open-e.com   2019-06-07T22:52:01Z
-```
-and 
-
-```bash
-[kub@kub-master /]$ kubectl get pods
-
-NAME                         READY   STATUS    RESTARTS   AGE
-joviandss-csi-controller-0   3/3     Running   0          10d
-joviandss-csi-node-q55k5     2/2     Running   0          10d
-joviandss-csi-node-w2cp8     2/2     Running   0          10d
-```
-
+General plugin configuration gets done by passing config file in form of kubernetes `secret`.
+You can check for example on how to expose config file to plugin in [installation guide](doc/install.md). 
+Check [configuration document](doc/configuration.md) to learn about configurational options.
 
 ### Deploy application
 

@@ -1,0 +1,19 @@
+loglevel  : Info
+logpath   : /tmp/csi-log
+pool      : Pool-0
+endpoint :
+  name: MainStorage
+  addrs:
+    - 192.168.0.100 # 192.168.0.3
+  port: 82 # 82
+  user: admin # JovianDSS Web/REST user name
+  pass: admin # JovianDSS Web/REST user passowrd
+  prot: https
+  pool: Pool-0  # pool name that you have created on JovianDSS
+  tries: 3
+  idletimeout: 30s
+iscsi:
+  iqn : iqn.csi.2019-04 
+  addrs:
+    - 192.168.0.100 # IP address that would be used to attach volumes over ISCSI
+  port: 3260
