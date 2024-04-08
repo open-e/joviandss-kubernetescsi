@@ -13,8 +13,6 @@ endpoint :
   tries: 3
   idletimeout: 30s
 iscsi:
-  namelen : 12
-  passlen : 16
   iqn : iqn.csi.2019-04 
   addrs:
     - 172.29.0.172
