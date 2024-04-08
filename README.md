@@ -1,6 +1,5 @@
 # Open-E JovianDSS Kubernetes CSI plugin
 
-[![Build Status](https://travis-ci.org/open-e/JovianDSS-KubernetesCSI.svg?branch=master)](https://travis-ci.org/open-e/JovianDSS-KubernetesCSI)
 [![Go Report Card](https://goreportcard.com/badge/github.com/open-e/joviandss-kubernetescsi)](https://goreportcard.com/report/github.com/open-e/joviandss-kubernetescsi)
 
 This repo provide plugin source code along side with the resource deffinitions and instructions on how to use [Jovian Data Storage Solution](https://www.open-e.com/products/jovian-data-storage-software/general-information/) as a storage for containers running in Kubernetes cluster.
