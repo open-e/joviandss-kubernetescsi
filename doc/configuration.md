@@ -51,6 +51,6 @@ iscsi:
     - `tries` how many attempts should be taken to sent single rest request to JovianDSS network interface before failing CSI request.
     - `iddletimeout` time to wait for REST request to complete before considering it as failed.
 - `iscsi` is a section of config file containing information on how to connect to JovianDSS iscsi targets.
-    `iqn` iqn prefix that would be used for target creation
-    `addrs` list of addresses that would be used to connect targets
-    `port` iscsi port provided by JovianDSS storage
+    - `iqn` iqn prefix that would be used for target creation
+    - `addrs` list of addresses that would be used to connect targets
+    - `port` iscsi port provided by JovianDSS storage
