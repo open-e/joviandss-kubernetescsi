@@ -22,12 +22,12 @@ import (
 	//"strings"
 	"context"
 	log "github.com/sirupsen/logrus"
-	
+
 	// "encoding/base64"
 
 	// "fmt"
-	"google.golang.org/protobuf/types/known/timestamppb"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	jcom "joviandss-kubernetescsi/pkg/common"
 	jdrvr "joviandss-kubernetescsi/pkg/driver"
@@ -35,11 +35,11 @@ import (
 )
 
 func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshotShort) (err error) {
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func": "completeListResponseFromSnapshotShort",
-		"section" : "controller",
+		"func":    "completeListResponseFromSnapshotShort",
+		"section": "controller",
 	})
 
 	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
@@ -65,7 +65,7 @@ func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSna
 				SnapshotId:     sd.CSIID(),
 				SourceVolumeId: vd.CSIID(),
 				CreationTime:   ts,
-				ReadyToUse:	true,
+				ReadyToUse:     true,
 			},
 		}
 		i += 1
@@ -76,11 +76,11 @@ func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSna
 }
 
 func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshot, ld jdrvr.LunDesc) (err error) {
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func": "completeListResponseFromSnapshotShort",
-		"section" : "controller",
+		"func":    "completeListResponseFromSnapshotShort",
+		"section": "controller",
 	})
 	var i = 0
 
@@ -100,7 +100,7 @@ func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSn
 				SnapshotId:     sd.CSIID(),
 				SourceVolumeId: ld.CSIID(),
 				CreationTime:   ts,
-				ReadyToUse:	true,
+				ReadyToUse:     true,
 			},
 		}
 		i += 1
@@ -111,11 +111,11 @@ func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSn
 }
 
 func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesResponse, vols []jrest.ResourceVolume) (err error) {
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func": "completeListResponseFromVolume",
-		"section" : "controller",
+		"func":    "completeListResponseFromVolume",
+		"section": "controller",
 	})
 
 	entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
@@ -128,11 +128,11 @@ func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesRes
 			continue
 		}
 		var contentSource *csi.VolumeContentSource
-		
+
 		osds := v.OriginSnapshot()
 		if len(osds) > 0 {
 			if jdrvr.IsSDS(osds) {
-				if sd, err := jdrvr.NewSnapshotDescFromSDS(vd,osds); err != nil {
+				if sd, err := jdrvr.NewSnapshotDescFromSDS(vd, osds); err != nil {
 					contentSource = &csi.VolumeContentSource{
 						Type: &csi.VolumeContentSource_Snapshot{
 							Snapshot: &csi.VolumeContentSource_SnapshotSource{
@@ -157,8 +157,8 @@ func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesRes
 
 		entries[i] = &csi.ListVolumesResponse_Entry{
 			Volume: &csi.Volume{
-				CapacityBytes:  v.GetSize(),
-				VolumeId:	vd.CSIID(),
+				CapacityBytes: v.GetSize(),
+				VolumeId:      vd.CSIID(),
 				ContentSource: contentSource,
 			},
 		}
@@ -168,4 +168,3 @@ func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesRes
 
 	return nil
 }
-

@@ -25,21 +25,20 @@ const (
 )
 
 var (
-	driverName	*string
-	address		string
-	netType		string
-	configPath	string
-	logLevel	string
-	logPath		string
+	driverName      *string
+	address         string
+	netType         string
+	configPath      string
+	logLevel        string
+	logPath         string
 	startController bool
-	startNode	bool
-	startIdentity	bool
+	startNode       bool
+	startIdentity   bool
 )
 
 func main() {
 
 	cfg := handleArgs()
-
 
 	// TODO: check if logging parametrs a properly parse
 	var l *logrus.Entry

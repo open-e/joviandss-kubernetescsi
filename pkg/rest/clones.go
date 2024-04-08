@@ -29,13 +29,13 @@ import (
 func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string, vds string, sds string) (clones []ResourceVolumeSnapshotClones, err RestError) {
 
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones", pool, vds, sds)
-	
+
 	l := s.l.WithFields(log.Fields{
-		"func": "GetVolumeSnapshotClones",
+		"func":    "GetVolumeSnapshotClones",
 		"section": "rest",
-		"url": addr,
+		"url":     addr,
 	})
-	
+
 	var rsp = GeneralResponse{Data: &clones}
 
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumeRCode)
@@ -49,12 +49,12 @@ func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string,
 	if errU := s.unmarshal(body, &rsp); errU != nil {
 		return nil, errU
 	}
-	
+
 	if stat == CodeOK || stat == CodeNoContent {
 		return clones, nil
 	}
 
-	return  nil, getError(ctx, body)
+	return nil, getError(ctx, body)
 
 }
 
@@ -67,19 +67,19 @@ func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string,
 //   - *vid* physical volume id as it used by JovianDSS
 //   - *desc* data, including new volume name, that would be transfered to create clone
 func (s *RestEndpoint) CreateClone(ctx context.Context, pool string, vid string, desc CloneVolumeDescriptor) RestError {
-	
+
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/clone", pool, vid)
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func": "CreateClone",
-		"url": addr,
+		"func":    "CreateClone",
+		"url":     addr,
 		"section": "rest",
 	})
-	l.Debugf("Create clone $s from volume %s snapshot %s", vid, desc.Snapshot, desc.Name)
+	l.Debugf("Create clone %s from volume %s snapshot %s", vid, desc.Snapshot, desc.Name)
 
 	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, CreateCloneRCode)
-	
+
 	if err != nil {
 		s.l.Warnln("Unable to create clone ", desc.Name)
 		return err
@@ -88,24 +88,23 @@ func (s *RestEndpoint) CreateClone(ctx context.Context, pool string, vid string,
 	if stat == CodeOK || stat == CodeCreated {
 		return nil
 	}
-	
+
 	return getError(ctx, body)
 }
 
-
 func (s *RestEndpoint) DeleteClone(ctx context.Context, pool string, vds string, sds string, cds string, desc DeleteVolumeDescriptor) RestError {
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones/%s", pool, vds, sds, cds)
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func": "DeleteClone",
-		"url": addr,
+		"func":    "DeleteClone",
+		"url":     addr,
 		"section": "rest",
 	})
-	l.Debugf("Delete clone $s from volume %s snapshot %s", cds, vds, sds)
+	l.Debugf("Delete clone %s from volume %s snapshot %s", cds, vds, sds)
 
 	stat, body, err := s.rp.Send(ctx, "DELETE", addr, desc, CreateCloneRCode)
-	
+
 	if err != nil {
 		s.l.Warnln("Unable to delete clone ", cds)
 		return err
@@ -114,6 +113,6 @@ func (s *RestEndpoint) DeleteClone(ctx context.Context, pool string, vds string,
 	if stat == CodeNoContent {
 		return nil
 	}
-	
+
 	return getError(ctx, body)
 }

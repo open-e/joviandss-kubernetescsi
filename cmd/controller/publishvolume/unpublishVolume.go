@@ -13,9 +13,9 @@ import (
 
 	csi_common "joviandss-kubernetescsi/pkg/common"
 	csi_controller "joviandss-kubernetescsi/pkg/controller"
-	
+
 	cli_common "joviandss-kubernetescsi/pkg/common"
-	
+
 	"joviandss-kubernetescsi/pkg/common"
 
 	"github.com/spf13/cobra"
@@ -23,22 +23,21 @@ import (
 
 var (
 	volumeId string
-	nodeId	string
+	nodeId   string
 	//volumeSize string
-	
+
 	//volumeSizeRequired string
 	//volumeSizeLimit string
 )
-	
 
 func unpublishVolume(cmd *cobra.Command, args []string) {
 	logrus.Debug("unpublish volume")
-	
+
 	var cfg csi_common.JovianDSSCfg
 
 	var cp csi_controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg) ; err != nil {
+	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -48,7 +47,6 @@ func unpublishVolume(cmd *cobra.Command, args []string) {
 
 	var req csi.ControllerUnpublishVolumeRequest
 	var ctx context.Context = common.GetContext("unpublish_volume")
-	
 
 	req.VolumeId = volumeId
 	req.NodeId = nodeId
@@ -109,10 +107,8 @@ to quickly create a Cobra application.`,
 
 func init() {
 
-	UnpublishVolumeCmd.Flags().StringVarP(&volumeId,	"volumeid",	"i",		"", "Name of volume to unstage")
-	UnpublishVolumeCmd.Flags().StringVarP(&nodeId,		"nodeid",	"n",		"", "Id of node that volume will be unstaged from")
-
-
+	UnpublishVolumeCmd.Flags().StringVarP(&volumeId, "volumeid", "i", "", "Name of volume to unstage")
+	UnpublishVolumeCmd.Flags().StringVarP(&nodeId, "nodeid", "n", "", "Id of node that volume will be unstaged from")
 
 	// Here you will define your flags and configuration settings.
 

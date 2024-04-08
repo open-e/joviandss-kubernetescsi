@@ -33,7 +33,6 @@ import (
 	jcom "joviandss-kubernetescsi/pkg/common"
 )
 
-
 type SnapshotDescriptor struct {
 	VName   string
 	SName   string
@@ -41,13 +40,13 @@ type SnapshotDescriptor struct {
 }
 
 func getError(ctx context.Context, body []byte) RestError {
-	
+
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
 		"func": "getError",
 	})
-	
+
 	var edata ErrorData
 	if err := json.Unmarshal(body, &edata); err != nil {
 		bs := fmt.Sprintf(string(body[:len(body)]))
@@ -60,7 +59,7 @@ func getError(ctx context.Context, body []byte) RestError {
 	}
 }
 
-func (re *RestEndpoint) unmarshal(resp []byte, ret interface{}) (RestError)  {
+func (re *RestEndpoint) unmarshal(resp []byte, ret interface{}) RestError {
 	if err := json.Unmarshal(resp, ret); err != nil {
 		msg := fmt.Sprintf("Data: %s, Err: %+v.", string(resp[:len(resp)]), err)
 		rErr := GetError(RestErrorRPM, msg)
@@ -74,10 +73,8 @@ func (re *RestEndpoint) GetAddress() (string, int) {
 	return re.rec.Addrs[0], re.rec.Port
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
 // Volumes
-
 
 func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string) (*ResourceVolume, RestError) {
 
@@ -85,11 +82,11 @@ func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string)
 	var rsp = GeneralResponse{Data: &resvol}
 
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s", pool, vname)
-	
+
 	l := s.l.WithFields(log.Fields{
-		"func": "GetVolume",
+		"func":    "GetVolume",
 		"traceId": ctx.Value("traceId"),
-		"url": addr,
+		"url":     addr,
 	})
 
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumeRCode)
@@ -103,24 +100,23 @@ func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string)
 	if errU := s.unmarshal(body, &rsp); errU != nil {
 		return nil, errU
 	}
-	
+
 	if stat == CodeOK || stat == CodeNoContent {
 		return &resvol, nil
 	}
 
-	return  nil, getError(ctx, body)
+	return nil, getError(ctx, body)
 }
 
 func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol CreateVolumeDescriptor) RestError {
-	
+
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes", pool)
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func": "CreateVolume",
-	        "traceId": ctx.Value("traceId"),
-		"url": addr,
-
+		"func":    "CreateVolume",
+		"traceId": ctx.Value("traceId"),
+		"url":     addr,
 	})
 
 	l.Debugf("sending to pool %s", pool)
@@ -140,7 +136,7 @@ func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol Create
 	}
 
 	// TODO: consider case when volume is in process of creation, and not finished yet
-	// should we check if it was created successfully 
+	// should we check if it was created successfully
 
 	return getError(ctx, body)
 }
@@ -154,8 +150,8 @@ func (s *RestEndpoint) DeleteVolume(ctx context.Context, pool string, vname stri
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func": "DeleteVolume",
-		"url": addr,
+		"func":    "DeleteVolume",
+		"url":     addr,
 		"section": "rest",
 	})
 
@@ -175,12 +171,12 @@ func (s *RestEndpoint) DeleteVolume(ctx context.Context, pool string, vname stri
 	return getError(ctx, body)
 }
 
-func (s *RestEndpoint) ListVolumes(ctx context.Context, pool string, vols *[]ResourceVolume) (RestError) {
+func (s *RestEndpoint) ListVolumes(ctx context.Context, pool string, vols *[]ResourceVolume) RestError {
 
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes", pool)
 
 	l := s.l.WithFields(log.Fields{
-		"func": "ListVolumes",
+		"func":    "ListVolumes",
 		"traceId": ctx.Value("traceId"),
 	})
 
@@ -188,15 +184,15 @@ func (s *RestEndpoint) ListVolumes(ctx context.Context, pool string, vols *[]Res
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumesRCode)
 
 	if err != nil {
-		l.Warnln("Unable to list volumes", err.Error)
+		l.Warnln("Unable to list volumes", err.Error())
 		return err
 	}
-	
-	var rsp = &GetVolumesData{Data : vols }
+
+	var rsp = &GetVolumesData{Data: vols}
 
 	if stat == CodeOK {
 		l.Debug("Obtained volume listing")
-		return s.unmarshal(body, &rsp) 
+		return s.unmarshal(body, &rsp)
 	}
 
 	return getError(ctx, body)
@@ -211,19 +207,19 @@ func (s *RestEndpoint) GetVolumeSnapshot(ctx context.Context, pool string, vname
 
 	l = s.l.WithFields(log.Fields{
 		"section": "rest",
-		"func": "GetVolumeSnapshot",
-		"url": addr,
+		"func":    "GetVolumeSnapshot",
+		"url":     addr,
 	})
 
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetSnapshotRCode)
 
 	if err != nil {
-		l.Warnf("Unable to get volume snapshots %+v", err.Error)
+		l.Warnf("Unable to get volume snapshots %+v", err.Error())
 		return nil, err
 	}
 
 	var snapdata ResourceSnapshot
-	var rsp = &GeneralResponse{Data : &snapdata }
+	var rsp = &GeneralResponse{Data: &snapdata}
 
 	if stat == CodeOK || stat == CodeAccepted {
 		l.Debug("Obtained volume listing")
@@ -254,7 +250,7 @@ func (s *RestEndpoint) CreateSnapshot(ctx context.Context, pool string, vid stri
 	})
 
 	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, CreateSnapshotRCode)
-	
+
 	if err != nil {
 		s.l.Warnln("Unable to create snapshot ", desc.SnapshotName)
 		return err
@@ -269,12 +265,11 @@ func (s *RestEndpoint) CreateSnapshot(ctx context.Context, pool string, vid stri
 }
 
 func (s *RestEndpoint) DeleteSnapshot(ctx context.Context, pool string, vname string, sname string, data DeleteSnapshotDescriptor) (err RestError) {
-	
+
 	l := jcom.LFC(ctx)
 
-
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s", pool, vname, sname)
-	
+
 	l = l.WithFields(log.Fields{
 		"func": "DeleteSnapshot",
 		"addr": addr,
@@ -291,10 +286,9 @@ func (s *RestEndpoint) DeleteSnapshot(ctx context.Context, pool string, vname st
 		l.Debugf("Snapshot %s deletion Done", sname)
 		return nil
 	}
-	
+
 	return getError(ctx, body)
 }
-
 
 func (s *RestEndpoint) getResultsEntries(data *GeneralResponse) (results *int64, entries interface{}) {
 	re, ok := data.Data.(ResultEntries)
@@ -304,9 +298,6 @@ func (s *RestEndpoint) getResultsEntries(data *GeneralResponse) (results *int64,
 	return nil, nil
 }
 
-
-
-
 //func (s *RestEndpoint) DeleteClone(
 //	vname string,
 //	sname string,
@@ -314,56 +305,56 @@ func (s *RestEndpoint) getResultsEntries(data *GeneralResponse) (results *int64,
 //	rChildren bool,
 //	rDependent bool) RestError {
 
-	// l := s.l.WithFields(logrus.Fields{
-	// 	"func": "Delete Clone of the Volume",
-	// })
+// l := s.l.WithFields(logrus.Fields{
+// 	"func": "Delete Clone of the Volume",
+// })
 
-	// data := DeleteClone{
-	// 	RecursivelyChildren:   rChildren,
-	// 	RecursivelyDependents: rDependent,
-	// 	ForceUmount:           false,
-	// }
-	// addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones/%s", s.pool, vname, sname, cname)
-	// msg := fmt.Sprintf("Deleting clone of snapshot %s  volume: %s", sname, vname)
-	// l.Trace(msg)
-	// stat, body, err := s.rp.Send("DELETE", addr, data, CreateCloneRCode)
+// data := DeleteClone{
+// 	RecursivelyChildren:   rChildren,
+// 	RecursivelyDependents: rDependent,
+// 	ForceUmount:           false,
+// }
+// addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones/%s", s.pool, vname, sname, cname)
+// msg := fmt.Sprintf("Deleting clone of snapshot %s  volume: %s", sname, vname)
+// l.Trace(msg)
+// stat, body, err := s.rp.Send("DELETE", addr, data, CreateCloneRCode)
 
-	// if err != nil {
-	// 	msg := fmt.Sprintf("Internal failure in communication with storage %s.", s.addr)
-	// 	l.Warn(msg)
-	// 	return GetError(RestRequestMalfunction, msg)
-	// }
+// if err != nil {
+// 	msg := fmt.Sprintf("Internal failure in communication with storage %s.", s.addr)
+// 	l.Warn(msg)
+// 	return GetError(RestRequestMalfunction, msg)
+// }
 
-	// if stat == DeleteCloneRCode {
-	// 	return nil
-	// }
+// if stat == DeleteCloneRCode {
+// 	return nil
+// }
 
-	// errData, er := s.getError(body)
+// errData, er := s.getError(body)
 
-	// if er != nil {
-	// 	msg := fmt.Sprintf("Unable to extract err message %+v", er)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestRequestMalfunction, msg)
-	// }
+// if er != nil {
+// 	msg := fmt.Sprintf("Unable to extract err message %+v", er)
+// 	s.l.Warn(msg)
+// 	return GetError(RestRequestMalfunction, msg)
+// }
 
-	// switch (*errData).Errno {
+// switch (*errData).Errno {
 
-	// case 1:
-	// 	msg := fmt.Sprintf("Clone %s doesn't exist", cname)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestResourceDNE, msg)
-	// case 1000:
-	// 	msg := fmt.Sprintf("Clone %s may have snapshots", cname)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestResourceBusy, msg)
-	// default:
-	// 	msg := fmt.Sprintf("Unknown error %d, %s",
-	// 		(*errData).Errno,
-	// 		(*errData).Message)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestStorageFailureUnknown, msg)
+// case 1:
+// 	msg := fmt.Sprintf("Clone %s doesn't exist", cname)
+// 	s.l.Warn(msg)
+// 	return GetError(RestResourceDNE, msg)
+// case 1000:
+// 	msg := fmt.Sprintf("Clone %s may have snapshots", cname)
+// 	s.l.Warn(msg)
+// 	return GetError(RestResourceBusy, msg)
+// default:
+// 	msg := fmt.Sprintf("Unknown error %d, %s",
+// 		(*errData).Errno,
+// 		(*errData).Message)
+// 	s.l.Warn(msg)
+// 	return GetError(RestStorageFailureUnknown, msg)
 
-	// }
+// }
 
 //	return nil
 //}
@@ -416,7 +407,6 @@ func (s *RestEndpoint) PromoteClone(vname string, sname string, cname string) Re
 
 	// return nil
 }
-
 
 func GetTimeStamp(tRaw string) (int64, RestError) {
 	layout := "2006-1-2 15:4:5"

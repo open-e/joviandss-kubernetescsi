@@ -32,7 +32,7 @@ import (
 type GetResourceEntries func(ctx context.Context, pool string, page int64, dc int64, args interface{}) (ent *ResultEntries, err RestError)
 
 func pagedcSuffix(addr string, page *int64, dc *int64) (out string) {
-	
+
 	if page != nil || dc != nil {
 		addr += "?"
 	}
@@ -57,14 +57,14 @@ func (s *RestEndpoint) GetVolumeSnapshotsEntries(ctx context.Context, pool strin
 }
 
 func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	
+
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes", pool)
 
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
-		"func": "GetVolumeEntries",
-		"addr": addr,
+		"func":    "GetVolumeEntries",
+		"addr":    addr,
 		"section": "rest",
 	})
 
@@ -75,7 +75,7 @@ func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page 
 
 	if err != nil {
 		s.l.Warnf("Unable to get snapshot list for pool %s", pool)
-		return  nil, err
+		return nil, err
 	}
 
 	var vols []ResourceVolume
@@ -111,8 +111,8 @@ func (s *RestEndpoint) GetSnapshotsEntries(ctx context.Context, pool string, pag
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
-		"func": "GetSnapshotsEntries",
-		"addr": addr,
+		"func":    "GetSnapshotsEntries",
+		"addr":    addr,
 		"section": "rest",
 	})
 
@@ -123,7 +123,7 @@ func (s *RestEndpoint) GetSnapshotsEntries(ctx context.Context, pool string, pag
 
 	if err != nil {
 		s.l.Warnf("Unable to get snapshot list for pool %s", pool)
-		return  nil, err
+		return nil, err
 	}
 
 	var snaps []ResourceSnapshotShort

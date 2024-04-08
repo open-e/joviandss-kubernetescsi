@@ -17,7 +17,7 @@ type Target struct {
 	Tname      string // target name = volumeID
 	// CoUser     string // Chap outgoing password
 	// CoPass     string // Chap outgoing Password
-	TProtocol  string // tcp, others are not supported
+	TProtocol string // tcp, others are not supported
 
 	FsType     string   // Type of file system
 	MountFlags []string // mount tool arguments

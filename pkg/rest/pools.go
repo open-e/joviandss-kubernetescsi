@@ -26,18 +26,17 @@ import (
 	jcom "joviandss-kubernetescsi/pkg/common"
 )
 
-
 func (s *RestEndpoint) GetPool(ctx context.Context, pool string) (*ResourcePool, RestError) {
-	
+
 	var respool ResourcePool
 	var rsp = GeneralResponse{Data: &respool}
-	
+
 	addr := fmt.Sprintf("api/v3/pools/%s", pool)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func": "GetPool",
-		"url": addr,
+		"func":    "GetPool",
+		"url":     addr,
 		"section": "rest",
 	})
 
@@ -49,7 +48,7 @@ func (s *RestEndpoint) GetPool(ctx context.Context, pool string) (*ResourcePool,
 		s.l.Warnln("unable to get pool: ", pool)
 		return nil, err
 	}
-	
+
 	if errU := s.unmarshal(body, &rsp); errU != nil {
 		return nil, errU
 	}
@@ -57,5 +56,5 @@ func (s *RestEndpoint) GetPool(ctx context.Context, pool string) (*ResourcePool,
 	if stat == CodeOK || stat == CodeNoContent {
 		return &respool, nil
 	}
-	return  nil, getError(ctx, body)
+	return nil, getError(ctx, body)
 }

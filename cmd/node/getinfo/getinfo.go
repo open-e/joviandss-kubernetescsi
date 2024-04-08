@@ -28,7 +28,7 @@ import (
 
 	csi_common "joviandss-kubernetescsi/pkg/common"
 	csi_node "joviandss-kubernetescsi/pkg/node"
-	
+
 	cli_common "joviandss-kubernetescsi/pkg/common"
 
 	"joviandss-kubernetescsi/pkg/common"
@@ -44,12 +44,11 @@ var (
 	//volumeSizeLimit string
 )
 
-
 func getInfo(cmd *cobra.Command, args []string) {
 
 	// var np csi_node.NodePlugin
 
-	logger, err := cli_common.GetLogger(csi_common.LogLevel, csi_common.LogPath); 
+	logger, err := cli_common.GetLogger(csi_common.LogLevel, csi_common.LogPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Unable to init loging because:", err.Error())
 		os.Exit(1)

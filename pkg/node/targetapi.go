@@ -18,13 +18,12 @@ License for the specific language governing permissions and limitations
 under the License.
 */
 
-
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -63,11 +62,11 @@ func GetTarget(l *log.Entry, tp string) (t *Target, err error) {
 
 // GetTargetFromReq constructs Target structure from request data
 func GetTargetFromReq(ctx context.Context, r interface{}) (t *Target, err error) {
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func": "GetTargetFromReq",
-		"section" : "target",
+		"func":    "GetTargetFromReq",
+		"section": "target",
 	})
 
 	var pubContext map[string]string
@@ -158,7 +157,7 @@ func GetTargetFromReq(ctx context.Context, r interface{}) (t *Target, err error)
 		l.Error(msg)
 		return nil, status.Error(codes.InvalidArgument, msg)
 	}
-	
+
 	targetName := pubContext["target"]
 	if len(targetName) == 0 {
 		msg = fmt.Sprintf("Context do not contain target value")
@@ -179,7 +178,7 @@ func GetTargetFromReq(ctx context.Context, r interface{}) (t *Target, err error)
 	// 	l.Warn(msg)
 	// 	return nil, status.Error(codes.InvalidArgument, msg)
 	// }
-	
+
 	lun := pubContext["lun"]
 	if len(lun) == 0 {
 		l.Debug("Using default lun 0")
@@ -233,7 +232,7 @@ func GetTargetFromPath(l *log.Entry, path string) (t *Target, err error) {
 		return nil, status.Error(codes.Internal, msg)
 	}
 	t.l = log.WithFields(log.Fields{
-		"func": "GetTargetFromPath",
+		"func":    "GetTargetFromPath",
 		"section": "node",
 	})
 	return t, nil
@@ -320,18 +319,18 @@ func (t *Target) DeleteSerialization() (err error) {
 
 // SetChapCred puts chap credantial to local db
 // func (t *Target) SetChapCred() error {
-// 
+//
 // 	tname := t.Iqn + ":" + t.Tname
-// 
+//
 // 	t.l.Tracef("Target: %s", tname)
-// 
+//
 // 	out, err := exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "update", "-n",
 // 		"node.session.auth.authmethod", "-v", "CHAP").Output()
 // 	if err != nil {
 // 		t.l.Errorf("Could not update authentication method for %s error: %s", tname, string(out))
 // 		return err
 // 	}
-// 
+//
 // 	out, err = exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "update", "-n",
 // 		"node.session.auth.username", "-v", t.CoUser).Output()
 // 	if err != nil {
@@ -342,24 +341,24 @@ func (t *Target) DeleteSerialization() (err error) {
 // 	if err != nil {
 // 		return fmt.Errorf("iscsi: failed to update node session password error: %v", string(out))
 // 	}
-// 
+//
 // 	return nil
 // }
 
 // ClearChapCred sets chap credential to empty values
 // func (t *Target) ClearChapCred() error {
-// 
+//
 // 	tname := t.Iqn + ":" + t.Tname
-// 
+//
 // 	portal := t.Portal + ":" + t.PortalPort
-// 
+//
 // 	exec.Command("iscsiadm", "-m", "node", "-p", portal,
 // 		"-T", tname, "-o", "update",
 // 		"-n", "node.session.auth.password", "-v", "").Run()
 // 	exec.Command("iscsiadm", "-m", "node", "-p", portal,
 // 		"-T", tname, "-o", "update",
 // 		"-n", "node.session.auth.username", "-v", "").Run()
-// 
+//
 // 	return nil
 // }
 
@@ -396,11 +395,11 @@ func (t *Target) UnMountVolume(ctx context.Context) error {
 	var msg string
 
 	var exists bool
-	
+
 	l := jcom.LFC(ctx)
-	
+
 	l = l.WithFields(log.Fields{
-		"func": "UnMountVolume",
+		"func":    "UnMountVolume",
 		"section": "node",
 	})
 
@@ -453,9 +452,9 @@ func (t *Target) StageVolume(ctx context.Context) error {
 
 	// Scan for targets
 	l := jcom.LFC(ctx)
-	
+
 	l = l.WithFields(log.Fields{
-		"func": "StageVolume",
+		"func":    "StageVolume",
 		"section": "node",
 	})
 
@@ -508,11 +507,11 @@ func (t *Target) UnStageVolume(ctx context.Context) error {
 	// Scan for targets
 
 	var msg string
-	
+
 	l := jcom.LFC(ctx)
-	
+
 	l = l.WithFields(log.Fields{
-		"func": "StageVolume",
+		"func":    "StageVolume",
 		"section": "node",
 	})
 

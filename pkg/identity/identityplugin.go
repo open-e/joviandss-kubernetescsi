@@ -11,13 +11,13 @@ import (
 )
 
 type IdentityPlugin struct {
-	l   *log.Entry
+	l *log.Entry
 }
 
 func (ip *IdentityPlugin) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	l := ip.l.WithFields(log.Fields{
 		"request": "GetPluginInfo",
-		"func": "GetPluginInfo",
+		"func":    "GetPluginInfo",
 		"section": "identity",
 	})
 	ctx = jcom.WithLogger(ctx, l)

@@ -43,15 +43,14 @@ type PluginServer struct {
 	server   *grpc.Server
 	listener *net.Listener
 	l        *logrus.Entry
-
 }
 
 func GetPluginServer(cfg *common.JovianDSSCfg, l *logrus.Entry, netType *string, addr *string, cntrSrv bool, nodeSrv bool, identitySrv bool) (s *PluginServer, err error) {
 	s = &PluginServer{}
 
 	l = l.WithFields(logrus.Fields{
-		"func": "GetPluginServer",
-		"section":  "PluginServer",
+		"func":    "GetPluginServer",
+		"section": "PluginServer",
 	})
 	s.l = l
 	if *netType == "unix" {
@@ -114,7 +113,7 @@ func (s *PluginServer) Run() (err error) {
 	if err != nil {
 		s.l.WithFields(logrus.Fields{
 			"func": "Run",
-			}).Warnf("Unable to start listening on socket: %s", err)
+		}).Warnf("Unable to start listening on socket: %s", err)
 		return err
 	}
 	return nil

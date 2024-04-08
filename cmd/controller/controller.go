@@ -20,7 +20,7 @@ package controller
 import (
 	"fmt"
 	"os"
-	
+
 	//"github.com/open-e/JovianDSS-KubernetesCSI/pkg/joviandss"
 
 	"github.com/spf13/cobra"
@@ -28,23 +28,20 @@ import (
 	cli_common "joviandss-kubernetescsi/pkg/common"
 )
 
-
-
 var (
-	volumeId string
-	volumeName string
-	volumeSize string
-	snapshotId string
-	nodeId string
+	volumeId           string
+	volumeName         string
+	volumeSize         string
+	snapshotId         string
+	nodeId             string
 	volumeSizeRequired int64
-	volumeSizeLimit int64
-	sourceVolumeName string
+	volumeSizeLimit    int64
+	sourceVolumeName   string
 	sourceSnapshotName string
-	maxent int32
-	token string
-	readOnly bool
+	maxent             int32
+	token              string
+	readOnly           bool
 )
-
 
 // controllerCmd represents the controller command
 var ControllerCmd = &cobra.Command{
@@ -67,16 +64,16 @@ func init() {
 	cFlags.StringVarP(
 		&cli_common.ControllerConfigPath, "config", "c", "", "Path to controller config")
 
-	if err:= cobra.MarkFlagRequired(cFlags, "config"); err != nil {
+	if err := cobra.MarkFlagRequired(cFlags, "config"); err != nil {
 		fmt.Fprintln(os.Stderr, "An error occurred:", err)
 		os.Exit(1)
 	}
 
-	if err:= cobra.MarkFlagFilename(cFlags, "config", "yml", "yaml"); err != nil {
+	if err := cobra.MarkFlagFilename(cFlags, "config", "yml", "yaml"); err != nil {
 		fmt.Fprintln(os.Stderr, "An error occurred:", err)
 		os.Exit(1)
 	}
-	
+
 	addSubCmds()
 	// rootCmd.AddCommand(controllerCmd)
 

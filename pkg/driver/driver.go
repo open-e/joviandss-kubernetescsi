@@ -23,7 +23,6 @@ package driver
 import (
 	"crypto/sha256"
 	"fmt"
-	//"math/rand"
 	"strings"
 	"time"
 
@@ -36,23 +35,22 @@ import (
 
 // JovianDSS CSI plugin
 type CSIDriver struct {
-	re		jrest.RestEndpoint
-	l		*logrus.Entry
+	re jrest.RestEndpoint
+	l  *logrus.Entry
 }
 
-
 func (d *CSIDriver) cloneLUN(ctx context.Context, pool string, source LunDesc, clone LunDesc, snap *SnapshotDesc) jrest.RestError {
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func": "cloneLUN",
 	})
-	
+
 	l.Debugf("Start cloning")
 
 	var sds string
 	if snap == nil {
-		var snapdata = jrest.CreateSnapshotDescriptor{SnapshotName: clone.VDS()} 
+		var snapdata = jrest.CreateSnapshotDescriptor{SnapshotName: clone.VDS()}
 
 		if err := d.re.CreateSnapshot(ctx, pool, source.VDS(), &snapdata); err != nil {
 			code := err.GetCode()
@@ -64,11 +62,11 @@ func (d *CSIDriver) cloneLUN(ctx context.Context, pool string, source LunDesc, c
 			//	if there are no clones snapshot have to be deleteted and recreated
 		}
 		sds = clone.VDS()
-	}else {
+	} else {
 		sds = snap.sds
 	}
 
-	var clonedata = jrest.CloneVolumeDescriptor{Name: clone.VDS(), Snapshot: sds }
+	var clonedata = jrest.CloneVolumeDescriptor{Name: clone.VDS(), Snapshot: sds}
 	err := d.re.CreateClone(ctx, pool, source.VDS(), clonedata)
 	return err
 }
@@ -84,17 +82,16 @@ func (d *CSIDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDe
 }
 
 func (d *CSIDriver) CreateVolumeFromSnapshot(ctx context.Context, pool string, sd *SnapshotDesc, nvd *VolumeDesc) jrest.RestError {
-	
-	var clonedata = jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: sd.SDS() }
+
+	var clonedata = jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: sd.SDS()}
 	return d.re.CreateClone(ctx, pool, sd.ld.VDS(), clonedata)
 }
-
 
 func (d *CSIDriver) deleteIntermediateSnapshot(ctx context.Context, pool string, vds string, sds string) (err jrest.RestError) {
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "deleteIntermediateSnapshot",
+		"func":    "deleteIntermediateSnapshot",
 		"section": "driver",
 	})
 	forceUnmount := true
@@ -111,12 +108,12 @@ func (d *CSIDriver) deleteIntermediateSnapshot(ctx context.Context, pool string,
 				// That is a weird, previously we failed because snapshot existed and now it is gone
 				// looks like some king of race condition
 				if errGS.GetCode() == jrest.RestErrorResourceDNE {
-					return  jrest.GetError(jrest.RestErrorStorageFailureUnknown,
-								fmt.Sprintf("It looks like there is a race condition"))
+					return jrest.GetError(jrest.RestErrorStorageFailureUnknown,
+						fmt.Sprintf("It looks like there is a race condition"))
 				}
 				return jrest.GetError(jrest.RestErrorStorageFailureUnknown,
-							fmt.Sprintf("Unable to delete intermediate snapshot %s for volume as clean up operation because of %s",
-							vds, sds, errGS.Error()))
+					fmt.Sprintf("Unable to delete intermediate snapshot %s for volume %s as clean up operation because of %s",
+						vds, sds, errGS.Error()))
 			} else {
 				// Target volume already created
 				if clones := snap.ClonesNames(); len(clones) == 1 {
@@ -137,7 +134,6 @@ func (d *CSIDriver) deleteIntermediateSnapshot(ctx context.Context, pool string,
 	return err
 }
 
-
 // CreateVolumeFromVolume creates volume from another volume
 //
 //	Takes as arguments:
@@ -147,10 +143,10 @@ func (d *CSIDriver) deleteIntermediateSnapshot(ctx context.Context, pool string,
 //	- vd source volume descripto
 //	- nvd new volume desctiptor
 func (d *CSIDriver) CreateVolumeFromVolume(ctx context.Context, pool string, vd *VolumeDesc, nvd *VolumeDesc) (err jrest.RestError) {
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "CreateVolumeFromVolume",
+		"func":    "CreateVolumeFromVolume",
 		"section": "driver",
 	})
 
@@ -162,32 +158,31 @@ func (d *CSIDriver) CreateVolumeFromVolume(ctx context.Context, pool string, vd 
 
 		// Probably it was already created
 		if code == jrest.RestErrorResourceExists {
-		
-			d.deleteIntermediateSnapshot(ctx, pool, vd.VDS(), nvd.VDS()) 
+
+			d.deleteIntermediateSnapshot(ctx, pool, vd.VDS(), nvd.VDS())
 		}
 		return err
 	}
 
-	var clonedata = jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: nvd.VDS() }
+	var clonedata = jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: nvd.VDS()}
 	if err = d.re.CreateClone(ctx, pool, vd.VDS(), clonedata); err != nil {
 		l.Warnf("Unable to create volume %s from snapshot %s of volume %s, because of error %+v. Removing intermediate snapshot", nvd.VDS(), nvd.VDS(), vd.VDS(), err.Error())
 
-		d.deleteIntermediateSnapshot(ctx, pool, vd.VDS(), nvd.VDS()) 
+		d.deleteIntermediateSnapshot(ctx, pool, vd.VDS(), nvd.VDS())
 		return err
 	}
-	
+
 	return nil
 }
-
 
 // cleanIntermediateSnapshots request list of snapshots related to particular volume and check if there are intermediate one that can be deleted
 //
 //	return list of snapshots that does not contain 'handing' one or error
 func (d *CSIDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (snaps []jrest.ResourceSnapshot, err jrest.RestError) {
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "cleanIntermediateSnapshots",
+		"func":    "cleanIntermediateSnapshots",
 		"section": "driver",
 	})
 	token := NewCSIListingToken()
@@ -220,20 +215,19 @@ func (d *CSIDriver) cleanIntermediateSnapshots(ctx context.Context, pool string,
 		}
 	}
 
-	return out, nil 
+	return out, nil
 }
-
 
 func (d *CSIDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) (err jrest.RestError) {
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "deleteLUN",
+		"func":    "deleteLUN",
 		"section": "driver",
 	})
-	
+
 	forceUmount := true
-	var deldata = jrest.DeleteVolumeDescriptor{ ForceUmount: &forceUmount }
+	var deldata = jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
 	err = d.re.DeleteVolume(ctx, pool, vd.VDS(), deldata)
 
 	switch jrest.ErrCode(err) {
@@ -267,7 +261,7 @@ func (d *CSIDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) 
 
 		var dvols []string
 		var dsnaps []string
-		var ncsi[]string
+		var ncsi []string
 		msg := fmt.Sprintf("Volume %s is dependent upon by", vd.Name())
 
 		for _, snap := range snaps {
@@ -291,7 +285,7 @@ func (d *CSIDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) 
 			msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(ncsi[:], ","))
 		}
 		err = jrest.GetError(jrest.RestErrorResourceBusy, msg)
-			//fmt.Sprintf("%s %v %v", msg, dsnaps, dvols))
+		//fmt.Sprintf("%s %v %v", msg, dsnaps, dvols))
 	}
 
 	return err
@@ -301,7 +295,7 @@ func (d *CSIDriver) DeleteVolume(ctx context.Context, pool string, vid *VolumeDe
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "DeleteVolume",
+		"func":    "DeleteVolume",
 		"section": "driver",
 	})
 
@@ -311,14 +305,14 @@ func (d *CSIDriver) DeleteVolume(ctx context.Context, pool string, vid *VolumeDe
 func (d *CSIDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (vols []jrest.ResourceVolume, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "ListAllVolumes",
+		"func":    "ListAllVolumes",
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken)(lres []jrest.ResourceVolume, err jrest.RestError) {
+	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceVolume, err jrest.RestError) {
 		l.Debugln("Getting Volume entries")
-	 	entr, err := d.re.GetVolumesEntries(ctx, pool, token.Page(), token.DC())
-		
+		entr, err := d.re.GetVolumesEntries(ctx, pool, token.Page(), token.DC())
+
 		if err != nil {
 			return nil, err
 		}
@@ -326,14 +320,14 @@ func (d *CSIDriver) ListAllVolumes(ctx context.Context, pool string, maxret int,
 		if entries, ok := entr.Entries.(*[]jrest.ResourceVolume); ok == true {
 			return *entries, nil
 		}
-		l.Warnf("Unable to identify format of %+v, it have %T",entr.Entries, entr.Entries)
+		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
 		return nil, nil
 	}
 
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token,  grf, RestVolumeEntryBasedID); err != nil {
+	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestVolumeEntryBasedID); err != nil {
 		return nil, nil, err
 	} else {
-		return entries, csitoken , nil
+		return entries, csitoken, nil
 	}
 }
 
@@ -342,20 +336,19 @@ func (d *CSIDriver) ListAllVolumes(ctx context.Context, pool string, maxret int,
 // 	l = l.WithFields(logrus.Fields{
 // 		"func": "findPageByToken",
 // 	})
-// 
+//
 // 	l.Debugf("Start volume deletion")
-// 	
+//
 // 	return nil
 // }
 
-
-func getResourcesList[RestResource any](ctx context.Context, maxret int, token CSIListingToken, 
-	grf func(context.Context, CSIListingToken)([]RestResource, jrest.RestError),
+func getResourcesList[RestResource any](ctx context.Context, maxret int, token CSIListingToken,
+	grf func(context.Context, CSIListingToken) ([]RestResource, jrest.RestError),
 	BasedID func(RestResource) string) (lres []RestResource, nt *CSIListingToken, err jrest.RestError) {
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "getResourceList",
+		"func":    "getResourceList",
 		"section": "driver",
 	})
 
@@ -373,7 +366,7 @@ func getResourcesList[RestResource any](ctx context.Context, maxret int, token C
 			if len(ent) == 0 {
 				return lres, nil, nil
 			}
-			
+
 			if len(token.BasedID()) == 0 {
 				lres = append(lres, (ent)...)
 			} else if token.BasedID() <= BasedID(ent[0]) {
@@ -410,14 +403,14 @@ func (d *CSIDriver) ListAllSnapshots(ctx context.Context, pool string, maxret in
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "ListAllSnapshots",
+		"func":    "ListAllSnapshots",
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken)(lres []jrest.ResourceSnapshotShort, err jrest.RestError) {
+	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceSnapshotShort, err jrest.RestError) {
 		l.Debugln("Getting SnapshotShort entries")
-	 	entr, err := d.re.GetSnapshotsEntries(ctx, pool, token.Page(), token.DC())
-		
+		entr, err := d.re.GetSnapshotsEntries(ctx, pool, token.Page(), token.DC())
+
 		if err != nil {
 			return nil, err
 		}
@@ -425,18 +418,17 @@ func (d *CSIDriver) ListAllSnapshots(ctx context.Context, pool string, maxret in
 		if entries, ok := entr.Entries.(*[]jrest.ResourceSnapshotShort); ok == true {
 			return *entries, nil
 		}
-		l.Warnf("Unable to identify format of %+v, it have %T",entr.Entries, entr.Entries)
+		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
 		return nil, nil
 	}
 
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token,  grf, RestSnapshotShortEntryBasedID); err != nil {
+	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestSnapshotShortEntryBasedID); err != nil {
 		return nil, nil, err
 	} else {
 		//ts := csitoken.Token()
-		return entries, csitoken , nil
+		return entries, csitoken, nil
 	}
 }
-
 
 // ListVolumeSnapshots provides maxret records of snapshots of volume starting from token
 // if no token nor limit on number of snapshot is given it will list all snapshots of particular volume
@@ -444,13 +436,13 @@ func (d *CSIDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *V
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "ListVolumeSnapshots",
+		"func":    "ListVolumeSnapshots",
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken)(lres []jrest.ResourceSnapshot, err jrest.RestError) {
+	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceSnapshot, err jrest.RestError) {
 		l.Debugln("Getting Volume Snapshots entries")
-	 	entr, err := d.re.GetVolumeSnapshotsEntries(ctx, pool, vid.VDS(), token.Page(), token.DC())
+		entr, err := d.re.GetVolumeSnapshotsEntries(ctx, pool, vid.VDS(), token.Page(), token.DC())
 
 		if err != nil {
 			return nil, err
@@ -459,47 +451,46 @@ func (d *CSIDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *V
 		if entries, ok := entr.Entries.(*[]jrest.ResourceSnapshot); ok == true {
 			return *entries, nil
 		}
-		l.Warnf("Unable to identify format of %+v, it have %T",entr.Entries, entr.Entries)
+		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
 		return nil, nil
 	}
 
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token,  grf, RestSnapshotEntryBasedID); err != nil {
+	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestSnapshotEntryBasedID); err != nil {
 		return nil, nil, err
 	} else {
 		//ts := csitoken.Token()
-		return entries, csitoken , nil
+		return entries, csitoken, nil
 	}
 }
 
 func NewJovianDSSCSIDriver(cfg *jcom.RestEndpointCfg, l *logrus.Entry) (d *CSIDriver, err error) {
-	
+
 	var drvr CSIDriver
 	jrest.SetupEndpoint(&drvr.re, cfg, l)
 
-	return &drvr, nil 
+	return &drvr, nil
 }
 
-func (d* CSIDriver)GetVolume(ctx context.Context, pool string, vd *VolumeDesc) (out *jrest.ResourceVolume, err jrest.RestError) {
+func (d *CSIDriver) GetVolume(ctx context.Context, pool string, vd *VolumeDesc) (out *jrest.ResourceVolume, err jrest.RestError) {
 	// return nil, nil
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "GetVolume",
-		"section" : "driver",
+		"func":    "GetVolume",
+		"section": "driver",
 	})
 
 	l.Debugf("Get volume with id: %s", vd.VDS())
-	
 
 	return d.re.GetVolume(ctx, pool, vd.VDS()) // v for Volume
 }
 
-func (d* CSIDriver)GetSnapshot(ctx context.Context, pool string, vd LunDesc, sd *SnapshotDesc) (out *jrest.ResourceSnapshot, err jrest.RestError) {
+func (d *CSIDriver) GetSnapshot(ctx context.Context, pool string, vd LunDesc, sd *SnapshotDesc) (out *jrest.ResourceSnapshot, err jrest.RestError) {
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "GetSnapshot",
-		"section" : "driver",
+		"func":    "GetSnapshot",
+		"section": "driver",
 	})
 
 	l.Debugf("Get snapshot %s of volume %s", sd.SDS(), vd.VDS())
@@ -507,42 +498,41 @@ func (d* CSIDriver)GetSnapshot(ctx context.Context, pool string, vd LunDesc, sd 
 	return d.re.GetVolumeSnapshot(ctx, pool, vd.VDS(), sd.SDS())
 }
 
-
 func (d *CSIDriver) CreateSnapshot(ctx context.Context, pool string, vd *VolumeDesc, sd *SnapshotDesc) jrest.RestError {
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "CreateSnapshot",
-		"section" : "driver",
+		"func":    "CreateSnapshot",
+		"section": "driver",
 	})
 
 	l.Debugf("Create snapshot %s for volume %s", sd.SDS(), vd.VDS())
-	
-	var snapdata = jrest.CreateSnapshotDescriptor{SnapshotName: sd.SDS()} 
+
+	var snapdata = jrest.CreateSnapshotDescriptor{SnapshotName: sd.SDS()}
 
 	return d.re.CreateSnapshot(ctx, pool, vd.VDS(), &snapdata)
 }
 
 func (d *CSIDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDesc, sd *SnapshotDesc) jrest.RestError {
-	
+
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "DeleteSnapshot",
-		"section" : "driver",
+		"func":    "DeleteSnapshot",
+		"section": "driver",
 	})
 
 	l.Debugf("Delete snapshot %s for volume %s", sd.SDS(), ld.VDS())
 
 	forceUmount := true
-	var deldata = jrest.DeleteSnapshotDescriptor{  ForceUnmount: &forceUmount} 
+	var deldata = jrest.DeleteSnapshotDescriptor{ForceUnmount: &forceUmount}
 
 	err := d.re.DeleteSnapshot(ctx, pool, ld.VDS(), sd.SDS(), deldata)
-	
+
 	var dvols []string
 	var dsnaps []string
 	var ncsi []string
 	var msg string
-	
+
 	if err.GetCode() == jrest.RestErrorResourceBusy || err.GetCode() == jrest.RestErrorResourceBusySnapshotHasClones {
 		if clones, rErr := d.re.GetVolumeSnapshotClones(ctx, pool, ld.VDS(), sd.SDS()); rErr != nil {
 			return rErr
@@ -563,7 +553,7 @@ func (d *CSIDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDesc,
 
 	if len(dsnaps) > 0 {
 		forceUmount := true
-		var delclone = jrest.DeleteVolumeDescriptor{ ForceUmount: &forceUmount }
+		var delclone = jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
 
 		for _, snapclone := range dsnaps {
 			if rErr := d.re.DeleteClone(ctx, pool, ld.VDS(), sd.SDS(), snapclone, delclone); rErr != nil {
@@ -572,7 +562,7 @@ func (d *CSIDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDesc,
 			}
 		}
 	}
-	
+
 	msg = fmt.Sprintf("Snapshot %s with ID %s is dependent upon by", sd.Name(), sd.CSIID())
 
 	if len(dvols) > 0 {
@@ -586,13 +576,13 @@ func (d *CSIDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDesc,
 	return err
 }
 
-func (d* CSIDriver)GetPool(ctx context.Context, pool string) (out *jrest.ResourcePool, err jrest.RestError) {
+func (d *CSIDriver) GetPool(ctx context.Context, pool string) (out *jrest.ResourcePool, err jrest.RestError) {
 	// return nil, nil
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "GetPool",
-		"section" : "driver",
+		"func":    "GetPool",
+		"section": "driver",
 	})
 
 	l.Debugf("Get pool with id: %s", pool)
@@ -600,16 +590,16 @@ func (d* CSIDriver)GetPool(ctx context.Context, pool string) (out *jrest.Resourc
 	return d.re.GetPool(ctx, pool)
 }
 
-func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, iqnPrefix string, readonly bool) (iscsiContext *map[string]string, rErr jrest.RestError) {
-	
+func (d *CSIDriver) PublishVolume(ctx context.Context, pool string, ld LunDesc, iqnPrefix string, readonly bool) (iscsiContext *map[string]string, rErr jrest.RestError) {
+
 	// Create target
 
-	iContext := map[string]string{} 
+	iContext := map[string]string{}
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "PublishVolume",
-		"section" : "driver",
+		"func":    "PublishVolume",
+		"section": "driver",
 	})
 
 	// We want target name to be uniquee
@@ -673,28 +663,28 @@ func (d *CSIDriver)PublishVolume(ctx context.Context, pool string, ld LunDesc, i
 	for i := 0; i < 3; i++ {
 		target, rErr := d.re.GetTarget(ctx, pool, iqn)
 		switch jrest.ErrCode(rErr) {
-			case jrest.RestErrorOk:
-				if target.Active == true {
-					return &iContext, nil
-				}
-			case jrest.RestErrorResourceDNE:
-				// According to specification from
-				time.Sleep(time.Second)
-				continue
-			default:
-				continue
+		case jrest.RestErrorOk:
+			if target.Active == true {
+				return &iContext, nil
+			}
+		case jrest.RestErrorResourceDNE:
+			// According to specification from
+			time.Sleep(time.Second)
+			continue
+		default:
+			continue
 		}
 	}
 
 	return nil, jrest.GetError(jrest.RestErrorRequestTimeout, fmt.Sprintf("Unable to ensure that target %s is up and running", iqn))
 }
 
-func (d *CSIDriver)UnpublishVolume(ctx context.Context, pool string, prefix string,  ld LunDesc) (rErr jrest.RestError) {
+func (d *CSIDriver) UnpublishVolume(ctx context.Context, pool string, prefix string, ld LunDesc) (rErr jrest.RestError) {
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "UnpublishVolume",
-		"section" : "driver",
+		"func":    "UnpublishVolume",
+		"section": "driver",
 	})
 
 	// We want target name to be uniquee
@@ -724,13 +714,12 @@ func (d *CSIDriver)UnpublishVolume(ctx context.Context, pool string, prefix stri
 
 	switch jrest.ErrCode(rErr) {
 	case jrest.RestErrorOk:
-		l.Debugf("target %s deleted", iqn)
+		l.Debugf("target %s deleted", *iqn)
 	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNETarget:
-		l.Debugf("target %s do not exists", iqn)
+		l.Debugf("target %s do not exists", *iqn)
 	default:
 		return rErr
 	}
-	
+
 	return nil
 }
-

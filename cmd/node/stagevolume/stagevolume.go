@@ -28,7 +28,7 @@ import (
 
 	csi_common "joviandss-kubernetescsi/pkg/common"
 	csi_node "joviandss-kubernetescsi/pkg/node"
-	
+
 	cli_common "joviandss-kubernetescsi/pkg/common"
 
 	"joviandss-kubernetescsi/pkg/common"
@@ -37,11 +37,11 @@ import (
 )
 
 var (
-	volume_id string
-	publish_context map[string]string
+	volume_id           string
+	publish_context     map[string]string
 	staging_target_path string
-	volume_capabilty []string
-	secrets map[string]string
+	volume_capabilty    []string
+	secrets             map[string]string
 
 	//volumeSize string
 
@@ -49,12 +49,11 @@ var (
 	//volumeSizeLimit string
 )
 
-
 func stageVolume(cmd *cobra.Command, args []string) {
 
 	// var np csi_node.NodePlugin
 
-	logger, err := cli_common.GetLogger(csi_common.LogLevel, csi_common.LogPath); 
+	logger, err := cli_common.GetLogger(csi_common.LogLevel, csi_common.LogPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Unable to init loging because:", err.Error())
 		os.Exit(1)
@@ -71,7 +70,7 @@ func stageVolume(cmd *cobra.Command, args []string) {
 
 	var req csi.NodeStageVolumeRequest
 	var ctx context.Context = common.GetContext("node_stagevolume")
-	
+
 	mountVolume := csi.VolumeCapability_MountVolume{
 		FsType:     "ext4",
 		MountFlags: []string{"rw"},
@@ -95,7 +94,7 @@ func stageVolume(cmd *cobra.Command, args []string) {
 	if len(publish_context) > 0 {
 		req.PublishContext = publish_context
 	}
-	
+
 	req.StagingTargetPath = staging_target_path
 
 	req.VolumeCapability = &volumeCapability
@@ -125,7 +124,7 @@ func init() {
 
 	NodeStageVolumeCmd.Flags().StringVarP(&volume_id, "volume_id", "i", "", "The ID of the volume to publish. This field is REQUIRED.")
 	NodeStageVolumeCmd.Flags().StringToStringVarP(&publish_context, "publish_context", "c", map[string]string{}, "Context provided by controller after running PublishVolume, Optional.")
-	
+
 	staging_target_path_desc := `The path to which the volume MAY be staged. It MUST be an
 	absolute path in the root filesystem of the process serving this
 	request, and MUST be a directory. The CO SHALL ensure that there
@@ -135,14 +134,14 @@ func init() {
 	CO SHALL be responsible for creating the directory if it does not
 	exist.`
 
-	NodeStageVolumeCmd.Flags().StringVarP(&staging_target_path, "staging_target_path", "p", "", staging_target_path_desc) 
+	NodeStageVolumeCmd.Flags().StringVarP(&staging_target_path, "staging_target_path", "p", "", staging_target_path_desc)
 
 	// TODO: implement volume capability
 	// Volume capability describing how the CO intends to use this volume.
-  	// SP MUST ensure the CO can use the staged volume as described.
-  	// Otherwise SP MUST return the appropriate gRPC error code.
-  	// This is a REQUIRED field.
-  	// VolumeCapability volume_capability = 4;
+	// SP MUST ensure the CO can use the staged volume as described.
+	// Otherwise SP MUST return the appropriate gRPC error code.
+	// This is a REQUIRED field.
+	// VolumeCapability volume_capability = 4;
 
 	// Secrets required by plugin to complete node stage volume request.
 	// This field is OPTIONAL. Refer to the `Secrets Requirements`
@@ -150,4 +149,3 @@ func init() {
 	NodeStageVolumeCmd.Flags().StringToStringVarP(&secrets, "secrets", "s", map[string]string{}, "Secrets required by plugin to complete node stage volume request, Optional.")
 
 }
-
