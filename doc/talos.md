@@ -24,7 +24,8 @@ For instance
 talosctl upgrade --image  factory.talos.dev/installer/c9078f9419961640c712a8bf2bb9174933dfcf1da383fd8ea2b7dc21493f8bac:v1.6.7 
 ```
 
-If installation completed successfully user will be able to see `tgtd` and `iscsid` services
+If installation completed successfully user will be able to see `tgtd` and `iscsid` services.
+Please notice that `iscsi` extension have to be present on all working nodes.
 
 ```bash
 user@talos-master:~$ talosctl get service -n node2.my-talos-cluster.lan
@@ -73,15 +74,34 @@ cluster:
 Assuming that user have current Talos node config file `node.yaml`, patch file with context provided above in the same directory and named `securitypatch.yaml` and node with FQDN or ip with name `node.myclaster.lan`
 , patching can be done by:
 
-1. Applying patch to present config localy
+Additionally user might want to ensure that `iscsi_tcp` will be loaded on machine start, that can be done by adding following patch
+```yaml
+machine:
+    install:
+        extraKernelArgs:
+            - iscsi_tcp=1
+    kernel:
+        # Kernel modules to load.
+        modules:
+            - name: iscsi_tcp # Module name.
+```
+
+
+1. Applying patch to present configuration files of worker node and controller node of your running Talos cluster locally.
 ```bash
-talosctl machineconfig patch node.yaml --patch @securitypatch.yaml -o node1.yaml
+talosctl machineconfig patch worker.yaml --patch @securitypatch.yaml -o worker_cfg_v2.yaml
+talosctl machineconfig patch controller.yaml --patch @securitypatch.yaml -o controller_cfg_v2.yaml
+```
+Ensuring module load on start 
+```bash
+talosctl machineconfig patch worker.yaml --patch @modulepatch.yaml -o worker_cfg_v2.yaml
 ```
 
 2. Uploading config to Talos
 
 ```bash
-talosctl apply-config -n node.mycluster.lan --file node1.yaml
+talosctl apply-config -n node1.my-talos-cluster.lan,node2.my-talos-cluster.lan,...<and all other worker nodes you have in your cluster>... --file node_cfg_v2.yaml
+talosctl apply-config -n cntr1.my-talos-cluster.lan,cntr2.my-talos-cluster.lan,...<and all other controller nodes you have in your cluster>... --file cntr_cfg_v2.yaml
 ```
 ```bash
 kubectl label ns joviandss-csi pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/warn=privileged
