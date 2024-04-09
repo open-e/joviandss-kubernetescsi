@@ -24,6 +24,32 @@ For instance
 talosctl upgrade --image  factory.talos.dev/installer/c9078f9419961640c712a8bf2bb9174933dfcf1da383fd8ea2b7dc21493f8bac:v1.6.7 
 ```
 
+If installation completed successfully user will be able to see `tgtd` and `iscsid` services
+
+```bash
+user@talos-master:~$ talosctl get service -n node2.my-talos-cluster.lan
+```
+
+```
+NODE                         NAMESPACE   TYPE      ID           VERSION   RUNNING   HEALTHY   HEALTH UNKNOWN
+cntr1.my-talos-cluster.lan   runtime     Service   ext-iscsid   1         true      false     true
+cntr1.my-talos-cluster.lan   runtime     Service   ext-tgtd     1         true      false     true
+```
+
+and extensions
+
+```bash
+user@talos-master:~$ talosctl get extensions -n node2.my-talos-cluster.lan
+```
+
+```
+NODE                         NAMESPACE   TYPE              ID   VERSION   NAME          VERSION
+node2.my-talos-cluster.lan   runtime     ExtensionStatus   0    1         iscsi-tools   v0.1.4
+```
+
+Listings above emphasize only services and extensions that is required for `plugin` to operate and does not include all possible services that might be present on your cluster.
+
+
 ## Patching security
 
 Talos OS security policies preventing direct interaction of containerised services with extensions and systems of Talos out of the box.
