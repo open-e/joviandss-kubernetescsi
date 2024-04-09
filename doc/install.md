@@ -8,7 +8,7 @@ This document provides detailed guide on installation of JovianDSS CSI Plugin, f
 `Plugin` expects host machine to have `iscsid` daemon, `iscsiadm` cli and `iscsi\_tcp` kernel module installed.
 That is needed as `plugin` does not contain mentioned iscsi tool yet relies on them heavily.
 Installation of this components is pretty straightforward on most of linux distribution and will not be coverer here except for `TalosOS`.
-Due to architecture and security policies [additioanal actions have to be take prior to following instructions provided below](docs/talos.md).
+Due to architecture and security policies [additioanal actions have to be take prior to following instructions provided below](talos.md).
 
 
 ## Installation
@@ -39,7 +39,7 @@ kubectl apply -f ./deploy/joviandss/snapshot-controller.yaml
 ### 4. Setup config file for `plugin`
 
 Main plugin configuration get provided by config file that get attached to controller service of plugin through `secret`.
-Check this [guide on configuration](doc/configuration.md) to get more information on `plugin` configuration.
+Check this [guide on configuration](configuration.md) to get more information on `plugin` configuration.
 
 ```bash
 kubectl create secret -n joviandss-csi generic jdss-controller-cfg --from-file ./deploy/cfg/cfg.yaml 

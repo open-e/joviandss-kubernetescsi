@@ -11,10 +11,6 @@ COPY ./_output/jdss-csi-plugin /usr/local/bin/jdss-csi-plugin
 COPY ./_output/jdss-csi-cli /usr/local/bin/jdss-csi-cli
 
 COPY ./deploy/container/scripts/iscsiadm /usr/local/bin/
-#COPY ./deploy/container/scripts/mount /usr/local/bin/
-#COPY ./deploy/container/scripts/umount /usr/local/bin/
-#COPY ./deploy/container/scripts/multipath /usr/local/bin/
-
 
 WORKDIR /root
 

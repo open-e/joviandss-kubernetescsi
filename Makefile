@@ -2,7 +2,8 @@ REGISTRY_NAME=opene
 IMAGE_NAME=joviandss-csi
 IMAGE_VERSION=$(shell git describe --long --tags)
 IMAGE_TAG_CENTOS=$(REGISTRY_NAME)/$(IMAGE_NAME)-c:$(IMAGE_VERSION)
-IMAGE_TAG_UBUNTU=$(REGISTRY_NAME)/$(IMAGE_NAME)-u:$(IMAGE_VERSION)
+IMAGE_TAG=$(REGISTRY_NAME)/$(IMAGE_NAME):$(IMAGE_VERSION)
+IMAGE_TAG_LATEST=$(REGISTRY_NAME)/$(IMAGE_NAME):latest
 IMAGE_TAG_DEV=$(REGISTRY_NAME)/$(IMAGE_NAME)-dev:$(IMAGE_VERSION)
 IMAGE_TAG_DEV_LATEST=$(REGISTRY_NAME)/$(IMAGE_NAME)-dev:latest
 #IMAGE_TAG_UBUNTU_16=$(REGISTRY_NAME)/$(IMAGE_NAME)-u-16:$(IMAGE_VERSION)
@@ -29,17 +30,15 @@ joviandss:
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X joviandss-kubernetescsi/pkg/common.Version=$(IMAGE_VERSION) -extldflags "-static"' -o _output/jdss-csi-plugin ./app/joviandssplugin
 	#chmod +x _output/jdss-csi-plugin
 
-container: joviandss
+container: joviandss cli
 	@echo Building Container
-	podman build -t $(IMAGE_TAG_CENTOS) -f ./deploy/container/centos.Dockerfile .
-	podman build -t $(IMAGE_TAG_UBUNTU) -f ./deploy/container/ubuntu.Dockerfile .
-	#sudo podman build -t $(IMAGE_TAG_UBUNTU_16) -f ./app/joviandssplugin/ubuntu-16.Dockerfile .
+	podman build -t docker.io/$(IMAGE_TAG) -f ./deploy/container/centos.Dockerfile .
+	podman build -t docker.io/$(IMAGE_TAG_LATEST) -f ./deploy/container/centos.Dockerfile .
 
-containerdev: joviandss
+containerdev: joviandss cli
 	@echo Building Container
 	podman build -t docker.io/$(IMAGE_TAG_DEV) -f ./deploy/container/centos.Dockerfile .
 	podman build -t docker.io/$(IMAGE_TAG_DEV_LATEST) -f ./deploy/container/centos.Dockerfile .
-	#podman build -t docker.io/$(IMAGE_TAG_UBUNTU) -f ./deploy/docker/ubuntu.Dockerfile .
 
 clean:
 	go clean -r -x
