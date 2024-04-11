@@ -103,6 +103,3 @@ talosctl machineconfig patch worker.yaml --patch @modulepatch.yaml -o worker_cfg
 talosctl apply-config -n node1.my-talos-cluster.lan,node2.my-talos-cluster.lan,...<and all other worker nodes you have in your cluster>... --file node_cfg_v2.yaml
 talosctl apply-config -n cntr1.my-talos-cluster.lan,cntr2.my-talos-cluster.lan,...<and all other controller nodes you have in your cluster>... --file cntr_cfg_v2.yaml
 ```
-```bash
-kubectl label ns joviandss-csi pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/warn=privileged
-```
