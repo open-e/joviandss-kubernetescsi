@@ -8,7 +8,7 @@ This document provides detailed guide on installation of JovianDSS CSI Plugin, f
 `Plugin` expects host machine to have `iscsid` daemon, `iscsiadm` cli and `iscsi\_tcp` kernel module installed.
 That is needed as `plugin` does not contain mentioned iscsi tool yet relies on them heavily.
 Installation of this components is pretty straightforward on most of linux distribution and will not be coverer here except for `TalosOS`.
-Due to architecture and security policies [additioanal actions have to be take prior to following instructions provided below](talos.md).
+Due to architecture and security policies [additional actions have to be take prior to following instructions provided below](talos.md).
 
 
 ## Installation
@@ -16,19 +16,19 @@ Due to architecture and security policies [additioanal actions have to be take p
 Installation process of JovianDSS CSI plugin goes through creation of appropriate Kubernetes resources.
 
 
-### 1. Create user need to create namespace for `plugin` and resources associates with it.
+### 1. Create namespace `joviandss-csi` that will host `plugin`. 
 
 ```bash
 kubectl apply -f ./deploy/joviandss/namespace.yaml
 ```
 
-Grant additional security pribilages to `joviandss-csi` namespace:
+Grant additional security privileges to `joviandss-csi` namespace:
 
 ```bash
 kubectl label ns joviandss-csi pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/warn=privileged
 ```
 
-### 2. User have to install CRDT provided for snapshot support. This CRDT's are inherited from [github.com/kubernetes-csi/external-snapshotter](https://github.com/kubernetes-csi/external-snapshotter/tree/release-5.0/client/config/crd`)
+### 2. Install CRDT and classes related snapshot support provided for snapshot support. This CRDT's are inherited from [github.com/kubernetes-csi/external-snapshotter](https://github.com/kubernetes-csi/external-snapshotter/tree/release-5.0/client/config/crd`)
 
 ```bash
 kubectl apply -f ./deploy/joviandss/svolumesnapshotclasses.yaml

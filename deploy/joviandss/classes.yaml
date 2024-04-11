@@ -1,0 +1,8 @@
+---
+
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: joviandss-snapshot-sc
+driver: iscsi.csi.joviandss.open-e.com
+deletionPolicy: Delete

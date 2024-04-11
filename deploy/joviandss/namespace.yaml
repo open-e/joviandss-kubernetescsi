@@ -4,24 +4,3 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: joviandss-csi
-
----
-
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: joviandss-sc
-provisioner: iscsi.csi.joviandss.open-e.com
-parameters:
-reclaimPolicy: Delete
-volumeBindingMode: Immediate
-
----
-
-apiVersion: snapshot.storage.k8s.io/v1
-kind: VolumeSnapshotClass
-metadata:
-  name: joviandss-snapshot-sc
-driver: iscsi.csi.joviandss.open-e.com
-deletionPolicy: Delete
-
