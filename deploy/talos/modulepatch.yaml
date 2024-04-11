@@ -6,4 +6,3 @@ machine:
         # Kernel modules to load.
         modules:
             - name: iscsi_tcp # Module name.
-

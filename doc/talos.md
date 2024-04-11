@@ -28,7 +28,7 @@ If installation completed successfully user will be able to see `tgtd` and `iscs
 Please notice that `iscsi` extension have to be present on all working nodes.
 
 ```bash
-user@talos-master:~$ talosctl get service -n node2.my-talos-cluster.lan
+talosctl get service -n node2.my-talos-cluster.lan
 ```
 
 ```
@@ -40,7 +40,7 @@ cntr1.my-talos-cluster.lan   runtime     Service   ext-tgtd     1         true  
 and extensions
 
 ```bash
-user@talos-master:~$ talosctl get extensions -n node2.my-talos-cluster.lan
+talosctl get extensions -n node2.my-talos-cluster.lan
 ```
 
 ```
