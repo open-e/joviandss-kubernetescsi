@@ -31,9 +31,9 @@ kubectl label ns joviandss-csi pod-security.kubernetes.io/audit=privileged pod-s
 ### 2. Install CRDT and classes related snapshot support provided for snapshot support. This CRDT's are inherited from [github.com/kubernetes-csi/external-snapshotter](https://github.com/kubernetes-csi/external-snapshotter/tree/release-5.0/client/config/crd`)
 
 ```bash
-kubectl apply -f ./deploy/joviandss/crdt/svolumesnapshotclasses.yaml
-kubectl apply -f ./deploy/joviandss/crdt/svolumesnapshotcontents.yaml
-kubectl apply -f ./deploy/joviandss/crdt/svolumesnapshots.yaml
+kubectl apply -f ./deploy/joviandss/crdt/volumesnapshotclasses.yaml
+kubectl apply -f ./deploy/joviandss/crdt/volumesnapshotcontents.yaml
+kubectl apply -f ./deploy/joviandss/crdt/volumesnapshots.yaml
 ```
 
 ### 3. Create snapshoting service
