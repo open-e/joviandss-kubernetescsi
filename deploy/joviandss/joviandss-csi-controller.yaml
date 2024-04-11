@@ -160,7 +160,7 @@ spec:
               mountPath: /var/lib/csi/sockets/pluginproxy
 
         - name: csi-controller
-          image: opene/joviandss-csi-dev:latest
+          image: opene/joviandss-csi:latest
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

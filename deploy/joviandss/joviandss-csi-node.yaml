@@ -91,7 +91,7 @@ spec:
             capabilities:
               add: ['SYS_ADMIN']
             allowPrivilegeEscalation: true
-          image: opene/joviandss-csi-dev:latest
+          image: opene/joviandss-csi:latest
           imagePullPolicy: Always
           args:
             - --csi-address=/csi/csi.sock
