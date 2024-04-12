@@ -31,7 +31,7 @@ Here is examples of volumes and snapshots:
 
 Keep in mind that PVC volumes will get automatically created and deleted with container creation and deletion.
 ``` bash
-kubectl apply -f ./deploy/examples/nginx-pvc.yaml
+kubectl apply -f ./deploy/example/nginx-pvc.yaml
 ```
 
 ### NGINX app with PV
@@ -53,17 +53,17 @@ kubectl apply -f ./deploy/example/pv-test.yaml
 Once you obtain Id of the volume you can create *pvc* based on specific *pv*:
 
 ```bash
-kubectl apply -f ./deploy/examples/pv-test-pvc.yaml
+kubectl apply -f ./deploy/example/pv-test-pvc.yaml
 ```
 4. Deploy application
 
 ```bash
-kubectl apply -f ./deploy/examples/pv-test-pvc-nginx.yaml
+kubectl apply -f ./deploy/example/pv-test-pvc-nginx.yaml
 ```
 
 ### Making snapshot
 
 Snapshot of volume associated with *pvc* `pv-test-pvc` provided in previous example can be created by:
 ```bash
-kubectl apply -f ./deploy/examples/pv-test-pvc-snapshot.yaml
+kubectl apply -f ./deploy/example/pv-test-pvc-snapshot.yaml
 ```
