@@ -36,10 +36,19 @@ kubectl apply -f ./deploy/joviandss/crdt/volumesnapshotcontents.yaml
 kubectl apply -f ./deploy/joviandss/crdt/volumesnapshots.yaml
 ```
 
-### 3. Create snapshoting service
+### 3. Create snapshot controller
+
+[Snapshot controller](https://kubernetes-csi.github.io/docs/snapshot-controller.html) is based on [external snapshoter project](https://github.com/kubernetes-csi/external-snapshotter).
+Keep in mind that `Cluster roler` for `snapshot-controller` is bound to `joviandss-csi-controller-service-account` in definition of `joviandss-csi-controller`,
+therefore possible renaming might require additional changes in `./deploy/joviandss/joviandss-csi-controller.yaml`.
+
+Original RBAC for `snapshot-controller` been extended with `update` for `resources` `volumesnapshotcontents/status`
+
+Controller can be installed by:
 
 ```bash
-kubectl apply -f ./deploy/joviandss/snapshot-controller.yaml
+kubectl apply -f ./deploy/joviandss/snapshot-controller/rbac-snapshot-controller.yaml
+kubectl apply -f ./deploy/joviandss/snapshot-controller/setup-snapshot-controller.yaml
 ```
 
 ### 4. Setup config file for `plugin`
@@ -77,7 +86,8 @@ NAME                             ATTACHREQUIRED   PODINFOONMOUNT   STORAGECAPACI
 iscsi.csi.joviandss.open-e.com   true             true             false             <unset>         false               Persistent   3d12h
 ``` 
 
-Also you should be able to see that `controller`, `node` services running along side with `snapshot-controller`
+You should be able to see that `controller` and `node` services in `joviandss-csi` namespace:
+
 ```bash
 kubectl get pods -n joviandss-csi
 ```
@@ -87,5 +97,14 @@ joviandss-csi-controller-0   4/4     Running   12 (3d1h ago)   3d12h
 joviandss-csi-node-hltwk     2/2     Running   0               3d23h
 joviandss-csi-node-nzqkp     2/2     Running   5 (3d23h ago)   3d23h
 joviandss-csi-node-qzdf6     2/2     Running   5 (3d23h ago)   3d23h
-snapshot-controller-0        1/1     Running   0               3d13h
+```
+
+Also `snapshot-controller` should be running in `kube-system` namespace:
+```bash
+kubectl get pods -n kube-system
+```
+```
+NAME                                   READY   STATUS    RESTARTS      AGE
+snapshot-controller-7c5dccb849-8vvzm   1/1     Running   0             61m
+snapshot-controller-7c5dccb849-q4hnx   1/1     Running   0             61m
 ```
