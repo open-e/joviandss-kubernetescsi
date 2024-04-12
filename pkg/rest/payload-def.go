@@ -17,15 +17,42 @@ under the License.
 
 package rest
 
+import (
+	"fmt"
+)
+
+// Operation completedGetPoolsRCode success response code
+const CodeOK = 200
+const CodeCreated = 201
+const CodeAccepted = 202
+const CodeNoContent = 204
+
 ///////////////////////////////////////////////////////////////////////////////
 /// Error message
 
 // ErrorT error message returned by server
 type ErrorT struct {
-	Class   string
-	Errno   int
-	Message string
-	Url     string
+	Class   *string `json:"class,omitempty"`
+	Errno   *int    `json:"errno,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Url     *string `json:"url,omitempty"`
+}
+
+func (err *ErrorT) String() string {
+	var ret string = "Rest Error: "
+	if err.Errno != nil {
+		ret += fmt.Sprintf("Errno: %d, ", *err.Errno)
+	}
+	if err.Class != nil {
+		ret += fmt.Sprintf("Class: %s, ", *err.Class)
+	}
+	if err.Message != nil {
+		ret += fmt.Sprintf("Message: %s, ", *err.Message)
+	}
+	if err.Url != nil {
+		ret += fmt.Sprintf("Url: %s, ", *err.Url)
+	}
+	return ret
 }
 
 // ErrorData response mask
@@ -38,87 +65,87 @@ type ErrorData struct {
 // /pools
 
 // IOStats data on input ourput statistics
-type IOStats struct {
-	Read   string `json:"read"`
-	Write  string `json:"write"`
-	chksum string `json:"chksum"`
-}
-
-// Disk structure returned by server
-type Disk struct {
-	Name    string
-	Id      string
-	Sn      string
-	Model   string
-	Path    string
-	Health  string
-	Size    int64
-	Iostats IOStats
-	Led     string
-	Origin  string
-}
-
-// VDevice virtual device structure
-type VDevice struct {
-	Name    string
-	Type    string
-	Health  string
-	Iostats IOStats
-	Disks   []Disk
-}
-
-// Enabled flag
-type Enabled struct {
-	Enabled bool
-}
-
+//type IOStats struct {
+//	Read   string `json:"read"`
+//	Write  string `json:"write"`
+//	Chksum string `json:"chksum"`
+//}
+//
+//// Disk structure returned by server
+//type Disk struct {
+//	Name    string
+//	Id      string
+//	Sn      string
+//	Model   string
+//	Path    string
+//	Health  string
+//	Size    int64
+//	Iostats IOStats
+//	Led     string
+//	Origin  string
+//}
+//
+//// VDevice virtual device structure
+//type VDevice struct {
+//	Name    string
+//	Type    string
+//	Health  string
+//	Iostats IOStats
+//	Disks   []Disk
+//}
+//
+//// Enabled flag
+//type Enabled struct {
+//	Enabled bool
+//}
+//
 ///////////////////////////////////////////////////////////////////////////////
 /// Pool
 
-type PoolEnabled struct {
-	Enabled bool `enabled:"enabled"`
-}
-
-// Pool response structure
-type Pool struct {
-	Available  string      `json: "available"`
-	Status     int         `json:"status"`
-	Name       string      `json:"name": "Pool-0"`
-	Scan       int         `json:"scan"`
-	Encryption PoolEnabled `json:"encryption"`
-	Iostats    IOStats     `json:"iostats"`
-	Vdevs      []VDevice   `json:"vdevs"`
-	Health     string      `json:"health"`
-	Operation  string      `json:"operation"`
-	ID         string      `json:"id"`
-	Size       string      `json:"size"`
-}
-
-// GetPoolData response mask
-type GetPoolData struct {
-	Data  Pool
-	Error ErrorT
-}
+//type PoolEnabled struct {
+//	Enabled bool `enabled:"enabled"`
+//}
+//
+//// Pool response structure
+//type Pool struct {
+//	Available  string      `json:"available"`
+//	Status     int         `json:"status"`
+//	Name       string      `json:"name"`
+//	Scan       int         `json:"scan"`
+//	Encryption PoolEnabled `json:"encryption"`
+//	Iostats    IOStats     `json:"iostats"`
+//	Vdevs      []VDevice   `json:"vdevs"`
+//	Health     string      `json:"health"`
+//	Operation  string      `json:"operation"`
+//	ID         string      `json:"id"`
+//	Size       string      `json:"size"`
+//}
+//
+//// GetPoolData response mask
+//type GetPoolData struct {
+//	Data  Pool
+//	Error ErrorT
+//}
 
 const GetPoolRCode = 200
 
 // PoolShort element of a pool list
-type PoolShort struct {
-	Name       string
-	Status     int
-	Health     string
-	Scan       int
-	Operation  string
-	Encryption Enabled
-	Iostats    IOStats
-	Vdevs      []VDevice
-}
+//type PoolShort struct {
+//	Name       string
+//	Status     int
+//	Health     string
+//	Scan       int
+//	Operation  string
+//	Encryption Enabled
+//	Iostats    IOStats
+//	Vdevs      []VDevice
+//}
 
 // GetPoolsData response mask
-type GetPoolsData struct {
-	Data  []PoolShort
-	Error ErrorT
-}
+//type GetPoolsData struct {
+//	Data  []PoolShort
+//	Error ErrorT
+//}
 
 // GetPoolsRCode success response code
 const GetPoolsRCode = 200
@@ -127,45 +154,45 @@ const GetPoolsRCode = 200
 /// Volume
 
 // Volume response structure
-type Volume struct {
-	Origin               string `json:"origin"`
-	Reference            string `json:"referencce"`
-	Primarycache         string `json:"primarycache"`
-	Logbias              string `json:"logbias"`
-	Creation             string `json:"creation"`
-	Sync                 string `json:"sync"`
-	IsClone              bool   `json:"is_clone"`
-	Dedup                string
-	Used                 string
-	Full_name            string
-	Type                 string
-	Written              string
-	Usedbyrefreservation string
-	Compression          string
-	Usedbysnapshots      string
-	Copies               string
-	Compressratio        string
-	Readonly             string
-	Mlslabel             string
-	Secondarycache       string
-	Available            string
-	Resource_name        string
-	Volblocksize         string
-	Refcompressratio     string
-	Snapdev              string
-	Volsize              string
-	Reservation          string
-	Usedbychildren       string
-	Usedbydataset        string
-	Name                 string
-	Checksum             string
-	Refreservation       string
-}
+// type Volume struct {
+// 	Origin               string `json:"origin"`
+// 	Reference            string `json:"referencce"`
+// 	Primarycache         string `json:"primarycache"`
+// 	Logbias              string `json:"logbias"`
+// 	Creation             string `json:"creation"`
+// 	Sync                 string `json:"sync"`
+// 	IsClone              bool   `json:"is_clone"`
+// 	Dedup                string
+// 	Used                 string
+// 	Full_name            string
+// 	Type                 string
+// 	Written              string
+// 	Usedbyrefreservation string
+// 	Compression          string
+// 	Usedbysnapshots      string
+// 	Copies               string
+// 	Compressratio        string
+// 	Readonly             string
+// 	Mlslabel             string
+// 	Secondarycache       string
+// 	Available            string
+// 	Resource_name        string
+// 	Volblocksize         string
+// 	Refcompressratio     string
+// 	Snapdev              string
+// 	Volsize              string
+// 	Reservation          string
+// 	Usedbychildren       string
+// 	Usedbydataset        string
+// 	Name                 string
+// 	Checksum             string
+// 	Refreservation       string
+// }
 
 // GetVolumeData data
 type GetVolumeData struct {
-	Data  Volume
-	Error ErrorT
+	Data  *ResourceVolume `json:"data,omitempty"`
+	Error *ErrorT         `json:"error,ommitempty"`
 }
 
 // GetVolumeRCode success response code
@@ -173,8 +200,8 @@ const GetVolumeRCode = 200
 
 // GetVolumesData data structure
 type GetVolumesData struct {
-	Data  []Volume `json:"data"`
-	Error ErrorT   `json:"error"`
+	Data  *[]ResourceVolume `json:"data"`
+	Error ErrorT            `json:"error"`
 }
 
 // GetVolumesRCode success response code
@@ -184,10 +211,10 @@ const GetVolumesRCode = 200
 /// Create Volume
 
 // CreateVolume request
-type CreateVolume struct {
-	Name string `json:"name"`
-	Size string `json:"size"`
-}
+//type CreateVolume struct {
+//	Name string `json:"name"`
+//	Size string `json:"size"`
+//}
 
 // CreateVolumeData data
 type CreateVolumeData struct {
@@ -249,26 +276,26 @@ type CreateSnapshotData struct {
 /// Get Snapshot
 
 // Snapshot structure
-type Snapshot struct {
-	Referenced       string
-	Name             string
-	Defer_destroy    string
-	Userrefs         string
-	Primarycache     string
-	Type             string
-	Creation         string
-	Refcompressratio string
-	Compressratio    string
-	Written          string
-	Used             string
-	Clones           string
-	Mlslabel         string
-	Secondarycache   string
-}
+// type Snapshot struct {
+// 	Referenced       string
+// 	Name             string
+// 	Defer_destroy    string
+// 	Userrefs         string
+// 	Primarycache     string
+// 	Type             string
+// 	Creation         string
+// 	Refcompressratio string
+// 	Compressratio    string
+// 	Written          string
+// 	Used             string
+// 	Clones           string
+// 	Mlslabel         string
+// 	Secondarycache   string
+// }
 
 // GetSnapshotData data
 type GetSnapshotData struct {
-	Data  Snapshot
+	Data  ResourceSnapshot
 	Error ErrorT
 }
 
@@ -286,40 +313,33 @@ type SnapshotProperties struct {
 	Creation string
 }
 
-// SnapshotShort structure
-type SnapshotShort struct {
-	Volume     string
-	Name       string
-	Clones     string
-	Properties SnapshotProperties
+// AllSnapshots structure
+type GetVolumeSnapshotsData struct {
+	Data  ResultEntries `jsom:"data"`
+	Error ErrorT        `json:"error"`
+}
+
+type GetAllSnapshotsData struct {
+	Data  ResultEntries `jsom:"data"`
+	Error ErrorT        `json:"error"`
 }
 
 // AllSnapshots structure
-type AllSnapshots struct {
-	Results int
-	Entries []SnapshotShort
-}
+// type GetAllSnapshots struct {
+// 	Results int
+// 	Entries []SnapshotShort
+// }
 
 // GetAllSnapshotsData data
-type GetAllSnapshotsData struct {
-	Data  AllSnapshots
-	Error ErrorT
-}
 
 // GetAllSnapshotsRCode success status code
 const GetAllSnapshotsRCode = 200
 
 // VolSnapshots structure
-type VolSnapshots struct {
-	Results int
-	Entries []Snapshot
-}
-
-// GetVolSnapshotsData data
-type GetVolSnapshotsData struct {
-	Data  VolSnapshots
-	Error ErrorT
-}
+// type GetVolumeSnapshots struct {
+// 	Results int
+// 	Entries []ResourceSnapshot
+// }
 
 // GetVolSnapshotsRCode success status code
 const GetVolSnapshotsRCode = 200

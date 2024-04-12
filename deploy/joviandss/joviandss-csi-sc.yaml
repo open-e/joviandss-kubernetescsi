@@ -1,6 +1,0 @@
-apiVersion: storage.k8s.io/v1beta1
-kind: StorageClass
-metadata:
-  name: joviandss-persisten-volume-sc
-provisioner: com.open-e.joviandss.csi
-parameters:

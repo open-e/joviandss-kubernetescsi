@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: nginx-jdss-pv
+  labels:
+    name: nginx-jdss-pv
+spec:
+  storageClassName: joviandss-sc
+  accessModes:
+    - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  csi:
+    driver: iscsi.csi.joviandss.open-e.com
+      #volumeHandle: testpv

@@ -1,13 +1,18 @@
 package main
 
 import (
-	"JovianDSS-KubernetesCSI/pkg/joviandss"
 	"flag"
 	"fmt"
+	"joviandss-kubernetescsi/pkg/common"
+	"joviandss-kubernetescsi/pkg/pluginserver"
+
 	"os"
 
 	"github.com/sirupsen/logrus"
+	//"joviandss-kubernetescsi/pkg/joviandss"
 )
+
+var Version string
 
 func init() {
 	flag.Set("logtostderr", "true")
@@ -20,18 +25,29 @@ const (
 )
 
 var (
-	addr       *string
-	net        *string
-	nodeId     *string
-	driverName *string
-	configPath *string
+	driverName      *string
+	address         string
+	netType         string
+	configPath      string
+	logLevel        string
+	logPath         string
+	startController bool
+	startNode       bool
+	startIdentity   bool
 )
 
 func main() {
 
 	cfg := handleArgs()
+
 	// TODO: check if logging parametrs a properly parse
-	l := initLogging(cfg.LLevel, cfg.LDest)
+	var l *logrus.Entry
+	if cfg != nil {
+		l = initLogging(cfg.LLevel, cfg.LDest)
+	} else {
+		l = initLogging(logLevel, logPath)
+	}
+	l.Debugf("Version %s", common.Version)
 
 	routine(cfg, l)
 	os.Exit(0)
@@ -67,57 +83,40 @@ func initLogging(logLevel string, toFile string) *logrus.Entry {
 	log.SetLevel(lvl)
 
 	l := log.WithFields(logrus.Fields{
-		"obj": "Main",
+		"section": "main",
 	})
 
 	return l
 }
 
-func handleArgs() *joviandss.Config {
-	addr = flag.String("csi-address", "/var/lib/kubelet/plugins_registry/joviandss-csi-driver/csi.sock", "CSI endpoint socket address")
-	net = flag.String("soc-type", "tcp", "CSI endpoint socket type")
+func handleArgs() *common.JovianDSSCfg {
+	flag.StringVar(&address, "csi-address", "/var/lib/kubelet/plugins_registry/joviandss-csi-driver/csi.sock", "CSI endpoint socket address")
+	flag.StringVar(&netType, "soc-type", "tcp", "CSI endpoint socket type")
 
-	nodeId = flag.String("nodeid", "", "node id")
-	configPath = flag.String("config", defaultConfigPath, "Path to configuration file")
+	flag.BoolVar(&startController, "controller", false, "Start controller plugin")
+	flag.BoolVar(&startNode, "node", false, "Start node plugin")
+	flag.BoolVar(&startIdentity, "identity", false, "Start identity plugin")
+
+	flag.StringVar(&common.NodeID, "nodeid", "", "Id of the kubernetes node")
+	flag.StringVar(&configPath, "config", "", "Path to configuration file")
+	flag.StringVar(&logLevel, "loglevel", "WARNING", "Log Level, default is Warning")
+	flag.StringVar(&logPath, "logpath", "", "Log file location")
 	flag.Parse()
 
-	if configPath == nil {
-		fmt.Fprintf(os.Stderr, "No config file provided")
-		os.Exit(1)
-	}
-
-	cfg, err := joviandss.GetConfig(*configPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to process config: %s", err.Error())
-		os.Exit(1)
-	}
-
-	if cfg.Addr != "" {
-		if *addr != defaultAddr {
-			cfg.Addr = *addr
+	if len(configPath) > 0 {
+		var cfg common.JovianDSSCfg
+		if err := common.SetupConfig(configPath, &cfg); err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to process config: %s", err.Error())
+			os.Exit(1)
 		}
-	} else {
-		cfg.Addr = *addr
+		return &cfg
 	}
-
-	if cfg.Network != "" {
-		if *addr != defaultAddr {
-			cfg.Network = *net
-		}
-	} else {
-		cfg.Network = *net
-	}
-
-	if len(*nodeId) > 0 {
-
-		cfg.Node.Id = cfg.Node.Id + *nodeId
-	}
-
-	return cfg
+	return nil
 }
 
-func routine(cfg *joviandss.Config, l *logrus.Entry) {
-	jdss, _ := joviandss.GetPlugin(cfg, l)
+func routine(cfg *common.JovianDSSCfg, l *logrus.Entry) {
+	l.Debug("Start app")
+	jdss, _ := pluginserver.GetPluginServer(cfg, l, &netType, &address, startController, startNode, startIdentity)
 
 	jdss.Run()
 }
