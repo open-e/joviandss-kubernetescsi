@@ -106,6 +106,23 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-snapshot-controller-cluster-role-binding
+  namespace: joviandss-csi
+subjects:
+  - kind: ServiceAccount
+    name: joviandss-csi-controller-service-account
+    namespace: joviandss-csi
+roleRef:
+  kind: ClusterRole
+  name: snapshot-controller-runner
+    #name: joviandss-csi-controller-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
