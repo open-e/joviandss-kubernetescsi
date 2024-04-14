@@ -1,11 +1,10 @@
-
 apiVersion: v1
 kind: Pod
 metadata:
-  name: nginx
+  name: pv-test-pvc-nginx
 spec:
   containers:
-    - image: nginx
+    - image: nginxinc/nginx-unprivileged
       imagePullPolicy: IfNotPresent
       name: nginx
       ports:
@@ -25,6 +24,5 @@ spec:
   volumes:
     - name: persistent-volume
       persistentVolumeClaim:
-        claimName: joviandss-csi-driver-pvc-dynamic
+        claimName: pv-test-pvc 
         readOnly: false
-

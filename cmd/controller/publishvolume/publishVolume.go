@@ -13,7 +13,7 @@ import (
 
 	csi_common "joviandss-kubernetescsi/pkg/common"
 	csi_controller "joviandss-kubernetescsi/pkg/controller"
-	
+
 	cli_common "joviandss-kubernetescsi/pkg/common"
 
 	"joviandss-kubernetescsi/pkg/common"
@@ -29,7 +29,6 @@ var (
 	//volumeSizeLimit string
 )
 
-
 func publishVolume(cmd *cobra.Command, args []string) {
 	logrus.Debug("publish volume")
 
@@ -37,7 +36,7 @@ func publishVolume(cmd *cobra.Command, args []string) {
 
 	var cp csi_controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg) ; err != nil {
+	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -93,9 +92,9 @@ var PublishVolumeCmd = &cobra.Command{
 
 func init() {
 
-	PublishVolumeCmd.Flags().StringVarP(&volumeId,	"id",		"i",	"", "Id of volume to publish")
-	PublishVolumeCmd.Flags().StringVarP(&nodeId,	"nodeid",	"n",	"", "Id of node that volume will be published on")
-	PublishVolumeCmd.Flags().BoolVarP(&readOnly,	"readonly",	"r",	false, "Should volume be readonly")
+	PublishVolumeCmd.Flags().StringVarP(&volumeId, "id", "i", "", "Id of volume to publish")
+	PublishVolumeCmd.Flags().StringVarP(&nodeId, "nodeid", "n", "", "Id of node that volume will be published on")
+	PublishVolumeCmd.Flags().BoolVarP(&readOnly, "readonly", "r", false, "Should volume be readonly")
 
 	//ControllerCmd.AddCommand(publishVolumeCmd)
 

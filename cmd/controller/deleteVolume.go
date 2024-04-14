@@ -1,6 +1,5 @@
 /*
 Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
 */
 package controller
 
@@ -8,9 +7,9 @@ import (
 	"context"
 	"fmt"
 
+	cli_common "joviandss-kubernetescsi/pkg/common"
 	csi_common "joviandss-kubernetescsi/pkg/common"
 	csi_controller "joviandss-kubernetescsi/pkg/controller"
-	cli_common "joviandss-kubernetescsi/pkg/common"
 
 	// csi_rest "joviandss-kubernetescsi/pkg/rest"
 
@@ -25,14 +24,12 @@ import (
 var deleteVolumeCmd = &cobra.Command{
 	Use:   "deleteVolume",
 	Short: "Delete specified volume",
-	Long: ``,
-	Run: deleteVolume,
+	Long:  ``,
+	Run:   deleteVolume,
 	// func(cmd *cobra.Command, args []string) {
 	// 	fmt.Println("deleteVolume called")
 	// },
 }
-
-
 
 func deleteVolume(cmd *cobra.Command, args []string) {
 
@@ -43,8 +40,7 @@ func deleteVolume(cmd *cobra.Command, args []string) {
 
 	var cp csi_controller.ControllerPlugin
 
-
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg) ; err != nil {
+	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -66,7 +62,7 @@ func deleteVolume(cmd *cobra.Command, args []string) {
 func init() {
 	deleteVolumeCmd.Flags().StringVarP(&volumeId, "name", "n", "", "Name of volume to delete")
 
-	if err:= deleteVolumeCmd.MarkFlagRequired("name"); err != nil {
+	if err := deleteVolumeCmd.MarkFlagRequired("name"); err != nil {
 		fmt.Println(err)
 	}
 

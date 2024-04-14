@@ -1,0 +1,75 @@
+#apiVersion: v1
+#kind: ServiceAccount
+#metadata:
+#  name: csi-snapshotter
+
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-controller-snapshoter-role
+rules:
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  # Secret permission is optional.
+  # Enable it if your driver needs secret.
+  # For example, `csi.storage.k8s.io/snapshotter-secret-name` is set in VolumeSnapshotClass.
+  # See https://kubernetes-csi.github.io/docs/secrets-and-credentials.html for more details.
+  #  - apiGroups: [""]
+  #    resources: ["secrets"]
+  #    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents/status"]
+    verbs: ["update", "patch"]
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-controller-snapshotter-role-binding
+subjects:
+  - kind: ServiceAccount
+    name: joviandss-csi-controller-service-account
+    namespace: joviandss-csi
+roleRef:
+  kind: ClusterRole
+  # change the name also here if the ClusterRole gets renamed
+  name: joviandss-csi-controller-snapshoter-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-controller-snapshoter-leaderelection-role
+  namespace: joviandss-csi
+    #namespace: default # TODO: replace with the namespace you want for your sidecar
+    #name: external-snapshotter-leaderelection
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["get", "watch", "list", "delete", "update", "create"]
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-controller-snapshoter-leaderelection-role
+    #name: external-snapshotter-leaderelection
+  namespace: joviandss-csi
+subjects:
+  - kind: ServiceAccount
+    name: csi-snapshotter
+    namespace: joviandss-csi
+roleRef:
+  kind: Role
+  name: joviandss-csi-controller-snapshoter-leaderelection-role
+    #name: external-snapshotter-leaderelection
+  apiGroup: rbac.authorization.k8s.io

@@ -12,6 +12,8 @@ import (
 	//"joviandss-kubernetescsi/pkg/joviandss"
 )
 
+var Version string
+
 func init() {
 	flag.Set("logtostderr", "true")
 }
@@ -23,20 +25,29 @@ const (
 )
 
 var (
-	driverName	*string
-	address		string
-	netType		string
-	configPath	string
+	driverName      *string
+	address         string
+	netType         string
+	configPath      string
+	logLevel        string
+	logPath         string
 	startController bool
-	startNode	bool
-	startIdentity	bool
+	startNode       bool
+	startIdentity   bool
 )
 
 func main() {
 
 	cfg := handleArgs()
+
 	// TODO: check if logging parametrs a properly parse
-	l := initLogging(cfg.LLevel, cfg.LDest)
+	var l *logrus.Entry
+	if cfg != nil {
+		l = initLogging(cfg.LLevel, cfg.LDest)
+	} else {
+		l = initLogging(logLevel, logPath)
+	}
+	l.Debugf("Version %s", common.Version)
 
 	routine(cfg, l)
 	os.Exit(0)
@@ -86,7 +97,10 @@ func handleArgs() *common.JovianDSSCfg {
 	flag.BoolVar(&startNode, "node", false, "Start node plugin")
 	flag.BoolVar(&startIdentity, "identity", false, "Start identity plugin")
 
+	flag.StringVar(&common.NodeID, "nodeid", "", "Id of the kubernetes node")
 	flag.StringVar(&configPath, "config", "", "Path to configuration file")
+	flag.StringVar(&logLevel, "loglevel", "WARNING", "Log Level, default is Warning")
+	flag.StringVar(&logPath, "logpath", "", "Log file location")
 	flag.Parse()
 
 	if len(configPath) > 0 {

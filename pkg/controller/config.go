@@ -5,19 +5,19 @@ import (
 	"os"
 
 	"gopkg.in/yaml.v2"
-	
+
 	"joviandss-kubernetescsi/pkg/rest"
 )
 
-//ControllerCfg stores configaration properties of controller instance
+// ControllerCfg stores configaration properties of controller instance
 type ControllerCfg struct {
-	RestEndpoint     rest.StorageCfg
-	Vnamelen         int
-	Vpasslen         int
-	Iqn              string
-	
-	LLevel		 string `yaml:"llevel"`
-	LPath		 string `yaml:"lpath"`
+	RestEndpoint rest.StorageCfg
+	Vnamelen     int
+	Vpasslen     int
+	Iqn          string
+
+	LLevel string `yaml:"llevel"`
+	LPath  string `yaml:"lpath"`
 }
 
 func GetConfing(path string, cfg *ControllerCfg) error {

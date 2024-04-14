@@ -33,4 +33,3 @@ func TargetIQN(prefix string, ld LunDesc) (*string, jrest.RestError) {
 
 	return &iqn, nil
 }
-

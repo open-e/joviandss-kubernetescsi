@@ -1,0 +1,8 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: joviandss-sc
+provisioner: iscsi.csi.joviandss.open-e.com
+parameters:
+reclaimPolicy: Delete
+volumeBindingMode: Immediate

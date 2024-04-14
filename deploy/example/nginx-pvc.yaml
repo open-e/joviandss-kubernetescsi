@@ -1,11 +1,43 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: joviandss-csi-driver-pvc-dynamic
+  name: joviandss-pvc-rw-many
 spec:
   accessModes:
-    - ReadWriteOnce
+    - ReadWriteMany
   resources:
     requests:
       storage: 1Gi
-  storageClassName: joviandss-persistent-volume-sc
+  storageClassName: joviandss-sc
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nginx-1
+spec:
+  containers:
+    - image: nginxinc/nginx-unprivileged
+      imagePullPolicy: IfNotPresent
+      name: nginx
+      ports:
+        - containerPort: 80
+          protocol: TCP
+      volumeMounts:
+        - mountPath: /usr/share/nginx/html
+          name: persistent-volume
+      securityContext:
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities:
+          drop:
+            - ALL
+              #runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+  volumes:
+    - name: persistent-volume
+      persistentVolumeClaim:
+        claimName: joviandss-pvc-rw-many
+        readOnly: false

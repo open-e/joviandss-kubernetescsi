@@ -23,22 +23,25 @@ var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
 // NodePlugin responsible for attaching and detaching volumes to host
 type NodePlugin struct {
 	//cfg *NodeCfg
-	l   *log.Entry
+	l *log.Entry
 }
 
-//GetNodePlugin inits NodePlugin
-func GetNodePlugin(l *log.Entry) (np *NodePlugin, err error) {
-	
+// GetNodePlugin inits NodePlugin
+func GetNodePlugin(l *log.Entry) (*NodePlugin, error) {
+	//TODO: rework getting node ID
 	nid, err := GetNodeId(l)
-	l = log.WithFields(log.Fields{
-		"nodeid":   nid,
-		"section": "node",
-		})
-	np = &NodePlugin{
-		l:   l,
+	if err != nil {
+		return nil, err
 	}
-	log.Debug("Init node plugin")
-	return np, nil
+	var np NodePlugin
+
+	np.l = l.WithFields(log.Fields{
+		"nodeid":  nid,
+		"section": "node",
+	})
+
+	l.Debug("Init node plugin")
+	return &np, nil
 }
 
 // NodeExpandVolume responsible for update of file system on volume
@@ -55,7 +58,7 @@ func (np *NodePlugin) NodeGetInfo(
 
 	l := np.l.WithFields(log.Fields{
 		"request": "NoneGetInfo",
-		"func": "NodeGetInfo",
+		"func":    "NodeGetInfo",
 		"section": "node",
 	})
 
@@ -74,18 +77,21 @@ func (np *NodePlugin) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest,
 ) (*csi.NodeStageVolumeResponse, error) {
-	
+
 	l := np.l.WithFields(log.Fields{
 		"request": "NoneStageVolume",
-		"func": "NodeStageVolume",
+		"func":    "NodeStageVolume",
 		"section": "node",
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
 	l.Debug("Node Stage Volume")
+	l.Debugf("Stage Volume request %+v", *req)
 	var msg string
 
-	t, err := GetTargetFromReq(l, *req)
+	t, err := GetTargetFromReq(ctx, *req)
+	l.Debugf("Target %+v", t)
+
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +136,7 @@ func (np *NodePlugin) NodeUnstageVolume(
 	var msg string
 	l := np.l.WithFields(log.Fields{
 		"request": "NoneUnstageVolume",
-		"func": "NodeUnstageVolume",
+		"func":    "NodeUnstageVolume",
 		"section": "node",
 	})
 	ctx = jcom.WithLogger(ctx, l)
@@ -177,12 +183,22 @@ func (np *NodePlugin) NodePublishVolume(
 
 	// TODO: ValidateCapability()
 
-	np.l.Tracef("Node Publish Volume %s", req.GetVolumeId())
+	l := np.l.WithFields(log.Fields{
+		"request": "NodePublishVolume",
+		"func":    "NodePublishVolume",
+		"section": "node",
+	})
+
+	ctx = jcom.WithLogger(ctx, l)
+
+	l.Debugf("Node Publish Volume %s", req.GetVolumeId())
+
+	l.Debugf("Publish Volume request %+v", *req)
 
 	block := false
 	var msg string
 
-	t, err := GetTargetFromReq(np.l, *req)
+	t, err := GetTargetFromReq(ctx, *req)
 	if err != nil {
 		return nil, err
 	}
@@ -216,6 +232,14 @@ func (np *NodePlugin) NodeUnpublishVolume(
 
 	ctx = jcom.WithLogger(ctx, l)
 
+	l := np.l.WithFields(log.Fields{
+		"request": "NodeUnpublishVolume",
+		"func":    "NodeUnpublishVolume",
+		"section": "node",
+	})
+
+	ctx = jcom.WithLogger(ctx, l)
+
 	l.Debugf("Node Unpublish Volume %s", req.GetVolumeId())
 
 	block := false
@@ -236,10 +260,10 @@ func (np *NodePlugin) NodeUnpublishVolume(
 
 	if !block {
 		err = t.UnMountVolume(ctx)
-                if err != nil {
-		    msg = fmt.Sprintf("Unable to clean up on volume unmounting: %s", err.Error())
-		    return nil, status.Error(codes.Aborted, msg)
-                }
+		if err != nil {
+			msg = fmt.Sprintf("Unable to clean up on volume unmounting: %s", err.Error())
+			return nil, status.Error(codes.Aborted, msg)
+		}
 	} else {
 		return nil, status.Error(codes.Unimplemented, "Block detaching is not supported")
 	}

@@ -11,32 +11,31 @@ import (
 	"github.com/sirupsen/logrus"
 	//humanize "github.com/dustin/go-humanize"
 
+	cli_common "joviandss-kubernetescsi/pkg/common"
 	csi_common "joviandss-kubernetescsi/pkg/common"
 	csi_controller "joviandss-kubernetescsi/pkg/controller"
-	cli_common "joviandss-kubernetescsi/pkg/common"
-	
+
 	"joviandss-kubernetescsi/pkg/common"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	//volumeName string
-	//volumeSize string
-	
-	//volumeSizeRequired string
-	//volumeSizeLimit string
+//volumeName string
+//volumeSize string
+
+//volumeSizeRequired string
+//volumeSizeLimit string
 )
-	
 
 func createVolume(cmd *cobra.Command, args []string) {
 	logrus.Debug("create volume")
-	
+
 	var cfg csi_common.JovianDSSCfg
 
 	var cp csi_controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg) ; err != nil {
+	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -46,9 +45,8 @@ func createVolume(cmd *cobra.Command, args []string) {
 
 	var req csi.CreateVolumeRequest
 	var ctx context.Context = common.GetContext("create_volume")
-	
-	var bytes uint64 = 0
 
+	var bytes uint64 = 0
 
 	var cr csi.CapacityRange
 	cr.RequiredBytes = int64(bytes)
@@ -65,32 +63,32 @@ func createVolume(cmd *cobra.Command, args []string) {
 	}
 
 	req.VolumeCapabilities = csi_controller.GetVolumeCapability(supportedVolumeCapabilities)
-        
+
 	if len(sourceSnapshotName) > 0 {
 		req.VolumeContentSource = &csi.VolumeContentSource{
-        	    Type: &csi.VolumeContentSource_Snapshot{
-        	        Snapshot: &csi.VolumeContentSource_SnapshotSource{
-        	            SnapshotId: sourceSnapshotName,
-        	        },
-        	    },
-        	}
+			Type: &csi.VolumeContentSource_Snapshot{
+				Snapshot: &csi.VolumeContentSource_SnapshotSource{
+					SnapshotId: sourceSnapshotName,
+				},
+			},
+		}
 	}
 
-	if len( sourceVolumeName) > 0 {
+	if len(sourceVolumeName) > 0 {
 		req.VolumeContentSource = &csi.VolumeContentSource{
-        	    Type: &csi.VolumeContentSource_Volume{
-        	        Volume: &csi.VolumeContentSource_VolumeSource{
-        	            VolumeId: sourceVolumeName,
-        	        },
-        	    },
-        	}
+			Type: &csi.VolumeContentSource_Volume{
+				Volume: &csi.VolumeContentSource_VolumeSource{
+					VolumeId: sourceVolumeName,
+				},
+			},
+		}
 	}
 
 	if volumeSizeLimit != 0 {
 		req.CapacityRange = &csi.CapacityRange{
 			LimitBytes: volumeSizeLimit,
 		}
-		
+
 	}
 
 	if volumeSizeRequired != 0 {
@@ -154,17 +152,17 @@ to quickly create a Cobra application.`,
 
 func init() {
 
-	createVolumeCmd.Flags().StringVarP(&volumeName,"name",	"n",		"", "Name of volume to create")
+	createVolumeCmd.Flags().StringVarP(&volumeName, "name", "n", "", "Name of volume to create")
 	//createVolumeCmd.Flags().StringVarP(&volumeSize,"size",	"s",		"", "Size of volume to create")
-	createVolumeCmd.Flags().Int64VarP(&volumeSizeRequired,	"srq",		"", 0, "Required size of volume to create")
-	createVolumeCmd.Flags().Int64VarP(&volumeSizeLimit,	"slm",		"", 0, "Limit size of volume to create")
-	createVolumeCmd.Flags().StringVarP(&sourceVolumeName,	"volume",	"", "", "Name of source volume to use")
-	createVolumeCmd.Flags().StringVarP(&sourceSnapshotName,	"snapshot",	"", "", "Name of source snapshot to use")
+	createVolumeCmd.Flags().Int64VarP(&volumeSizeRequired, "srq", "", 0, "Required size of volume to create")
+	createVolumeCmd.Flags().Int64VarP(&volumeSizeLimit, "slm", "", 0, "Limit size of volume to create")
+	createVolumeCmd.Flags().StringVarP(&sourceVolumeName, "volume", "", "", "Name of source volume to use")
+	createVolumeCmd.Flags().StringVarP(&sourceSnapshotName, "snapshot", "", "", "Name of source snapshot to use")
 
-	if err:= createVolumeCmd.MarkFlagRequired("name"); err != nil {
+	if err := createVolumeCmd.MarkFlagRequired("name"); err != nil {
 		fmt.Println(err)
 	}
-	
+
 	//if err:= createVolumeCmd.MarkFlagRequired("size"); err != nil {
 	//	fmt.Println(err)
 	//}

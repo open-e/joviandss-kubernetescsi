@@ -1,6 +1,5 @@
 /*
 Copyright © 2023 NAME HERE <EMAIL ADDRESS>
-
 */
 package node
 
@@ -10,16 +9,16 @@ import (
 
 	"github.com/spf13/cobra"
 	//cli_common "joviandss-kubernetescsi/pkg/common"
-	
-	cliGetInfo "joviandss-kubernetescsi/cmd/node/getinfo"
 
+	cliGetInfo "joviandss-kubernetescsi/cmd/node/getinfo"
+	cliStageVolume "joviandss-kubernetescsi/cmd/node/stagevolume"
 )
 
 // nodeCmd represents the node command
 var NodeCmd = &cobra.Command{
 	Use:   "node",
 	Short: "Comand line interface to node commands",
-	Long: `That is general sub command that stores all node related commands.`,
+	Long:  `That is general sub command that stores all node related commands.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("node called")
 	},
@@ -27,12 +26,11 @@ var NodeCmd = &cobra.Command{
 
 func addSubCmds() {
 	NodeCmd.AddCommand(cliGetInfo.NodeGetInfoCmd)
-	//NodeCmd.AddCommand(cliPublishVolume.UnpublishVolumeCmd)
+	NodeCmd.AddCommand(cliStageVolume.NodeStageVolumeCmd)
 }
 
-
 func init() {
-	
+
 	addSubCmds()
 	//rootCmd.AddCommand(nodeCmd)
 

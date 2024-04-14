@@ -1,17 +1,37 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: joviandss-sc
+provisioner: iscsi.csi.joviandss.open-e.com
+parameters:
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+
+---
+
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: joviandss-snapshot-sc
+driver: iscsi.csi.joviandss.open-e.com
+deletionPolicy: Delete
+
+---
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
-  name: com.open-e.joviandss.csi
+  name: iscsi.csi.joviandss.open-e.com
 spec:
   attachRequired: true
   podInfoOnMount: true
----
 
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: joviandss-csi-controller-service-account
-  namespace: default
+  namespace: joviandss-csi
 
 ---
 
@@ -25,7 +45,7 @@ rules:
     verbs: ['get', 'list']
   - apiGroups: ['']
     resources: ['persistentvolumes']
-    verbs: ['get', 'list', 'watch', 'create', 'update', 'delete']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'delete', "patch"]
   - apiGroups: ['']
     resources: ['persistentvolumeclaims']
     verbs: ['get', 'list', 'watch', 'update']
@@ -34,14 +54,13 @@ rules:
     verbs: ['get', 'list', 'watch']
   - apiGroups: ['']
     resources: ['events']
-    verbs: ['list', 'watch', 'create', 'update', 'patch']
+    verbs: ['get', 'list', 'watch', 'create', 'update', 'patch']
   - apiGroups: ['snapshot.storage.k8s.io']
     resources: ['volumesnapshots']
     verbs: ['get', 'list']
   - apiGroups: ['snapshot.storage.k8s.io']
     resources: ['volumesnapshotcontents']
     verbs: ['get', 'list']
-
   - apiGroups: ['']
     resources: ['nodes']
     verbs: ['get', 'list', 'watch']
@@ -49,9 +68,11 @@ rules:
     resources: ['csinodeinfos']
     verbs: ['get', 'list', 'watch']
   - apiGroups: ['storage.k8s.io']
-    resources: ['volumeattachments']
-    verbs: ['get', 'list', 'watch', 'update']
-
+    resources: ["csinodes", "volumeattachments", "volumeattachments/status" ]
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
   - apiGroups: ['snapshot.storage.k8s.io']
     resources: ['volumesnapshotclasses']
     verbs: ['get', 'list', 'watch']
@@ -64,6 +85,9 @@ rules:
   - apiGroups: ['apiextensions.k8s.io']
     resources: ['customresourcedefinitions']
     verbs: ['create', 'list', 'watch', 'delete']
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "update"]
 
 ---
 
@@ -71,13 +95,31 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: joviandss-csi-controller-cluster-role-binding
+  namespace: joviandss-csi
 subjects:
   - kind: ServiceAccount
     name: joviandss-csi-controller-service-account
-    namespace: default
+    namespace: joviandss-csi
 roleRef:
   kind: ClusterRole
   name: joviandss-csi-controller-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-snapshot-controller-cluster-role-binding
+  namespace: joviandss-csi
+subjects:
+  - kind: ServiceAccount
+    name: joviandss-csi-controller-service-account
+    namespace: joviandss-csi
+roleRef:
+  kind: ClusterRole
+  name: snapshot-controller-runner
+    #name: joviandss-csi-controller-cluster-role
   apiGroup: rbac.authorization.k8s.io
 
 ---
@@ -85,6 +127,7 @@ kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   name: joviandss-csi-controller
+  namespace: joviandss-csi
 spec:
   serviceName: "joviandss-csi-controller"
   replicas: 1
@@ -100,18 +143,31 @@ spec:
       hostNetwork: true
       containers:
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.0.2
+          image: quay.io/k8scsi/csi-provisioner:v2.1.2
           imagePullPolicy: IfNotPresent
           args:
-            - --connection-timeout=25s
-            - --provisioner=com.open-e.joviandss.csi
             - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
             - --volume-name-prefix=pvc-ns
           volumeMounts:
             - name: socket-dir
               mountPath: /var/lib/csi/sockets/pluginproxy
+
+        - name: csi-snapshotter
+          image: registry.k8s.io/sig-storage/csi-snapshotter:v6.2.3
+          args:
+            - --v=5
+            - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
+            - "--leader-election=false"
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy
+
         - name: csi-attacher
-          image: quay.io/k8scsi/csi-attacher:v1.2.1
+          image: quay.io/k8scsi/csi-attacher:v3.1.0
           imagePullPolicy: IfNotPresent
           args:
             - --v=3
@@ -121,15 +177,20 @@ spec:
               mountPath: /var/lib/csi/sockets/pluginproxy
 
         - name: csi-controller
-          image: hub.docker.com/opene/joviandss-csi:latest
+          image: opene/joviandss-csi:latest
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
           args:
             - --csi-address=/csi/csi.sock
             - --soc-type=unix
             - --config=$(JOVIANDSS_CONFIG)
+            - --controller
+            - --identity
           env:
             - name: JOVIANDSS_CONFIG
-              value: /config/controller-cfg.yaml
-          imagePullPolicy: IfNotPresent
+              value: /config/cfg.yaml
+          imagePullPolicy: Always
           securityContext:
             privileged: true
           volumeMounts:
@@ -144,7 +205,7 @@ spec:
             secretName: jdss-controller-cfg 
         - name: socket-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/com.open-e.joviandss.csi
+            path: /var/lib/kubelet/plugins/com.open-e.joviandss.csi.cntr
             type: DirectoryOrCreate
         - name: mountpoint-dir
           hostPath:

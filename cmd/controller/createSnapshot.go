@@ -12,9 +12,9 @@ import (
 
 	csi_common "joviandss-kubernetescsi/pkg/common"
 	csi_controller "joviandss-kubernetescsi/pkg/controller"
-	
+
 	cli_common "joviandss-kubernetescsi/pkg/common"
-	
+
 	"joviandss-kubernetescsi/pkg/common"
 
 	"github.com/spf13/cobra"
@@ -26,20 +26,20 @@ var (
 
 func createSnaposhot(cmd *cobra.Command, args []string) {
 	logrus.Debug("create snapshot")
-	
-	if err:= createVolumeCmd.MarkFlagRequired("sv"); err != nil {
+
+	if err := createVolumeCmd.MarkFlagRequired("sv"); err != nil {
 		fmt.Println(err)
 	}
-	
-	if err:= createVolumeCmd.MarkFlagRequired("csn"); err != nil {
+
+	if err := createVolumeCmd.MarkFlagRequired("csn"); err != nil {
 		fmt.Println(err)
 	}
-	
+
 	var cfg csi_common.JovianDSSCfg
 
 	var cp csi_controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg) ; err != nil {
+	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -106,11 +106,9 @@ Regular CSI create snapshot request.`,
 
 func init() {
 
-	createSnapshotCmd.Flags().StringVarP(&snapshotName,"csn",	"", "", "snapshot name")
-	createSnapshotCmd.Flags().StringVarP(&volumeId,"sv",	"", "", "volume id")
+	createSnapshotCmd.Flags().StringVarP(&snapshotName, "csn", "", "", "snapshot name")
+	createSnapshotCmd.Flags().StringVarP(&volumeId, "sv", "", "", "volume id")
 
-
-	
 	//if err:= createVolumeCmd.MarkFlagRequired("size"); err != nil {
 	//	fmt.Println(err)
 	//}

@@ -25,18 +25,17 @@ import (
 const CodeOK = 200
 const CodeCreated = 201
 const CodeAccepted = 202
-const CodeNoContent =204
-
+const CodeNoContent = 204
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Error message
 
 // ErrorT error message returned by server
 type ErrorT struct {
-	Class   *string	`json:"class,omitempty"`
-	Errno   *int	`json:"errno,omitempty"`
-	Message *string	`json:"message,omitempty"`
-	Url     *string	`json:"url,omitempty"`
+	Class   *string `json:"class,omitempty"`
+	Errno   *int    `json:"errno,omitempty"`
+	Message *string `json:"message,omitempty"`
+	Url     *string `json:"url,omitempty"`
 }
 
 func (err *ErrorT) String() string {
@@ -192,8 +191,8 @@ const GetPoolsRCode = 200
 
 // GetVolumeData data
 type GetVolumeData struct {
-	Data  *ResourceVolume	`json:"data,omitempty"`
-	Error *ErrorT			`json:"error,ommitempty"`
+	Data  *ResourceVolume `json:"data,omitempty"`
+	Error *ErrorT         `json:"error,ommitempty"`
 }
 
 // GetVolumeRCode success response code
@@ -201,8 +200,8 @@ const GetVolumeRCode = 200
 
 // GetVolumesData data structure
 type GetVolumesData struct {
-	Data  *[]ResourceVolume	`json:"data"`
-	Error ErrorT			`json:"error"`
+	Data  *[]ResourceVolume `json:"data"`
+	Error ErrorT            `json:"error"`
 }
 
 // GetVolumesRCode success response code
@@ -314,16 +313,15 @@ type SnapshotProperties struct {
 	Creation string
 }
 
-
 // AllSnapshots structure
 type GetVolumeSnapshotsData struct {
-	Data  ResultEntries		`jsom:"data"`
-	Error ErrorT			`json:"error"`
+	Data  ResultEntries `jsom:"data"`
+	Error ErrorT        `json:"error"`
 }
 
 type GetAllSnapshotsData struct {
-	Data  ResultEntries		`jsom:"data"`
-	Error ErrorT			`json:"error"`
+	Data  ResultEntries `jsom:"data"`
+	Error ErrorT        `json:"error"`
 }
 
 // AllSnapshots structure
@@ -333,7 +331,6 @@ type GetAllSnapshotsData struct {
 // }
 
 // GetAllSnapshotsData data
-
 
 // GetAllSnapshotsRCode success status code
 const GetAllSnapshotsRCode = 200

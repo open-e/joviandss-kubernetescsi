@@ -1,0 +1,8 @@
+machine:
+    install:
+        extraKernelArgs:
+            - iscsi_tcp=1
+    kernel:
+        # Kernel modules to load.
+        modules:
+            - name: iscsi_tcp # Module name.

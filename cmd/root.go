@@ -59,7 +59,7 @@ func init() {
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	rootCmd.PersistentFlags().StringVarP(&jcom.LogLevel, "loglevel", "l", "INFO", "Level of logging")
-	rootCmd.PersistentFlags().StringVarP(&jcom.LogPath, "logpath", "p", "/tmp/joviandss-csi", "File to store log information")
+	rootCmd.PersistentFlags().StringVar(&jcom.LogPath, "logpath", "", "File to store log information")
 
 	addSubCmds()
 }

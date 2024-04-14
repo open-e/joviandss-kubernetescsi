@@ -43,17 +43,16 @@ type PluginServer struct {
 	server   *grpc.Server
 	listener *net.Listener
 	l        *logrus.Entry
-
 }
 
 func GetPluginServer(cfg *common.JovianDSSCfg, l *logrus.Entry, netType *string, addr *string, cntrSrv bool, nodeSrv bool, identitySrv bool) (s *PluginServer, err error) {
 	s = &PluginServer{}
 
 	l = l.WithFields(logrus.Fields{
-		"func": "GetPluginServer",
-		"section":  "PluginServer",
+		"func":    "GetPluginServer",
+		"section": "PluginServer",
 	})
-
+	s.l = l
 	if *netType == "unix" {
 		if err := os.Remove(*addr); err != nil && !os.IsNotExist(err) {
 			s.l.Warnf("Unable to clear unix socket %s. Error: %s", *addr, err)
@@ -83,12 +82,12 @@ func GetPluginServer(cfg *common.JovianDSSCfg, l *logrus.Entry, netType *string,
 		var cp jcntr.ControllerPlugin
 
 		if err = jcntr.SetupControllerPlugin(&cp, cfg); err == nil {
-			s.l.Info("Register Controller Plugin")
+			l.Info("Register Controller Plugin")
 
 			csi.RegisterControllerServer(s.server, &cp)
 
 		} else {
-			s.l.Warnf("Unable to create Controller Plugin: %s", err)
+			l.Warnf("Unable to create Controller Plugin: %s", err)
 		}
 
 	}
@@ -112,7 +111,9 @@ func GetPluginServer(cfg *common.JovianDSSCfg, l *logrus.Entry, netType *string,
 func (s *PluginServer) Run() (err error) {
 	err = s.server.Serve(*s.listener)
 	if err != nil {
-		s.l.Warnf("Unable to start listening on socket: %s", err)
+		s.l.WithFields(logrus.Fields{
+			"func": "Run",
+		}).Warnf("Unable to start listening on socket: %s", err)
 		return err
 	}
 	return nil
@@ -126,7 +127,8 @@ func (s *PluginServer) grpcErrorHandler(
 ) (interface{}, error) {
 	resp, err := handler(ctx, req)
 	if err != nil {
-		s.l.WithFields(logrus.Fields{"grpc": "Fail"}).Warn(err)
+		s.l.WithFields(logrus.Fields{
+			"func": "grpcErrorhandler"}).Warn(err.Error())
 	}
 	return resp, err
 }

@@ -1,6 +1,27 @@
+/*
+Copyright © 2023 NAME HERE <EMAIL ADDRESS>
+*/
+/*
+Copyright (c) 2024 Open-E, Inc.
+All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License. You may obtain
+a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations
+under the License.
+*/
+
 package node
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"context"
@@ -23,7 +44,7 @@ import (
 )
 
 const (
-	deviceIPPath = "/dev/disk/by-path/ip"
+	deviceIPPath = "/host/dev/disk/by-path/ip"
 )
 
 // GetTarget constructs basic Target structure
@@ -41,10 +62,12 @@ func GetTarget(l *log.Entry, tp string) (t *Target, err error) {
 }
 
 // GetTargetFromReq constructs Target structure from request data
-func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
+func GetTargetFromReq(ctx context.Context, r interface{}) (t *Target, err error) {
 
+	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func":  "GetTargetFromReq",
+		"func":    "GetTargetFromReq",
+		"section": "target",
 	})
 
 	var pubContext map[string]string
@@ -57,10 +80,10 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 	sTPath := ""
 	tPath := ""
 
-	l.Trace("Processing request")
+	l.Debug("Processing request")
 	if d, ok := r.(csi.NodeStageVolumeRequest); ok {
 
-		l.Trace("Processing Stage request")
+		l.Debug("Processing Stage request")
 		pubContext = d.GetPublishContext()
 		sTPath = d.GetStagingTargetPath()
 		if len(sTPath) == 0 {
@@ -80,12 +103,11 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 			fsType = mount.GetFsType()
 			mountFlags = mount.GetMountFlags()
 		}
-
 	}
 
 	if d, ok := r.(csi.NodePublishVolumeRequest); ok {
 
-		l.Trace("Processing Publish request")
+		l.Debug("Processing Publish request")
 
 		pubContext = d.GetPublishContext()
 		tPath = d.GetTargetPath()
@@ -110,13 +132,16 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 		}
 	}
 
-	var p string
-	if len(pubContext["addr"]) > 0 {
-		l.Debugf("addr %s", pubContext)
-		p = pubContext["addr"]
+	var addrs []string
+	if len(pubContext["addrs"]) > 0 {
+		l.Debugf("addrs %s", pubContext["addrs"])
+		addrs = strings.Split(pubContext["addrs"], ",")
+		if len(addrs) == 0 {
+			return nil, status.Errorf(codes.InvalidArgument, "Addrs are empty. No addresses provided.")
+		}
 	} else {
 		l.Errorf("No JovianDSS address provideed in context %+v", pubContext)
-		return nil, status.Errorf(codes.InvalidArgument, "Unable to identify storage address from request")
+		return nil, status.Errorf(codes.InvalidArgument, "Request context does not contain joviandss addresses")
 	}
 
 	var pp string
@@ -134,6 +159,13 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 		return nil, status.Error(codes.InvalidArgument, msg)
 	}
 
+	targetName := pubContext["target"]
+	if len(targetName) == 0 {
+		msg = fmt.Sprintf("Context do not contain target value")
+		l.Error(msg)
+		return nil, status.Error(codes.InvalidArgument, msg)
+	}
+
 	// coUser := ctx["name"]
 	// if len(coUser) == 0 {
 	// 	msg = fmt.Sprintf("Request do not contain CHAP name")
@@ -147,28 +179,26 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 	// 	l.Warn(msg)
 	// 	return nil, status.Error(codes.InvalidArgument, msg)
 	// }
-	
+
 	lun := pubContext["lun"]
 	if len(lun) == 0 {
 		l.Debug("Using default lun 0")
 		lun = "0"
 	}
 
-	tname := iqn
+	fullPortal := addrs[0] + ":" + pp
 
-	fullPortal := p + ":" + pp
-
-	dPath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", tname, "lun", lun}, "-")
+	dPath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", iqn, "lun", lun}, "-")
 
 	// TODO: Provide default file system selection
 	t = &Target{
 		STPath:     sTPath,
 		TPath:      tPath,
 		DPath:      dPath,
-		Portal:     p,
+		Portal:     addrs[0],
 		PortalPort: pp,
 		Iqn:        iqn,
-		Tname:      vID,
+		Tname:      targetName,
 		Lun:        lun,
 		//CoUser:     coUser, // Chap outgoing password
 		//CoPass:     coPass, // Chap outgoing Password
@@ -177,6 +207,7 @@ func GetTargetFromReq(l *log.Entry, r interface{}) (t *Target, err error) {
 		MountFlags: make([]string, 0),
 	}
 
+	l.Debugf("Target %+v", *t)
 	if len(fsType) > 0 {
 		t.FsType = fsType
 	}
@@ -202,7 +233,7 @@ func GetTargetFromPath(l *log.Entry, path string) (t *Target, err error) {
 		return nil, status.Error(codes.Internal, msg)
 	}
 	t.l = log.WithFields(log.Fields{
-		"func": "GetTargetFromPath",
+		"func":    "GetTargetFromPath",
 		"section": "node",
 	})
 	return t, nil
@@ -289,18 +320,18 @@ func (t *Target) DeleteSerialization() (err error) {
 
 // SetChapCred puts chap credantial to local db
 // func (t *Target) SetChapCred() error {
-// 
+//
 // 	tname := t.Iqn + ":" + t.Tname
-// 
+//
 // 	t.l.Tracef("Target: %s", tname)
-// 
+//
 // 	out, err := exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "update", "-n",
 // 		"node.session.auth.authmethod", "-v", "CHAP").Output()
 // 	if err != nil {
 // 		t.l.Errorf("Could not update authentication method for %s error: %s", tname, string(out))
 // 		return err
 // 	}
-// 
+//
 // 	out, err = exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "update", "-n",
 // 		"node.session.auth.username", "-v", t.CoUser).Output()
 // 	if err != nil {
@@ -311,24 +342,24 @@ func (t *Target) DeleteSerialization() (err error) {
 // 	if err != nil {
 // 		return fmt.Errorf("iscsi: failed to update node session password error: %v", string(out))
 // 	}
-// 
+//
 // 	return nil
 // }
 
 // ClearChapCred sets chap credential to empty values
 // func (t *Target) ClearChapCred() error {
-// 
+//
 // 	tname := t.Iqn + ":" + t.Tname
-// 
+//
 // 	portal := t.Portal + ":" + t.PortalPort
-// 
+//
 // 	exec.Command("iscsiadm", "-m", "node", "-p", portal,
 // 		"-T", tname, "-o", "update",
 // 		"-n", "node.session.auth.password", "-v", "").Run()
 // 	exec.Command("iscsiadm", "-m", "node", "-p", portal,
 // 		"-T", tname, "-o", "update",
 // 		"-n", "node.session.auth.username", "-v", "").Run()
-// 
+//
 // 	return nil
 // }
 
@@ -344,7 +375,6 @@ func (t *Target) FormatMountVolume(req *csi.NodePublishVolumeRequest) error {
 		if err = os.MkdirAll(t.TPath, 0640); err != nil {
 			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", t.TPath, err.Error())
 			return status.Error(codes.Internal, msg)
-
 		}
 	}
 
@@ -371,6 +401,13 @@ func (t *Target) UnMountVolume(ctx context.Context) error {
 	
 	l = l.WithFields(log.Fields{
 		"func": "UnMountVolume",
+		"section": "node",
+	})
+
+	l := jcom.LFC(ctx)
+
+	l = l.WithFields(log.Fields{
+		"func":    "UnMountVolume",
 		"section": "node",
 	})
 
@@ -423,21 +460,21 @@ func (t *Target) StageVolume(ctx context.Context) error {
 
 	// Scan for targets
 	l := jcom.LFC(ctx)
-	
+
 	l = l.WithFields(log.Fields{
-		"func": "StageVolume",
+		"func":    "StageVolume",
 		"section": "node",
 	})
 
-	tname := t.Iqn + ":" + t.Tname
+	//tname := t.Iqn // + ":" + t.Tname
 
 	fullPortal := t.Portal + ":" + t.PortalPort
 
-	devicePath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", tname, "lun", t.Lun}, "-")
+	devicePath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", t.Iqn, "lun", t.Lun}, "-")
 
-	out, err := exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "new").Output()
+	out, err := exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "-o", "new").Output()
 	if err != nil {
-		msg := fmt.Sprintf("Unable to add targetation %s error: %s", tname, err.Error())
+		msg := fmt.Sprintf("Unable to add targetation %s error: %s", t.Iqn, err.Error())
 		return errors.New(msg)
 	}
 
@@ -450,10 +487,13 @@ func (t *Target) StageVolume(ctx context.Context) error {
 	// }
 
 	//Attach Target
-	out, err = exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "--login").Output()
+	// iscsiadm --mode discovery --op update --type sendtargets --portal targetIP
+	// iscsiadm -m node -p 172.29.0.1 -T someiqn --login
+	out, err = exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "--login").Output()
 	if err != nil {
 		//t.ClearChapCred()
-		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "delete").Run()
+		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "--logout").Run()
+		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "-o", "delete").Run()
 		msg := fmt.Sprintf("iscsi: failed to attach disk: Error: %s (%v)", string(out), err)
 		return status.Errorf(codes.Internal, msg)
 	}
@@ -461,7 +501,7 @@ func (t *Target) StageVolume(ctx context.Context) error {
 	if exist := waitForPathToExist(&devicePath, 10, t.TProtocol); !exist {
 		l.Errorf("Could not attach disk to the path %s: Timeout after 10s", devicePath)
 		//t.ClearChapCred()
-		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", tname, "-o", "delete").Run()
+		exec.Command("iscsiadm", "-m", "node", "-p", t.Portal, "-T", t.Iqn, "-o", "delete").Run()
 		msg := "Could not attach disk: Timeout after 10s"
 		return status.Errorf(codes.Internal, msg)
 	}
@@ -483,12 +523,19 @@ func (t *Target) UnStageVolume(ctx context.Context) error {
 		"section": "node",
 	})
 
-	tname := t.Iqn + ":" + t.Tname
+	l := jcom.LFC(ctx)
+
+	l = l.WithFields(log.Fields{
+		"func":    "StageVolume",
+		"section": "node",
+	})
+
+	//tname := t.Iqn // + ":" + t.Tname
 
 	portal := t.Portal + ":" + t.PortalPort
 
-	if len(tname) == 0 {
-		msg = fmt.Sprintf("Unable to get device target %s", tname)
+	if len(t.Iqn) == 0 {
+		msg = fmt.Sprintf("Unable to get device target %s", t.Iqn)
 		return errors.New(msg)
 	}
 
@@ -498,8 +545,8 @@ func (t *Target) UnStageVolume(ctx context.Context) error {
 	//	return errors.New(msg)
 	//}
 
-	exec.Command("iscsiadm", "-m", "node", "-p", portal, "-T", tname, "--logout").Run()
-	exec.Command("iscsiadm", "-m", "node", "-p", portal, "-T", tname, "-o", "delete").Run()
+	exec.Command("iscsiadm", "-m", "node", "-p", portal, "-T", t.Iqn, "--logout").Run()
+	exec.Command("iscsiadm", "-m", "node", "-p", portal, "-T", t.Iqn, "-o", "delete").Run()
 
 	return nil
 }

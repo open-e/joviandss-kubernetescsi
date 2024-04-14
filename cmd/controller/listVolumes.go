@@ -7,9 +7,9 @@ import (
 	"context"
 	"fmt"
 
+	cli_common "joviandss-kubernetescsi/pkg/common"
 	csi_common "joviandss-kubernetescsi/pkg/common"
 	csi_controller "joviandss-kubernetescsi/pkg/controller"
-	cli_common "joviandss-kubernetescsi/pkg/common"
 
 	// csi_rest "joviandss-kubernetescsi/pkg/rest"
 
@@ -41,8 +41,7 @@ func listVolumes(cmd *cobra.Command, args []string) {
 
 	var cp csi_controller.ControllerPlugin
 
-
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg) ; err != nil {
+	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -58,7 +57,7 @@ func listVolumes(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("Got resp of size %d %+v\n", len(resp.Entries), resp)
-	for i:=0 ; i < len(resp.Entries) ; i++ {
+	for i := 0; i < len(resp.Entries); i++ {
 		fmt.Printf("volume %s\n", resp.Entries[i].Volume.VolumeId)
 	}
 

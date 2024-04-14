@@ -7,9 +7,9 @@ import (
 	"context"
 	"fmt"
 
+	cli_common "joviandss-kubernetescsi/pkg/common"
 	csi_common "joviandss-kubernetescsi/pkg/common"
 	csi_controller "joviandss-kubernetescsi/pkg/controller"
-	cli_common "joviandss-kubernetescsi/pkg/common"
 
 	// csi_rest "joviandss-kubernetescsi/pkg/rest"
 
@@ -41,8 +41,7 @@ func listSnapshots(cmd *cobra.Command, args []string) {
 
 	var cp csi_controller.ControllerPlugin
 
-
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg) ; err != nil {
+	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -51,7 +50,7 @@ func listSnapshots(cmd *cobra.Command, args []string) {
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 
 	var req csi.ListSnapshotsRequest
-	
+
 	if len(volumeId) > 0 {
 		req.SourceVolumeId = volumeId
 	}
@@ -71,7 +70,7 @@ func listSnapshots(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("Got resp of size %d %+v\n", len(resp.Entries), resp)
-	for i:=0 ; i < len(resp.Entries) ; i++ {
+	for i := 0; i < len(resp.Entries); i++ {
 		fmt.Printf("%d snapshot %s volume %s\n", i, resp.Entries[i].Snapshot.SnapshotId, resp.Entries[i].Snapshot.SourceVolumeId)
 	}
 
@@ -100,8 +99,8 @@ func listSnapshots(cmd *cobra.Command, args []string) {
 func init() {
 	// rootCmd.AddCommand(listVolumesCmd)
 
-	listSnapshotsCmd.Flags().StringVarP(&volumeId,"volumeid", "", "", "id of volume to list snapshots for")
-	listSnapshotsCmd.Flags().StringVarP(&snapshotId,"snapshotid", "", "", "id of snapshot")
+	listSnapshotsCmd.Flags().StringVarP(&volumeId, "volumeid", "", "", "id of volume to list snapshots for")
+	listSnapshotsCmd.Flags().StringVarP(&snapshotId, "snapshotid", "", "", "id of snapshot")
 	listSnapshotsCmd.Flags().Int32VarP(&maxent, "maxent", "", 0, "maximal number of snapshots to provide")
 	listSnapshotsCmd.Flags().StringVarP(&token, "token", "", "", "starting token")
 

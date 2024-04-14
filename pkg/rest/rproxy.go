@@ -41,70 +41,67 @@ const sessionTimeout = 30 * time.Second
 
 // RestProxy - request client for any REST API
 type RestProxy struct {
-	addrs		[]string
-	active_addr	int
-	port		int
-	authToken	string
-	httpRestProxy 	*http.Client
-	l             	*logrus.Entry
-	prot          	string
-	user          	string
-	pass          	string
-	tries         	int
+	addrs         []string
+	active_addr   int
+	port          int
+	authToken     string
+	httpRestProxy *http.Client
+	l             *logrus.Entry
+	prot          string
+	user          string
+	pass          string
+	tries         int
 
-	mu		sync.Mutex
-	requestID 	int64
-	timeout   	int64
+	mu        sync.Mutex
+	requestID int64
+	timeout   int64
 }
 
 // restProxy - request client for any REST API
 type restProxy struct {
-	addrs		[]string
-	active_addr	int
-	port		int
-	authToken	string
-	httpRestProxy 	*http.Client
-	l             	*logrus.Entry
-	prot          	string
-	user          	string
-	pass          	string
-	tries         	int
+	addrs         []string
+	active_addr   int
+	port          int
+	authToken     string
+	httpRestProxy *http.Client
+	l             *logrus.Entry
+	prot          string
+	user          string
+	pass          string
+	tries         int
 
-	mu		sync.Mutex
-	requestID 	int64
-	timeout   	int64
+	mu        sync.Mutex
+	requestID int64
+	timeout   int64
 }
 
 // RestProxyInterface - request client interface
 type RestProxyInterface interface {
 	//Send(method, path string, data interface{}, ok int) (int, []byte, error)
 	Send(ctx context.Context, method string, path string, data interface{}, ok int) (int, []byte, RestError)
-
 }
 
 func (rp *RestProxy) Send(ctx context.Context, method string, path string, data interface{}, ok int) (int, []byte, RestError) {
 	var res *http.Response
 	// var err restError
 	l := jcom.LFC(ctx)
-	l.Debugf("Path %s", path)	
+	l.Debugf("Path %s", path)
 	//l.Debugf("proto %+v, addr %+v, port %+v, url %+v", )
 
 	url := fmt.Sprintf("%s://%s:%d/%s", rp.prot, rp.addrs[rp.active_addr], rp.port, path)
-	
+
 	l = l.WithFields(logrus.Fields{
-		"func": "Send",
+		"func":    "Send",
 		"section": "rest",
-		"method": method,
-		"url": url,
+		"method":  method,
+		"url":     url,
 	})
-	
+
 	l.Debugf("Available addrs %+v", rp.addrs)
 
 	//rp.mu.Lock()
 	//rp.requestID++
 	//rp.mu.Unlock()
-
-
 
 	// send request data as json
 	var reader io.Reader
@@ -131,8 +128,6 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	req.Header.Set("User-Agent", "Kubernetes CSI Plugin")
 	res, err = rp.httpRestProxy.Do(req)
 
-	defer res.Body.Close()
-
 	if err != nil {
 		if urlErr, ok := err.(*httpUrl.Error); ok {
 			if opErr, ok := urlErr.Err.(*net.OpError); ok {
@@ -142,7 +137,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 				} else if opErr.Op == "dial" {
 					l.Errorln("Connection error:", opErr)
 					return res.StatusCode, nil, &restError{RestErrorUnableToConnect, opErr.Error()}
-	    		        } else if netErr, ok := err.(net.Error); ok {
+				} else if netErr, ok := err.(net.Error); ok {
 					if netErr.Timeout() {
 						l.Errorln("Network error (timeout):", netErr.Error())
 						return res.StatusCode, nil, &restError{RestErrorRequestTimeout, opErr.Error()}
@@ -155,16 +150,18 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 				fmt.Println("Network error:", opErr)
 				return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, urlErr.Error()}
 			}
-    		} else {
+		} else {
 			fmt.Println("Unknown error:", err.Error())
 			return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, err.Error()}
-    		}
+		}
 	}
+
+	defer res.Body.Close()
 
 	// validate response body
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		l.Error("reading response failed: %+v", err)
+		l.Errorf("reading response failed: %s", err.Error())
 		err = status.Error(codes.Internal, "Unable to process response")
 		return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, err.Error()}
 	}
@@ -174,7 +171,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 
 
 type RestProxyCfg struct {
-	Addrs        string
+	Addrs       string
 	ActiveAddr  int
 	Port        int
 	Prot        string
@@ -187,21 +184,21 @@ type RestProxyCfg struct {
 
 // TODO: implement sessions
 // func NewRestProxy(cfg *RestEndpointCfg, l *logrus.Entry) (ri RestProxyInterface, err error) {
-// 
-// 
+//
+//
 // 	var timeoutDuration time.Duration
-// 	
+//
 // 	le := l.WithFields(logrus.Fields{"section": "restproxy", "addrs": cfg.Addrs, "port": cfg.Port,})
-// 
+//
 // 	l.Debugf("Rest Proxy to %v", cfg.Addrs)
-// 
+//
 // 	timeoutDuration, err = time.ParseDuration(cfg.IdleTimeOut)
-// 
+//
 // 	if err != nil {
 // 		l.Warnf("Uncorrect IdleTimeOut value: %s, Error %s", cfg.IdleTimeOut, err)
 // 		return nil, err
 // 	}
-// 
+//
 // 	tr := &http.Transport{
 // 		IdleConnTimeout: sessionTimeout,
 // 		TLSClientConfig: &tls.Config{
@@ -209,12 +206,12 @@ type RestProxyCfg struct {
 // 			InsecureSkipVerify: true,
 // 		},
 // 	}
-// 
+//
 // 	httpRestProxy := &http.Client{
 // 		Transport: tr,
 // 		Timeout:   timeoutDuration,
 // 	}
-// 
+//
 // 	if cfg.Tries == 0 {
 // 		cfg.Tries = 3
 // 	}
@@ -230,15 +227,15 @@ type RestProxyCfg struct {
 // 		pass:          	cfg.Pass,
 // 		tries:         	cfg.Tries,
 // 	}
-// 
+//
 // 	return ri, nil
 // }
 
 func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) (err error) {
 
 	// rp.l = l.WithField("section", "restproxy")
- 	rp.l = l.WithFields(logrus.Fields{"section": "restproxy", "addrs": cfg.Addrs, "port": cfg.Port,})
-	
+	rp.l = l.WithFields(logrus.Fields{"section": "restproxy", "addrs": cfg.Addrs, "port": cfg.Port})
+
 	rp.l.Debug("Setting up rest proxy")
 	var timeoutDuration time.Duration
 
