@@ -67,7 +67,7 @@ func GetPluginServer(cfg *common.JovianDSSCfg, l *logrus.Entry, netType *string,
 		return nil, err
 	}
 
-	s.server = grpc.NewServer(grpc.UnaryInterceptor(s.grpcErrorHandler))
+	s.server = grpc.NewServer(grpc.UnaryInterceptor(s.grpcErrorHandler), grpc.MaxConcurrentStreams(128))
 
 	if identitySrv {
 		ip, err := jidnt.GetIdentityPlugin(l)

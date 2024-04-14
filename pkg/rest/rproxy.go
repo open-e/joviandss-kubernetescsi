@@ -31,8 +31,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	jcom "joviandss-kubernetescsi/pkg/common"
 )
@@ -162,8 +160,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		l.Errorf("reading response failed: %s", err.Error())
-		err = status.Error(codes.Internal, "Unable to process response")
-		return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, err.Error()}
+		return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, "Unable to process response"}
 	}
 	l.Debugf("Request completed with code %d, obtained %d bytes", res.StatusCode, len(bodyBytes))
 	return res.StatusCode, bodyBytes, nil
