@@ -24,7 +24,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -396,13 +395,6 @@ func (t *Target) UnMountVolume(ctx context.Context) error {
 	var msg string
 
 	var exists bool
-	
-	l := jcom.LFC(ctx)
-	
-	l = l.WithFields(log.Fields{
-		"func": "UnMountVolume",
-		"section": "node",
-	})
 
 	l := jcom.LFC(ctx)
 
@@ -515,13 +507,6 @@ func (t *Target) UnStageVolume(ctx context.Context) error {
 	// Scan for targets
 
 	var msg string
-	
-	l := jcom.LFC(ctx)
-	
-	l = l.WithFields(log.Fields{
-		"func": "StageVolume",
-		"section": "node",
-	})
 
 	l := jcom.LFC(ctx)
 

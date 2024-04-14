@@ -169,7 +169,6 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	return res.StatusCode, bodyBytes, nil
 }
 
-
 type RestProxyCfg struct {
 	Addrs       string
 	ActiveAddr  int

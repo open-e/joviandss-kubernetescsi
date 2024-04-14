@@ -1,4 +1,4 @@
-package joviandssplugin
+package main
 
 import (
 	"flag"

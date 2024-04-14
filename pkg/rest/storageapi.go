@@ -73,7 +73,6 @@ func (re *RestEndpoint) GetAddress() (string, int) {
 	return re.rec.Addrs[0], re.rec.Port
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
 // Volumes
 

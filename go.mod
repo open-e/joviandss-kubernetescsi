@@ -1,4 +1,4 @@
-module joviandss-kubernetescsi
+module github.com/open-e/joviandss-kubernetescsi
 
 go 1.19
 

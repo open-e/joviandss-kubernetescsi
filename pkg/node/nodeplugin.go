@@ -223,14 +223,6 @@ func (np *NodePlugin) NodeUnpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
 ) (*csi.NodeUnpublishVolumeResponse, error) {
-	
-	l := np.l.WithFields(log.Fields{
-		"request": "NodeUnpublishVolume",
-		"func": "NodeUnpublishVolume",
-		"section": "node",
-	})
-
-	ctx = jcom.WithLogger(ctx, l)
 
 	l := np.l.WithFields(log.Fields{
 		"request": "NodeUnpublishVolume",
