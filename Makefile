@@ -21,24 +21,28 @@ all:  joviandss container cli
 
 cli:
 	go mod tidy
-	go get ./app/joviandssplugin
+	#go get ./app/joviandssplugin
 	CGO_ENABLED=0 GOOS=linux go build -a -o _output/jdss-csi-cli ./app/jdss-csi-cli
 
 joviandss:
 	go mod tidy
-	go get ./app/joviandssplugin
+	#go get ./app/joviandssplugin
 	CGO_ENABLED=0 GOOS=linux go build -a -ldflags '-X joviandss-kubernetescsi/pkg/common.Version=$(IMAGE_VERSION) -extldflags "-static"' -o _output/jdss-csi-plugin ./app/joviandssplugin
-	#chmod +x _output/jdss-csi-plugin
+
+joviandss-dev:
+	go mod tidy
+	go get ./app/joviandssplugin
+	CGO_ENABLED=0 GOOS=linux go build -a -gcflags "-N -l" -ldflags '-X joviandss-kubernetescsi/pkg/common.Version=$(IMAGE_VERSION) -extldflags "-static"' -o _output/jdss-csi-plugin ./app/joviandssplugin
 
 container: joviandss cli
 	@echo Building Container
 	podman build -t docker.io/$(IMAGE_TAG) -f ./deploy/container/centos.Dockerfile .
 	podman build -t docker.io/$(IMAGE_TAG_LATEST) -f ./deploy/container/centos.Dockerfile .
 
-containerdev: joviandss cli
+containerdev: joviandss-dev cli
 	@echo Building Container
-	podman build -t docker.io/$(IMAGE_TAG_DEV) -f ./deploy/container/centos.Dockerfile .
-	podman build -t docker.io/$(IMAGE_TAG_DEV_LATEST) -f ./deploy/container/centos.Dockerfile .
+	podman build -t docker.io/$(IMAGE_TAG_DEV) -f ./deploy/container/centos-dev.Dockerfile .
+	podman build -t docker.io/$(IMAGE_TAG_DEV_LATEST) -f ./deploy/container/centos-dev.Dockerfile .
 
 clean:
 	go clean -r -x

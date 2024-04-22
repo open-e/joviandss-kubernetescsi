@@ -1,7 +1,4 @@
 /*
-Copyright © 2023 NAME HERE <EMAIL ADDRESS>
-*/
-/*
 Copyright (c) 2024 Open-E, Inc.
 All Rights Reserved.
 
@@ -26,10 +23,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
+	//"path/filepath"
 	//"strconv"
 	"strings"
-	"time"
+	//"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	log "github.com/sirupsen/logrus"
@@ -37,7 +34,7 @@ import (
 	"google.golang.org/grpc/status"
 	"gopkg.in/yaml.v2"
 	kexec "k8s.io/utils/exec"
-	"k8s.io/utils/mount"
+	mount "k8s.io/mount-utils"
 
 	jcom "joviandss-kubernetescsi/pkg/common"
 )
@@ -363,18 +360,26 @@ func (t *Target) DeleteSerialization() (err error) {
 // }
 
 // FormatMountVolume tries to check fs on volume and formats if not sutable been found
-func (t *Target) FormatMountVolume(req *csi.NodePublishVolumeRequest) error {
+func (t *Target) FormatMountVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) error {
 	var err error
 	var msg string
 	m := mount.SafeFormatAndMount{
 		Interface: mount.New(""),
 		Exec:      kexec.New()}
 
+	l := jcom.LFC(ctx)
+
+	l = l.WithFields(log.Fields{
+		"func":    "FormatMountVolume",
+	})
+
+	l.Debugf("Mounting to %s", t.TPath)
 	if exists, err := mount.PathExists(t.TPath); exists == false {
 		if err = os.MkdirAll(t.TPath, 0640); err != nil {
 			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", t.TPath, err.Error())
 			return status.Error(codes.Internal, msg)
 		}
+		l.Debugf("Create dirrectory %s", t.TPath)
 	}
 
 	fsType := req.GetVolumeCapability().GetMount().GetFsType()
@@ -385,6 +390,8 @@ func (t *Target) FormatMountVolume(req *csi.NodePublishVolumeRequest) error {
 			t.TPath, err.Error())
 		return status.Error(codes.Internal, msg)
 	}
+
+	l.Debugf("Mounting %s done", t.TPath)
 
 	return nil
 }
@@ -403,20 +410,40 @@ func (t *Target) UnMountVolume(ctx context.Context) error {
 		"section": "node",
 	})
 
-	m := mount.New("")
-
-	devices, mCount, err := mount.GetDeviceNameFromMount(m, t.TPath)
-	if err != nil {
-		msg = fmt.Sprintf("Unable to get device name from mount point %s, Err: %s", t.TPath, err.Error())
-		t.l.Warn(msg)
+	// Check if device exists by itself
+	if exists, err := mount.PathExists(t.DPath); err != nil {
+		msg = fmt.Sprintf("Unable to identify state of device %s, Err: %s", t.DPath, err.Error())
+		l.Warn(msg)
 		return status.Error(codes.Internal, msg)
+	} else if exists == false {
+		l.Debugf("Device do not %s exists", t.DPath)
+		return nil
+	} else {
+		l.Debugf("Device %s exists", t.DPath)
 	}
 
 	if exists, err = mount.PathExists(t.TPath); err != nil {
-		msg = fmt.Sprintf("Target path do not exists %s, Err: %s", t.TPath, err.Error())
-		t.l.Warn(msg)
+		msg = fmt.Sprintf("Unable to identify state of target file %s, Err: %s", t.TPath, err.Error())
+		l.Warn(msg)
+		return status.Error(codes.Internal, msg)
+	} else if exists == false {
+		l.Debugf("Mount poiunt do not %s exists", t.TPath)
 		return nil
+	} else {
+		l.Debugf("Mount point %s exists", t.DPath)
 	}
+
+	m := mount.New("")
+
+	deviceName, mCount, err := mount.GetDeviceNameFromMount(m, t.TPath)
+
+	if err != nil {
+		msg = fmt.Sprintf("Unable to get device name from mount point %s, Err: %s", t.TPath, err.Error())
+		l.Warn(msg)
+		return status.Error(codes.Internal, msg)
+	}
+
+	l.Debugf("Identified device name %s, reference count is %d", deviceName, mCount)
 
 	if mCount == 0 && exists == false {
 		t.l.Tracef("Target %s already umounted", t.TPath)
@@ -426,7 +453,7 @@ func (t *Target) UnMountVolume(ctx context.Context) error {
 	if mCount > 0 {
 		if err = m.Unmount(t.TPath); err != nil {
 			msg = fmt.Sprintf("Unable to unmounted target %s for device %+v , Err: %s",
-				t.TPath, devices, err.Error())
+				t.TPath, deviceName, err.Error())
 			t.l.Warn(msg)
 			return status.Error(codes.Internal, msg)
 		}
@@ -537,38 +564,3 @@ func (t *Target) UnStageVolume(ctx context.Context) error {
 
 type statFunc func(string) (os.FileInfo, error)
 type globFunc func(string) ([]string, error)
-
-func waitForPathToExist(devicePath *string, maxRetries int, deviceTransport string) bool {
-	return waitForPathToExistInternal(devicePath, maxRetries, deviceTransport, os.Stat, filepath.Glob)
-}
-
-func waitForPathToExistInternal(devicePath *string, maxRetries int, deviceTransport string, osStat statFunc, filepathGlob globFunc) bool {
-	if devicePath == nil {
-		return false
-	}
-
-	for i := 0; i < maxRetries; i++ {
-		var err error
-		if deviceTransport == "tcp" {
-			_, err = osStat(*devicePath)
-		} else {
-			fpath, _ := filepathGlob(*devicePath)
-			if fpath == nil {
-				err = os.ErrNotExist
-			} else {
-				*devicePath = fpath[0]
-			}
-		}
-		if err == nil {
-			return true
-		}
-		if !os.IsNotExist(err) {
-			return false
-		}
-		if i == maxRetries-1 {
-			break
-		}
-		time.Sleep(time.Second)
-	}
-	return false
-}

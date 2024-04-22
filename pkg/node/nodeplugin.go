@@ -1,3 +1,20 @@
+/*
+Copyright (c) 2024 Open-E, Inc.
+All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License. You may obtain
+a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations
+under the License.
+*/
+
 package node
 
 import (
@@ -9,7 +26,8 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/utils/mount"
+	//"k8s.io/utils/mount"
+	mount "k8s.io/mount-utils"
 
 	jcom "joviandss-kubernetescsi/pkg/common"
 )
@@ -23,7 +41,8 @@ var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
 // NodePlugin responsible for attaching and detaching volumes to host
 type NodePlugin struct {
 	//cfg *NodeCfg
-	l *log.Entry
+	l		*log.Entry
+	umounter	mount.MounterForceUnmounter
 }
 
 // GetNodePlugin inits NodePlugin
@@ -39,7 +58,8 @@ func GetNodePlugin(l *log.Entry) (*NodePlugin, error) {
 		"nodeid":  nid,
 		"section": "node",
 	})
-
+	
+	np.umounter = mount.Mounter{}
 	l.Debug("Init node plugin")
 	return &np, nil
 }
@@ -85,8 +105,10 @@ func (np *NodePlugin) NodeStageVolume(
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debug("Node Stage Volume")
-	l.Debugf("Stage Volume request %+v", *req)
+	l.Debugf("Node Stage Volume %s", req.VolumeId)
+	l.Debugf("PublishContext %+v", req.GetPublishContext())
+	l.Debugf("StagingTargetPath %s", req.GetStagingTargetPath())
+	l.Debugf("VolumeCapability %+v", req.GetVolumeCapability())
 	var msg string
 
 	t, err := GetTargetFromReq(ctx, *req)
@@ -96,35 +118,25 @@ func (np *NodePlugin) NodeStageVolume(
 		return nil, err
 	}
 	var exists bool
-	if exists, err = mount.PathExists(t.STPath); err != nil {
-		msg = fmt.Sprintf("Unable to check file %s for volume %s. Err: %s", t.STPath, t.Tname, err.Error())
-		t.l.Warn(msg)
+	if exists, err = mount.PathExists(req.GetStagingTargetPath()); err != nil {
+		msg = fmt.Sprintf("Staging target path %s error: %s", req.GetStagingTargetPath(), err.Error())
+		l.Warn(msg)
 		return nil, status.Error(codes.Internal, msg)
 	}
 
 	// Some activity are taking place with target staging path
 	if exists == false {
-		if err = os.MkdirAll(t.STPath, 0640); err != nil {
+		l.Debugf("STP dne, creating")
+		if err = os.MkdirAll(req.GetStagingTargetPath(), 0640); err != nil {
 			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", t.TPath, err.Error())
 			return nil, status.Error(codes.Internal, msg)
 		}
 	}
 
-	// Volume do not exist
-	err = t.SerializeTarget()
-	if err != nil {
+	if err := StageVolume(ctx, req); err != nil {
 		return nil, err
 	}
-
-	err = t.StageVolume(ctx)
-
-	if err != nil {
-		t.DeleteSerialization()
-		msg = fmt.Sprintf("Unable to stage volume: %s ", err.Error())
-		np.l.Warn(msg)
-		return nil, status.Error(codes.Internal, msg)
-	}
-	return &csi.NodeStageVolumeResponse{}, nil
+	return &csi.NodeStageVolumeResponse{}, 	nil
 }
 
 // NodeUnstageVolume remove volume from host
@@ -204,7 +216,7 @@ func (np *NodePlugin) NodePublishVolume(
 	}
 
 	if !block {
-		err = t.FormatMountVolume(req)
+		err = t.FormatMountVolume(ctx, req)
 	} else {
 		return nil, status.Error(codes.Unimplemented, "Block attaching is not supported")
 	}
