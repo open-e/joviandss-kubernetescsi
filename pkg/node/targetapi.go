@@ -36,7 +36,7 @@ import (
 	kexec "k8s.io/utils/exec"
 	mount "k8s.io/mount-utils"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 const (

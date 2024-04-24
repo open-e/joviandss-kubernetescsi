@@ -21,7 +21,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	jrest "joviandss-kubernetescsi/pkg/rest"
+	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
 func TargetIQN(prefix string, ld LunDesc) (*string, jrest.RestError) {

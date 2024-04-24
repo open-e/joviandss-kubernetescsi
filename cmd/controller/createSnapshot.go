@@ -10,12 +10,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/sirupsen/logrus"
 
-	csi_common "joviandss-kubernetescsi/pkg/common"
-	csi_controller "joviandss-kubernetescsi/pkg/controller"
-
-	cli_common "joviandss-kubernetescsi/pkg/common"
-
-	"joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/controller"
 
 	"github.com/spf13/cobra"
 )
@@ -35,15 +31,15 @@ func createSnaposhot(cmd *cobra.Command, args []string) {
 		fmt.Println(err)
 	}
 
-	var cfg csi_common.JovianDSSCfg
+	var cfg common.JovianDSSCfg
 
-	var cp csi_controller.ControllerPlugin
+	var cp controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
+	if err := common.SetupConfig(common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
-	csi_controller.SetupControllerPlugin(&cp, &cfg)
+	controller.SetupControllerPlugin(&cp, &cfg)
 
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 

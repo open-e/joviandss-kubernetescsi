@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	jrest "joviandss-kubernetescsi/pkg/rest"
+	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
 type CSIListingToken struct {

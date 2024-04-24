@@ -30,7 +30,7 @@ import (
 	"google.golang.org/grpc/status"
 	mount "k8s.io/mount-utils"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 // StageVolume discovers iscsi target and attachs it
@@ -79,7 +79,6 @@ func StageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) error {
 		lun = "0"
 	}
 	
-	var loginSuccess = false
 	for _, addr := range addrs {
 
 		fullPortal := addr + ":" + port
@@ -109,7 +108,8 @@ func StageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) error {
 			// msg := fmt.Sprintf("Unable to togin into target %s error: %s (%v)", iqn, out, err.Error())
 			// return status.Errorf(codes.Internal, msg)
 		}
-		loginSuccess = true
+
+		devicePath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", iqn, "lun", lun}, "-")
 		if err = FormatMountVolume(ctx, *req.GetVolumeCapability(), devicePath, req.GetStagingTargetPath()); err != nil {
 			exec.Command("iscsiadm", "-m", "node", "-p", fullPortal, "-T", iqn, "--logout").Run()
 			exec.Command("iscsiadm", "-m", "node", "-p", fullPortal, "-T", iqn, "-o", "delete").Run()
@@ -134,10 +134,10 @@ func (np *NodePlugin)UnStageVolume(ctx context.Context, req *csi.NodeStageVolume
 		"func":    "StageVolume",
 		"section": "node",
 	})
-	mntr := mount.Mounter{}
-	if mp, _ := mntr.IsMountPoint(req.GetStagingTargetPath); mp == true {
-		if err := np.umounter.UnmountWithForce(req.GetStagingTargetPath() , time.Minute); err != nil {
-			msg = fmt.Sprintf("Failure in volume %s unmounting %s", devicePath, err.Error())
+	umounter := np.mounter.(mount.MounterForceUnmounter)
+	if mp, _ := np.mounter.IsMountPoint(req.GetStagingTargetPath()); mp == true {
+		if err := umounter.UnmountWithForce(req.GetStagingTargetPath() , time.Minute); err != nil {
+			msg = fmt.Sprintf("Failure in umounting %s unmounting %s", req.GetStagingTargetPath(), err.Error())
 			l.Warn(msg)
 			return status.Error(codes.Internal, msg)
 		}
@@ -186,19 +186,12 @@ func (np *NodePlugin)UnStageVolume(ctx context.Context, req *csi.NodeStageVolume
 
 		if exists, _ := mount.PathExists(devicePath); exists {
 
-			UMountDevice(ctx, &np.umounter, devicePath)
+			UMountDevice(ctx, umounter, devicePath)
 			exec.Command("iscsiadm", "-m", "node", "-p", fullPortal, "-T", iqn, "--logout").Run()
 			exec.Command("iscsiadm", "-m", "node", "-p", fullPortal, "-T", iqn, "-o", "delete").Run()
 			return nil
 		}
 	}
-
-
-	//err := t.ClearChapCred()
-	//if err != nil {
-	//	msg = fmt.Sprintf("Failed to clear ISCSI CHAP data %s error: %v", tname, err)
-	//	return errors.New(msg)
-	//}
 
 	return nil
 

@@ -24,14 +24,9 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	log "github.com/sirupsen/logrus"
-	//humanize "github.com/dustin/go-humanize"
 
-	csi_common "joviandss-kubernetescsi/pkg/common"
-	csi_node "joviandss-kubernetescsi/pkg/node"
-
-	cli_common "joviandss-kubernetescsi/pkg/common"
-
-	"joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/node"
 
 	"github.com/spf13/cobra"
 )
@@ -48,7 +43,7 @@ func getInfo(cmd *cobra.Command, args []string) {
 
 	// var np csi_node.NodePlugin
 
-	logger, err := cli_common.GetLogger(csi_common.LogLevel, csi_common.LogPath)
+	logger, err := common.GetLogger(common.LogLevel, common.LogPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Unable to init loging because:", err.Error())
 		os.Exit(1)
@@ -56,7 +51,7 @@ func getInfo(cmd *cobra.Command, args []string) {
 	l := log.NewEntry(logger)
 	l.Debug("publish volume")
 
-	np, err := csi_node.GetNodePlugin(l)
+	np, err := node.GetNodePlugin(l)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Unable to init node plugin:", err.Error())
 		os.Exit(1)
@@ -82,9 +77,6 @@ var NodeGetInfoCmd = &cobra.Command{
 
 	That makes volume available for attachment`,
 	Run: getInfo,
-	//func(cmd *cobra.Command, args []string) {
-	//	fmt.Println("createvolume called")
-	//},
 }
 
 func init() {

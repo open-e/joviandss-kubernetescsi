@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"joviandss-kubernetescsi/pkg/common"
-	"joviandss-kubernetescsi/pkg/pluginserver"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/pluginserver"
 
 	"os"
 

@@ -7,13 +7,8 @@ import (
 	"context"
 	"fmt"
 
-	cli_common "joviandss-kubernetescsi/pkg/common"
-	csi_common "joviandss-kubernetescsi/pkg/common"
-	csi_controller "joviandss-kubernetescsi/pkg/controller"
-
-	// csi_rest "joviandss-kubernetescsi/pkg/rest"
-
-	"joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/controller"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/sirupsen/logrus"
@@ -35,17 +30,17 @@ can do for all in one call or broken into sections`,
 func listVolumes(cmd *cobra.Command, args []string) {
 
 	logrus.Debug("list volumes")
-	var cfg csi_common.JovianDSSCfg
+	var cfg common.JovianDSSCfg
 	// controller.ControllerCfg
 	// var cp csi_controller.ControllerPlugin
 
-	var cp csi_controller.ControllerPlugin
+	var cp controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
+	if err := common.SetupConfig(common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
-	csi_controller.SetupControllerPlugin(&cp, &cfg)
+	controller.SetupControllerPlugin(&cp, &cfg)
 
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 
@@ -60,27 +55,6 @@ func listVolumes(cmd *cobra.Command, args []string) {
 	for i := 0; i < len(resp.Entries); i++ {
 		fmt.Printf("volume %s\n", resp.Entries[i].Volume.VolumeId)
 	}
-
-	// var vols []csi_rest.Volume
-	// var rEndpoint csi_rest.RestEndpoint
-	// csi_rest.SetupEndpoint(&rEndpoint, &cfg.RestEndpointCfg)
-
-	// if err := rEndpoint.ListVolumes("Pool-0", &vols) ; err != nil {
-	// 	panic(err)
-	// }
-
-	// for i:=0 ; i < len(vols) ; i++ {
-	// 	fmt.Printf("volume %s\n", vols[i].Name)
-	// }
-	//csi_rest.CreateV lume(
-	//if err := csi_controller.GetConfig(ControllerConfigPath, &controllerCfg); err != nil {
-	//	panic(err)
-	//}
-	//l := csi_common.GetLogger(cfg.LLevel, cfg.LPath)
-
-	//if err := csi_controller.GetControllerPlugin(&cp, &cfg, l); err != nil {
-	//		log.Fatalf("Unable to init controller: %v", err)
-	//}
 }
 
 func init() {

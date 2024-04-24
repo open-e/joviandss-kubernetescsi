@@ -11,11 +11,8 @@ import (
 	"github.com/sirupsen/logrus"
 	//humanize "github.com/dustin/go-humanize"
 
-	cli_common "joviandss-kubernetescsi/pkg/common"
-	csi_common "joviandss-kubernetescsi/pkg/common"
-	csi_controller "joviandss-kubernetescsi/pkg/controller"
-
-	"joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/controller"
 
 	"github.com/spf13/cobra"
 )
@@ -31,15 +28,15 @@ var (
 func createVolume(cmd *cobra.Command, args []string) {
 	logrus.Debug("create volume")
 
-	var cfg csi_common.JovianDSSCfg
+	var cfg common.JovianDSSCfg
 
-	var cp csi_controller.ControllerPlugin
+	var cp controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
+	if err := common.SetupConfig(common.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
-	csi_controller.SetupControllerPlugin(&cp, &cfg)
+	controller.SetupControllerPlugin(&cp, &cfg)
 
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 
@@ -62,7 +59,7 @@ func createVolume(cmd *cobra.Command, args []string) {
 		// VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 	}
 
-	req.VolumeCapabilities = csi_controller.GetVolumeCapability(supportedVolumeCapabilities)
+	req.VolumeCapabilities = controller.GetVolumeCapability(supportedVolumeCapabilities)
 
 	if len(sourceSnapshotName) > 0 {
 		req.VolumeContentSource = &csi.VolumeContentSource{
@@ -102,36 +99,6 @@ func createVolume(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("%+v\n", resp)
-	//for i:=0 ; i < len(resp.Entries) ; i++ {
-	//	fmt.Printf("volume %s\n",:23
-	//resp.Entries[i].Volume.VolumeId)
-	//}
-
-	// var cfg csi_common.JovianDSSCfg
-	// // controller.ControllerCfg
-	// // var cp csi_controller.ControllerPlugin
-
-	// if err := csi_common.SetupConfig(ControllerConfigPath, &cfg) ; err != nil {
-	// 	// GetConfig(ControllerConfigPath, &controllerCfg)
-	// 	panic(err)
-	// }
-
-	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
-	// var rEndpoint csi_rest.RestEndpoint
-	// csi_rest.SetupEndpoint(&rEndpoint, &cfg.RestEndpointCfg)
-
-	// if err := rEndpoint.CreateVolume("Pool-0", vol) ; err != nil {
-	// 	panic(err)
-	// }
-	//csi_rest.CreateVolume(
-	//if err := csi_controller.GetConfig(ControllerConfigPath, &controllerCfg); err != nil {
-	//	panic(err)
-	//}
-	//l := csi_common.GetLogger(cfg.LLevel, cfg.LPath)
-
-	//if err := csi_controller.GetControllerPlugin(&cp, &cfg, l); err != nil {
-	//		log.Fatalf("Unable to init controller: %v", err)
-	//}
 }
 
 // createVolumeCmd represents the createvolume command
@@ -163,19 +130,5 @@ func init() {
 		fmt.Println(err)
 	}
 
-	//if err:= createVolumeCmd.MarkFlagRequired("size"); err != nil {
-	//	fmt.Println(err)
-	//}
-
 	ControllerCmd.AddCommand(createVolumeCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// createvolumeCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// createvolumeCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

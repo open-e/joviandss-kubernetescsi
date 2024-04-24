@@ -29,7 +29,7 @@ import (
 	//"k8s.io/utils/mount"
 	mount "k8s.io/mount-utils"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
@@ -42,7 +42,7 @@ var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
 type NodePlugin struct {
 	//cfg *NodeCfg
 	l		*log.Entry
-	umounter	mount.MounterForceUnmounter
+	mounter	mount.Interface
 }
 
 // GetNodePlugin inits NodePlugin
@@ -58,8 +58,9 @@ func GetNodePlugin(l *log.Entry) (*NodePlugin, error) {
 		"nodeid":  nid,
 		"section": "node",
 	})
-	
-	np.umounter = mount.Mounter{}
+
+	mounter := mount.New("")
+	np.mounter = mounter
 	l.Debug("Init node plugin")
 	return &np, nil
 }

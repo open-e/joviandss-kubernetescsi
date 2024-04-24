@@ -29,9 +29,9 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
-	jdrvr "joviandss-kubernetescsi/pkg/driver"
-	jrest "joviandss-kubernetescsi/pkg/rest"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	jdrvr "github.com/open-e/joviandss-kubernetescsi/pkg/driver"
+	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
 func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshotShort) (err error) {

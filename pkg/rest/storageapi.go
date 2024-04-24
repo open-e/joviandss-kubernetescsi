@@ -30,7 +30,7 @@ import (
 	//"google.golang.org/grpc/codes"
 	//"google.golang.org/grpc/status"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 type SnapshotDescriptor struct {

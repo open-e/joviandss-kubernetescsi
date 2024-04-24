@@ -26,7 +26,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 type GetResourceEntries func(ctx context.Context, pool string, page int64, dc int64, args interface{}) (ent *ResultEntries, err RestError)

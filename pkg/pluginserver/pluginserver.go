@@ -27,10 +27,10 @@ import (
 	"google.golang.org/grpc"
 	//"google.golang.org/grpc/codes"
 
-	"joviandss-kubernetescsi/pkg/common"
-	jcntr "joviandss-kubernetescsi/pkg/controller"
-	jidnt "joviandss-kubernetescsi/pkg/identity"
-	jnode "joviandss-kubernetescsi/pkg/node"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	jcntr "github.com/open-e/joviandss-kubernetescsi/pkg/controller"
+	jidnt "github.com/open-e/joviandss-kubernetescsi/pkg/identity"
+	jnode "github.com/open-e/joviandss-kubernetescsi/pkg/node"
 )
 
 const (

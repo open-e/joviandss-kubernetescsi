@@ -6,11 +6,11 @@ package cmd
 
 import (
 	"os"
-	"joviandss-kubernetescsi/cmd/controller"
-	"joviandss-kubernetescsi/cmd/node"
+	"github.com/open-e/joviandss-kubernetescsi/cmd/controller"
+	"github.com/open-e/joviandss-kubernetescsi/cmd/node"
 	"github.com/spf13/cobra"
 	
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 

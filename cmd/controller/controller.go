@@ -24,8 +24,8 @@ import (
 	//"github.com/open-e/JovianDSS-KubernetesCSI/pkg/joviandss"
 
 	"github.com/spf13/cobra"
-	cliPublishVolume "joviandss-kubernetescsi/cmd/controller/publishvolume"
-	cli_common "joviandss-kubernetescsi/pkg/common"
+	cliPublishVolume "github.com/open-e/joviandss-kubernetescsi/cmd/controller/publishvolume"
+	cli_common "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 var (

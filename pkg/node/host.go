@@ -19,7 +19,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 //var nodeId = ""
@@ -126,7 +126,7 @@ func FormatMountVolume(ctx context.Context, volumeCapability csi.VolumeCapabilit
 }
 
 // UnMountVolume unmounts volume
-func UMountDevice(ctx context.Context, umounter *mount.MounterForceUnmounter, device string) error {
+func UMountDevice(ctx context.Context, umounter mount.MounterForceUnmounter, device string) error {
 
 	l := jcom.LFC(ctx)
 
