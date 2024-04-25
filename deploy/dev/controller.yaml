@@ -1,3 +1,24 @@
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: joviandss-sc
+provisioner: iscsi.csi.joviandss.open-e.com
+parameters:
+reclaimPolicy: Delete
+volumeBindingMode: Immediate
+
+---
+
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotClass
+metadata:
+  name: joviandss-snapshot-sc
+driver: iscsi.csi.joviandss.open-e.com
+deletionPolicy: Delete
+
+---
+
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
@@ -5,6 +26,7 @@ metadata:
 spec:
   attachRequired: true
   podInfoOnMount: true
+
 ---
 
 apiVersion: v1
@@ -86,6 +108,24 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
 
 ---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: joviandss-csi-snapshot-controller-cluster-role-binding
+  namespace: joviandss-csi
+subjects:
+  - kind: ServiceAccount
+    name: joviandss-csi-controller-service-account
+    namespace: joviandss-csi
+roleRef:
+  kind: ClusterRole
+  name: snapshot-controller-runner
+    #name: joviandss-csi-controller-cluster-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:

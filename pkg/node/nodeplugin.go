@@ -206,26 +206,8 @@ func (np *NodePlugin) NodePublishVolume(
 
 	l.Debugf("Node Publish Volume %s", req.GetVolumeId())
 
-	l.Debugf("Publish Volume request %+v", *req)
-
-	block := false
-	var msg string
-
-	t, err := GetTargetFromReq(ctx, *req)
-	if err != nil {
+	if err := np.PublishVolume(ctx, req); err != nil {
 		return nil, err
-	}
-
-	if !block {
-		err = t.FormatMountVolume(ctx, req)
-	} else {
-		return nil, status.Error(codes.Unimplemented, "Block attaching is not supported")
-	}
-
-	if err != nil {
-		msg = fmt.Sprintf("Unable to mount volume: %s", err.Error())
-		np.l.Warn(msg)
-		return nil, status.Error(codes.Internal, msg)
 	}
 
 	return &csi.NodePublishVolumeResponse{}, nil
@@ -247,33 +229,11 @@ func (np *NodePlugin) NodeUnpublishVolume(
 
 	l.Debugf("Node Unpublish Volume %s", req.GetVolumeId())
 
-	block := false
-	//eq := false
-	var msg string
-
-	tp := req.GetTargetPath()
-	if len(tp) == 0 {
-		msg = fmt.Sprintf("Request do not contain target path")
-		l.Warn(msg)
-		return nil, status.Error(codes.InvalidArgument, msg)
-	}
-
-	t, err := GetTarget(l, tp)
-	if err != nil {
+	if err := np.UnpublishVolume(ctx, req); err != nil {
 		return nil, err
 	}
 
-	if !block {
-		err = t.UnMountVolume(ctx)
-		if err != nil {
-			msg = fmt.Sprintf("Unable to clean up on volume unmounting: %s", err.Error())
-			return nil, status.Error(codes.Aborted, msg)
-		}
-	} else {
-		return nil, status.Error(codes.Unimplemented, "Block detaching is not supported")
-	}
-
-	l.Tracef("Node Unpublish Volume %s Done.", req.GetVolumeId())
+	l.Debugf("Node Unpublish Volume %s from path %s Done.", req.GetVolumeId(), req.GetTargetPath())
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }

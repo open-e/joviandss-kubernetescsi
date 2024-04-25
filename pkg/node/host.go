@@ -149,3 +149,32 @@ func UMountDevice(ctx context.Context, umounter mount.MounterForceUnmounter, dev
 	umounter.UnmountWithForce(device, time.Minute)
 	return nil
 }
+
+func BindVolume(ctx context.Context, mounter mount.SafeFormatAndMount, from string, to string, ro bool) error {
+
+	l := jcom.LFC(ctx)
+
+	l = l.WithFields(log.Fields{
+		"func":    "BindVolume",
+		"section": "node",
+	})
+
+	opts := []string{"bind"}
+	if ro {
+		opts = append(opts, "ro")
+	}
+	if err := mounter.Mount(from, to, "", opts ); err != nil {
+		l.Errorf("Unable to bind %s to %s: %s", from, to, err.Error())
+		return status.Error(codes.Internal, err.Error())
+	}
+	l.Debugf("Binded %s to %s with opts %s", from, to, opts)
+
+	return nil
+}
+
+func UmountVolume(ctx context.Context, umounter mount.MounterForceUnmounter, mnt string) error {
+	if mp, _ := umounter.IsMountPoint(mnt); mp == true {
+		umounter.UnmountWithForce(mnt, time.Minute)
+	}
+	return nil
+}
