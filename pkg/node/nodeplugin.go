@@ -26,9 +26,11 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
 	//"k8s.io/utils/mount"
 	mount "k8s.io/mount-utils"
 
+	"github.com/open-e/joviandss-kubernetescsi/pkg/common"
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
@@ -81,6 +83,7 @@ func (np *NodePlugin) NodeGetInfo(
 		"request": "NoneGetInfo",
 		"func":    "NodeGetInfo",
 		"section": "node",
+		"version": common.Version,
 	})
 
 	if nid, err := GetNodeId(l); err != nil {
