@@ -647,7 +647,7 @@ func (d *CSIDriver) PublishVolume(ctx context.Context, pool string, ld LunDesc, 
 		case jrest.RestErrorResourceDNEVolume:
 			d.re.DeleteTarget(ctx, pool, tname)
 			return nil, rErr
-		case jrest.RestErrorResourceExists:
+		case jrest.RestErrorResourceBusy:
 			// According to specification from
 			// TODO: check that resource indeed properly assigned and continue if everything is ok
 			l.Debugf("Volume %s already attached", ld.Name())

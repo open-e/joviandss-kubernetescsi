@@ -222,7 +222,7 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 						return &restError{code: RestErrorResourceExists, msg: *err.Message}
 					}
 					if volumeAlteadyUsedRegexp.MatchString(*err.Message) {
-						return &restError{code: RestErrorResourceExists, msg: *err.Message}
+						return &restError{code: RestErrorResourceBusy, msg: *err.Message}
 					}
 				}
 				if itemNotFoundClassRegexp.MatchString(*err.Class) {

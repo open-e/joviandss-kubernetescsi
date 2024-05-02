@@ -29,7 +29,7 @@ spec:
           name: persistent-volume
       securityContext:
         allowPrivilegeEscalation: false
-          #runAsNonRoot: true
+        runAsNonRoot: true
         capabilities:
           drop:
             - ALL
@@ -41,5 +41,3 @@ spec:
       persistentVolumeClaim:
         claimName: joviandss-pvc-rw-many
         readOnly: false
-
-

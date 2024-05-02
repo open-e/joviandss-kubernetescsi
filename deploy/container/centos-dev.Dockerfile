@@ -12,8 +12,10 @@ COPY ./_output/jdss-csi-plugin /usr/local/bin/jdss-csi-plugin
 COPY ./_output/jdss-csi-cli /usr/local/bin/jdss-csi-cli
 
 COPY ./deploy/container/scripts/iscsiadm /usr/local/bin/
+COPY ./deploy/container/scripts/donothing.sh /usr/local/bin/
 COPY ./deploy/container/bin/csc /usr/local/bin/
 
 WORKDIR /root
 
+#ENTRYPOINT ["/usr/local/bin/donothing.sh"]
 ENTRYPOINT ["/usr/local/bin/jdss-csi-plugin"]
