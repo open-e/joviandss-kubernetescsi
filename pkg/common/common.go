@@ -1,3 +1,20 @@
+/*
+Copyright (c) 2024 Open-E, Inc.
+All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License. You may obtain
+a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations
+under the License.
+*/
+
 package common
 
 import (
@@ -15,26 +32,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Version of plugin, should be filed during compilation
-var (
-	Version  string
-	NodeID   string
-	LogLevel string
-	LogPath  string
-)
-
-// Plugin name
-var PluginName = "iscsi.csi.joviandss.open-e.com"
-
 var replacertojbase32 = strings.NewReplacer("=", "-")
 var replacerfromjbase32 = strings.NewReplacer("-", "=")
 
-// var replacertojbase64 = strings.NewReplacer("+", "_", "/", "-", "=", ".")
-// var replacerfromjbase64 = strings.NewReplacer("_", "+", "-", "/", ".", "=")
 
-var (
-	NodeConfigPath       string
-	ControllerConfigPath string
+type StorageAccessProtocolType string
+
+const (
+	iSCSI StorageAccessProtocolType = "iscsi"
+	NFS StorageAccessProtocolType = "nfs"
 )
 
 type RestEndpointCfg struct {
@@ -100,38 +106,6 @@ func GetLogger(logLevel string, toFile string) (*logrus.Logger, error) {
 
 	return log, nil
 }
-
-// func SetupLogger(logLevel string, toFile string, l *logrus.Logger) (error)  {
-//
-// 	formater := logrus.TextFormatter{
-//
-// 		DisableColors: false,
-// 		FullTimestamp: true,
-// 	}
-// 	l.SetFormatter(&formater)
-//
-// 	if len(toFile) > 0 {
-// 		file, err := os.OpenFile(toFile, os.O_CREATE|os.O_WRONLY, 0o640)
-// 		if err == nil {
-// 			l.Out = file
-// 		} else {
-// 			fmt.Fprintf(os.Stderr, "Logging to file error: %s\n", err.Error())
-// 			return err
-// 		}
-// 	} else {
-// 		l.Out = os.Stdout
-// 	}
-//
-// 	lvl, err := logrus.ParseLevel(logLevel)
-// 	if err != nil {
-// 		fmt.Fprintf(os.Stderr, "LogLevel processing error: %s\n", err.Error())
-// 		return nil
-// 	}
-//
-// 	l.SetLevel(lvl)
-//
-// 	return nil
-// }
 
 // GetConfing reads Config from config file
 func SetupConfig(path string, c *JovianDSSCfg) error {

@@ -19,6 +19,7 @@ package rest
 
 import (
 	"encoding/json"
+	"net"
 	"regexp"
 	"strconv"
 	"time"
@@ -383,3 +384,41 @@ type ResourceTarget struct {
 	AllowIP             []string                  `json:"allow_ip,omitempty"`
 	DenyIP              []string                  `json:"deny_ip,omitempty"`
 }
+
+
+type ShareNFS struct {
+	NoRootSquash          bool     `json:"no_root_squash"`
+	AllowWriteIP          []net.IP `json:"allow_write_ip"`
+	AllSquash             bool     `json:"all_squash"`
+	Enabled               bool     `json:"enabled"`
+	InsecureConnections   bool     `json:"insecure_connections"`
+	SynchronousDataRecord bool     `json:"synchronous_data_record"`
+	InsecureLockRequests  bool     `json:"insecure_lock_requests"`
+	AllowAccessIP         []net.IP `json:"allow_access_ip"`
+}
+
+type ShareSMB struct {
+	Enabled            bool   `json:"enabled"`
+	ReadOnly           bool   `json:"read_only"`
+	Visible            bool   `json:"visible"`
+	HandlingLargeDirs  bool   `json:"handling_large_dirs"`
+	DefaultCase        string `json:"default_case"`
+	InheritOwner       bool   `json:"inherit_owner"`
+	InheritPerms       bool   `json:"inherit_perms"`
+	AccessMode         string `json:"access_mode"`
+	Timemachine        bool   `json:"timemachine"`
+	Recycle            bool   `json:"recycle"`
+	RecycleName        string `json:"recycle_name"`
+}
+
+type ResourceShare struct {
+	Comment     string	`json:"comment"`
+	Name        string 	`json:"name"`
+	RealPath    string 	`json:"real_path"`
+	NFS         ShareNFS    `json:"nfs"`
+	SMB         ShareSMB    `json:"smb"`
+	Active      bool	`json:"active"`
+	Path        string 	`json:"path"`
+	Conflicted  bool   	`json:"conflicted"`
+}
+

@@ -55,7 +55,7 @@ func NewSnapshotDescFromName(lid LunDesc, name string) *SnapshotDesc {
 		sd.sds = fmt.Sprintf("ss_%X", rawID)
 		sd.idFormat = "ss"
 	}
-
+	# TODO: reconsider using base64
 	sd.csiID = fmt.Sprintf("%s_%s",
 		sd.sds,
 		base64.StdEncoding.EncodeToString([]byte(sd.ld.VDS())))
@@ -78,7 +78,6 @@ func (sd *SnapshotDesc) parseSDS(sds string) error {
 	case "sp":
 		sd.idFormat = "sp"
 		sd.name = strings.Join(parts[1:], "")
-	// Volume name in form of base52
 	case "sb":
 		if name, err := jcom.JBase32ToStr(strings.Join(parts[1:], "")); err != nil {
 			return err
