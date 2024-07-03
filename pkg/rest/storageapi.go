@@ -40,7 +40,6 @@ type SnapshotDescriptor struct {
 }
 
 func getError(ctx context.Context, body []byte) RestError {
-
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
@@ -49,21 +48,20 @@ func getError(ctx context.Context, body []byte) RestError {
 
 	var edata ErrorData
 	if err := json.Unmarshal(body, &edata); err != nil {
-		bs := fmt.Sprintf(string(body[:len(body)]))
+		bs := fmt.Sprintf(string(body[:]))
 		msg := fmt.Sprintf("Unable to extract json output from error message: %s", bs)
 		l.Warnf(msg)
 		return &restError{RestErrorRequestMalfunction, msg}
 	} else {
-
 		return ErrorFromErrorT(ctx, &edata.Error, l)
 	}
 }
 
 func (re *RestEndpoint) unmarshal(resp []byte, ret interface{}) RestError {
 	if err := json.Unmarshal(resp, ret); err != nil {
-		msg := fmt.Sprintf("Data: %s, Err: %+v.", string(resp[:len(resp)]), err)
+		msg := fmt.Sprintf("Data: %s, Err: %+v.", string(resp[:]), err)
 		rErr := GetError(RestErrorRPM, msg)
-		//re.l.Warn(rErr.Error())
+		// re.l.Warn(rErr.Error())
 		return rErr
 	}
 	return nil
@@ -77,9 +75,8 @@ func (re *RestEndpoint) GetAddress() (string, int) {
 // Volumes
 
 func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string) (*ResourceVolume, RestError) {
-
 	var resvol ResourceVolume
-	var rsp = GeneralResponse{Data: &resvol}
+	rsp := GeneralResponse{Data: &resvol}
 
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s", pool, vname)
 
@@ -90,7 +87,6 @@ func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string)
 	})
 
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumeRCode)
-
 	if err != nil {
 		msg := fmt.Sprintf("Unable to get volume information")
 		l.Warn(msg)
@@ -109,7 +105,6 @@ func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string)
 }
 
 func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol CreateVolumeDescriptor) RestError {
-
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes", pool)
 
 	l := jcom.LFC(ctx)
@@ -122,7 +117,6 @@ func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol Create
 	l.Debugf("sending to pool %s", pool)
 	// l.Debugf("Sending data %+v", vol)
 	stat, body, err := s.rp.Send(ctx, "POST", addr, vol, CreateVolumeRCode)
-
 	if err != nil {
 		s.l.Warnln("Unable to create volume: ", vol.Name)
 		return err
@@ -145,7 +139,6 @@ func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol Create
 //
 // set rSnapshots to true in order to delete snapshots
 func (s *RestEndpoint) DeleteVolume(ctx context.Context, pool string, vname string, data DeleteVolumeDescriptor) RestError {
-
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s", pool, vname)
 
 	l := jcom.LFC(ctx)
@@ -158,7 +151,6 @@ func (s *RestEndpoint) DeleteVolume(ctx context.Context, pool string, vname stri
 	l.Debugf("Deleting volume %s ", vname)
 
 	stat, body, err := s.rp.Send(ctx, "DELETE", addr, data, DeleteVolumeRCode)
-
 	if err != nil {
 		s.l.Warnln("Unable to delete volume: ", vname)
 		return err
@@ -172,7 +164,6 @@ func (s *RestEndpoint) DeleteVolume(ctx context.Context, pool string, vname stri
 }
 
 func (s *RestEndpoint) ListVolumes(ctx context.Context, pool string, vols *[]ResourceVolume) RestError {
-
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes", pool)
 
 	l := s.l.WithFields(log.Fields{
@@ -182,13 +173,12 @@ func (s *RestEndpoint) ListVolumes(ctx context.Context, pool string, vols *[]Res
 
 	l.Debug("Listing volumes")
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumesRCode)
-
 	if err != nil {
 		l.Warnln("Unable to list volumes", err.Error())
 		return err
 	}
 
-	var rsp = &GetVolumesData{Data: vols}
+	rsp := &GetVolumesData{Data: vols}
 
 	if stat == CodeOK {
 		l.Debug("Obtained volume listing")
@@ -200,7 +190,6 @@ func (s *RestEndpoint) ListVolumes(ctx context.Context, pool string, vols *[]Res
 
 // GetVolumeSnapshot provides information about specific volume snapshot requested
 func (s *RestEndpoint) GetVolumeSnapshot(ctx context.Context, pool string, vname string, sname string) (sdp *ResourceSnapshot, err RestError) {
-
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s", pool, vname, sname)
 
 	l := jcom.LFC(ctx)
@@ -212,14 +201,13 @@ func (s *RestEndpoint) GetVolumeSnapshot(ctx context.Context, pool string, vname
 	})
 
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetSnapshotRCode)
-
 	if err != nil {
 		l.Warnf("Unable to get volume snapshots %+v", err.Error())
 		return nil, err
 	}
 
 	var snapdata ResourceSnapshot
-	var rsp = &GeneralResponse{Data: &snapdata}
+	rsp := &GeneralResponse{Data: &snapdata}
 
 	if stat == CodeOK || stat == CodeAccepted {
 		l.Debug("Obtained volume listing")
@@ -241,7 +229,6 @@ func (s *RestEndpoint) GetVolumeSnapshot(ctx context.Context, pool string, vname
 //   - *vid* physical volume id as it used by JovianDSS
 //   - *desc* data, including snapahot name, that would be transfered to create snapshot
 func (s *RestEndpoint) CreateSnapshot(ctx context.Context, pool string, vid string, desc *CreateSnapshotDescriptor) RestError {
-
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots", pool, vid)
 
 	l := jcom.LFC(ctx)
@@ -250,7 +237,6 @@ func (s *RestEndpoint) CreateSnapshot(ctx context.Context, pool string, vid stri
 	})
 
 	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, CreateSnapshotRCode)
-
 	if err != nil {
 		s.l.Warnln("Unable to create snapshot ", desc.SnapshotName)
 		return err
@@ -265,7 +251,6 @@ func (s *RestEndpoint) CreateSnapshot(ctx context.Context, pool string, vid stri
 }
 
 func (s *RestEndpoint) DeleteSnapshot(ctx context.Context, pool string, vname string, sname string, data DeleteSnapshotDescriptor) (err RestError) {
-
 	l := jcom.LFC(ctx)
 
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s", pool, vname, sname)
@@ -276,7 +261,6 @@ func (s *RestEndpoint) DeleteSnapshot(ctx context.Context, pool string, vname st
 	})
 
 	stat, body, err := s.rp.Send(ctx, "DELETE", addr, data, DeleteSnapshotRCode)
-
 	if err != nil {
 		s.l.Warnf("Unable to send delete snapshot %s request", sname)
 		return err
@@ -298,7 +282,7 @@ func (s *RestEndpoint) getResultsEntries(data *GeneralResponse) (results *int64,
 	return nil, nil
 }
 
-//func (s *RestEndpoint) DeleteClone(
+// func (s *RestEndpoint) DeleteClone(
 //	vname string,
 //	sname string,
 //	cname string,
@@ -360,7 +344,6 @@ func (s *RestEndpoint) getResultsEntries(data *GeneralResponse) (results *int64,
 //}
 
 func (s *RestEndpoint) PromoteClone(vname string, sname string, cname string) RestError {
-
 	return nil
 	// l := s.l.WithFields(logrus.Fields{
 	// 	"func": "PromoteClone",

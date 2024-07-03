@@ -118,7 +118,7 @@ type CreateSnapshotProperties struct {
 type CreateSnapshotDescriptor struct {
 	SnapshotName string                    `json:"snapshot_name"`        // string with name of the new snapshot.
 	Recursive    *bool                     `json:"recursive,omitempty"`  // boolean indicating if recursively create snapshots of all descendant datasets
-	Properties   *CreateSnapshotProperties `json:"properties,omitempty"` //object containing properties of new snapshot.
+	Properties   *CreateSnapshotProperties `json:"properties,omitempty"` // object containing properties of new snapshot.
 }
 
 type DeleteSnapshotDescriptor struct {
@@ -147,4 +147,42 @@ type TargetLunDescriptor struct {
 	Mode      *string `json:"mode,omitempty"`
 	BlockSize *int    `json:"block_size,omitempty"`
 	EUI       *string `json:"eui,omitempty"`
+}
+
+type CreateShareDescriptor struct {
+	Name    string     `json:"name"`
+	Path    string     `json:"path"`
+	Comment *string    `json:"comment,omitempty"`
+	Active  *bool      `json:"active,omitempty"`
+	NFS     *NFSConfig `json:"nfs,omitempty"`
+	SMB     *SMBConfig `json:"smb,omitempty"`
+}
+
+type NFSConfig struct {
+	Enabled               *bool    `json:"enabled,omitempty"`
+	AllowAccessIP         []string `json:"allow_access_ip,omitempty"`
+	AllowWriteIP          []string `json:"allow_write_ip,omitempty"`
+	InsecureConnections   *bool    `json:"insecure_connections,omitempty"`
+	SynchronousDataRecord *bool    `json:"synchronous_data_record,omitempty"`
+	InsecureLockRequests  *bool    `json:"insecure_lock_requests,omitempty"`
+	AllSquash             *bool    `json:"all_squash,omitempty"`
+	NoRootSquash          *bool    `json:"no_root_squash,omitempty"`
+}
+
+type SMBConfig struct {
+	Enabled           *bool   `json:"enabled,omitempty"`
+	ReadOnly          *bool   `json:"read_only,omitempty"`
+	Visible           *bool   `json:"visible,omitempty"`
+	HandlingLargeDirs *bool   `json:"handling_large_dirs,omitempty"`
+	DefaultCase       *string `json:"default_case,omitempty"`
+	InheritOwner      *bool   `json:"inherit_owner,omitempty"`
+	InheritPerms      *bool   `json:"inherit_perms,omitempty"`
+	AccessMode        *string `json:"access_mode,omitempty"`
+	Spotlight         *bool   `json:"spotlight,omitempty"`
+	TimeMachine       *bool   `json:"timemachine,omitempty"`
+}
+
+type DeleteShareDescriptor struct {
+	RecursivelyChildren *bool `json:"recursively_children,omitempty"`
+	ForceUnmount        *bool `json:"force_umount,omitempty"`
 }

@@ -21,39 +21,68 @@ import (
 	"context"
 	"fmt"
 
-	log "github.com/sirupsen/logrus"
-
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	log "github.com/sirupsen/logrus"
 )
 
-func (s *RestEndpoint) CreateShare(ctx context.Context, share string) (err RestError) {
-
+func (s *RestEndpoint) CreateShare(ctx context.Context, desc *CreateShareDescriptor) RestError {
 	addr := fmt.Sprintf("api/v3/shares")
 
-	l := s.l.WithFields(log.Fields{
+	l := jcom.LFC(ctx)
+	l = l.WithFields(log.Fields{
 		"func":    "CreateShares",
 		"section": "rest",
 		"url":     addr,
 	})
 
-	var rsp = GeneralResponse{Data: &clones}
+	var share ResourceShare
+	rsp := GeneralResponse{Data: &share}
 
-	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumeRCode)
-
+	stat, body, err := s.rp.Send(ctx, "POST", addr, rsp, GetVolumeRCode)
 	if err != nil {
-		msg := fmt.Sprintf("Unable to get list of shares ")
+		msg := fmt.Sprintf("Unable to create share %s ", desc.Name)
 		l.Warn(msg)
-		return nil, GetError(RestErrorRequestMalfunction, msg)
+		return GetError(RestErrorRequestMalfunction, msg)
 	}
 
 	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return nil, errU
+		return errU
 	}
 
-	if stat == CodeOK || stat == CodeNoContent {
-		return clones, nil
+	if stat == CodeOK || stat == CodeCreated {
+		return nil
 	}
 
-	return nil, getError(ctx, body)
+	return getError(ctx, body)
 }
 
+// func (s *RestEndpoint) DeleteShare(ctx context.Context, desc *DeleteShareDescriptor) RestError {
+// 	addr := fmt.Sprintf("api/v3/shares")
+//
+// 	l := jcom.LFC(ctx)
+// 	l = l.WithFields(log.Fields{
+// 		"func":    "CreateShares",
+// 		"section": "rest",
+// 		"url":     addr,
+// 	})
+//
+// 	var share ResourceShare
+// 	rsp := GeneralResponse{Data: &share}
+//
+// 	stat, body, err := s.rp.Send(ctx, "POST", addr, rsp, GetVolumeRCode)
+// 	if err != nil {
+// 		msg := fmt.Sprintf("Unable to create share %s ", desc. Name)
+// 		l.Warn(msg)
+// 		return GetError(RestErrorRequestMalfunction, msg)
+// 	}
+//
+// 	if errU := s.unmarshal(body, &rsp); errU != nil {
+// 		return errU
+// 	}
+//
+// 	if stat == CodeOK || stat == CodeCreated {
+// 		return nil
+// 	}
+//
+// 	return getError(ctx, body)
+// }

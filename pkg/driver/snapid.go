@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
-	//jrest "joviandss-kubernetescsi/pkg/rest"
+	// jrest "joviandss-kubernetescsi/pkg/rest"
 )
 
 type SnapshotDesc struct {
@@ -29,7 +29,6 @@ func IsSDS(vds string) bool {
 }
 
 func NewSnapshotDescFromName(lid LunDesc, name string) *SnapshotDesc {
-
 	// Get universal volume ID
 	var sd SnapshotDesc
 
@@ -55,7 +54,7 @@ func NewSnapshotDescFromName(lid LunDesc, name string) *SnapshotDesc {
 		sd.sds = fmt.Sprintf("ss_%X", rawID)
 		sd.idFormat = "ss"
 	}
-	# TODO: reconsider using base64
+	// TODO: reconsider using base64
 	sd.csiID = fmt.Sprintf("%s_%s",
 		sd.sds,
 		base64.StdEncoding.EncodeToString([]byte(sd.ld.VDS())))
@@ -64,7 +63,6 @@ func NewSnapshotDescFromName(lid LunDesc, name string) *SnapshotDesc {
 
 // parseSDS take sds string as
 func (sd *SnapshotDesc) parseSDS(sds string) error {
-
 	parts := strings.Split(sds, "_")
 
 	if len(parts) < 2 {
@@ -148,7 +146,6 @@ func (ps *SnapshotDesc) String() string {
 }
 
 func (sd *SnapshotDesc) Name() string {
-
 	if len(sd.name) == 0 {
 		panic(fmt.Sprintf("Unable to identify snapshot name %+v", sd))
 	}
@@ -156,7 +153,6 @@ func (sd *SnapshotDesc) Name() string {
 }
 
 func (sd *SnapshotDesc) SDS() string {
-
 	if len(sd.sds) == 0 {
 		panic(fmt.Sprintf("Unable to identify snapshot descriptor string %+v", sd))
 	}
@@ -164,7 +160,6 @@ func (sd *SnapshotDesc) SDS() string {
 }
 
 func (sd *SnapshotDesc) CSIID() string {
-
 	if len(sd.csiID) == 0 {
 		panic(fmt.Sprintf("Unable to identify snapshot csi id %+v", sd))
 	}
