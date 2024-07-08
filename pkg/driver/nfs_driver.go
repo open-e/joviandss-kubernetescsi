@@ -34,12 +34,12 @@ import (
 )
 
 // JovianDSS CSI plugin
-type CSIDriver struct {
+type CSINFSDriver struct {
 	re jrest.RestEndpoint
 	l  *logrus.Entry
 }
 
-func (d *CSIDriver) cloneLUN(ctx context.Context, pool string, source LunDesc, clone LunDesc, snap *SnapshotDesc) jrest.RestError {
+func (d *CSINFSDriver) cloneLUN(ctx context.Context, pool string, source LunDesc, clone LunDesc, snap *SnapshotDesc) jrest.RestError {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func": "cloneLUN",
@@ -70,21 +70,34 @@ func (d *CSIDriver) cloneLUN(ctx context.Context, pool string, source LunDesc, c
 	return err
 }
 
-func (d *CSIDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDesc, volumeSize int64) jrest.RestError {
-	vd := jrest.CreateVolumeDescriptor{
-		Name: nvd.VDS(),
-		Size: fmt.Sprintf("%d", volumeSize),
+func (d *CSINFSDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDesc, volumeSize int64) jrest.RestError {
+	enable_NFS := true
+	all_squash_NFS := true
+	active_share := true
+	name := nvd.Name()
+	path := fmt.Sprintf("%s/%s/%s", pool, name, name)
+
+	nfs := jrest.ShareNFSDescriptor{
+		Enabled:   &enable_NFS,
+		AllSquash: &all_squash_NFS,
 	}
 
-	return d.re.CreateVolume(ctx, pool, vd)
+	sd := jrest.CreateShareDescriptor{
+		Name:   nvd.VDS(),
+		Active: &active_share,
+		Path:   path,
+		NFS:    &nfs,
+	}
+
+	return d.re.CreateShare(ctx, &sd)
 }
 
-func (d *CSIDriver) CreateVolumeFromSnapshot(ctx context.Context, pool string, sd *SnapshotDesc, nvd *VolumeDesc) jrest.RestError {
+func (d *CSINFSDriver) CreateVolumeFromSnapshot(ctx context.Context, pool string, sd *SnapshotDesc, nvd *VolumeDesc) jrest.RestError {
 	clonedata := jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: sd.SDS()}
 	return d.re.CreateClone(ctx, pool, sd.ld.VDS(), clonedata)
 }
 
-func (d *CSIDriver) deleteIntermediateSnapshot(ctx context.Context, pool string, vds string, sds string) (err jrest.RestError) {
+func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool string, vds string, sds string) (err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "deleteIntermediateSnapshot",
@@ -138,7 +151,7 @@ func (d *CSIDriver) deleteIntermediateSnapshot(ctx context.Context, pool string,
 //	- pool pool name
 //	- vd source volume descripto
 //	- nvd new volume desctiptor
-func (d *CSIDriver) CreateVolumeFromVolume(ctx context.Context, pool string, vd *VolumeDesc, nvd *VolumeDesc) (err jrest.RestError) {
+func (d *CSINFSDriver) CreateVolumeFromVolume(ctx context.Context, pool string, vd *VolumeDesc, nvd *VolumeDesc) (err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "CreateVolumeFromVolume",
@@ -172,7 +185,7 @@ func (d *CSIDriver) CreateVolumeFromVolume(ctx context.Context, pool string, vd 
 // cleanIntermediateSnapshots request list of snapshots related to particular volume and check if there are intermediate one that can be deleted
 //
 //	return list of snapshots that does not contain 'handing' one or error
-func (d *CSIDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (snaps []jrest.ResourceSnapshot, err jrest.RestError) {
+func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (snaps []jrest.ResourceSnapshot, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "cleanIntermediateSnapshots",
@@ -211,7 +224,7 @@ func (d *CSIDriver) cleanIntermediateSnapshots(ctx context.Context, pool string,
 	return out, nil
 }
 
-func (d *CSIDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) (err jrest.RestError) {
+func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) (err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "deleteLUN",
@@ -283,7 +296,7 @@ func (d *CSIDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) 
 	return err
 }
 
-func (d *CSIDriver) DeleteVolume(ctx context.Context, pool string, vid *VolumeDesc) jrest.RestError {
+func (d *CSINFSDriver) DeleteVolume(ctx context.Context, pool string, vid *VolumeDesc) jrest.RestError {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "DeleteVolume",
@@ -293,7 +306,7 @@ func (d *CSIDriver) DeleteVolume(ctx context.Context, pool string, vid *VolumeDe
 	return d.deleteLUN(ctx, pool, vid)
 }
 
-func (d *CSIDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (vols []jrest.ResourceVolume, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSINFSDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (vols []jrest.ResourceVolume, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllVolumes",
@@ -321,7 +334,7 @@ func (d *CSIDriver) ListAllVolumes(ctx context.Context, pool string, maxret int,
 	}
 }
 
-func (d *CSIDriver) ListAllSnapshots(ctx context.Context, pool string, maxret int, token CSIListingToken) (snaps []jrest.ResourceSnapshotShort, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSINFSDriver) ListAllSnapshots(ctx context.Context, pool string, maxret int, token CSIListingToken) (snaps []jrest.ResourceSnapshotShort, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllSnapshots",
@@ -352,7 +365,7 @@ func (d *CSIDriver) ListAllSnapshots(ctx context.Context, pool string, maxret in
 
 // ListVolumeSnapshots provides maxret records of snapshots of volume starting from token
 // if no token nor limit on number of snapshot is given it will list all snapshots of particular volume
-func (d *CSIDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token CSIListingToken) (snaps []jrest.ResourceSnapshot, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSINFSDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token CSIListingToken) (snaps []jrest.ResourceSnapshot, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListVolumeSnapshots",
@@ -381,14 +394,14 @@ func (d *CSIDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *V
 	}
 }
 
-func NewJovianDSSCSIDriver(cfg *jcom.RestEndpointCfg, l *logrus.Entry) (d *CSIDriver, err error) {
+func NewJovianDSSCSINFSDriver(cfg *jcom.RestEndpointCfg, l *logrus.Entry) (d *CSIDriver, err error) {
 	var drvr CSIDriver
 	jrest.SetupEndpoint(&drvr.re, cfg, l)
 
 	return &drvr, nil
 }
 
-func (d *CSIDriver) GetVolume(ctx context.Context, pool string, vd *VolumeDesc) (out *jrest.ResourceVolume, err jrest.RestError) {
+func (d *CSINFSDriver) GetVolume(ctx context.Context, pool string, vd *VolumeDesc) (out *jrest.ResourceVolume, err jrest.RestError) {
 	// return nil, nil
 
 	l := jcom.LFC(ctx)
@@ -402,7 +415,7 @@ func (d *CSIDriver) GetVolume(ctx context.Context, pool string, vd *VolumeDesc) 
 	return d.re.GetVolume(ctx, pool, vd.VDS()) // v for Volume
 }
 
-func (d *CSIDriver) GetSnapshot(ctx context.Context, pool string, vd LunDesc, sd *SnapshotDesc) (out *jrest.ResourceSnapshot, err jrest.RestError) {
+func (d *CSINFSDriver) GetSnapshot(ctx context.Context, pool string, vd LunDesc, sd *SnapshotDesc) (out *jrest.ResourceSnapshot, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "GetSnapshot",
@@ -414,7 +427,7 @@ func (d *CSIDriver) GetSnapshot(ctx context.Context, pool string, vd LunDesc, sd
 	return d.re.GetVolumeSnapshot(ctx, pool, vd.VDS(), sd.SDS())
 }
 
-func (d *CSIDriver) CreateSnapshot(ctx context.Context, pool string, vd *VolumeDesc, sd *SnapshotDesc) jrest.RestError {
+func (d *CSINFSDriver) CreateSnapshot(ctx context.Context, pool string, vd *VolumeDesc, sd *SnapshotDesc) jrest.RestError {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "CreateSnapshot",
@@ -428,7 +441,7 @@ func (d *CSIDriver) CreateSnapshot(ctx context.Context, pool string, vd *VolumeD
 	return d.re.CreateSnapshot(ctx, pool, vd.VDS(), &snapdata)
 }
 
-func (d *CSIDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDesc, sd *SnapshotDesc) jrest.RestError {
+func (d *CSINFSDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDesc, sd *SnapshotDesc) jrest.RestError {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "DeleteSnapshot",
@@ -490,7 +503,7 @@ func (d *CSIDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDesc,
 	return err
 }
 
-func (d *CSIDriver) GetPool(ctx context.Context, pool string) (out *jrest.ResourcePool, err jrest.RestError) {
+func (d *CSINFSDriver) GetPool(ctx context.Context, pool string) (out *jrest.ResourcePool, err jrest.RestError) {
 	// return nil, nil
 
 	l := jcom.LFC(ctx)
@@ -504,7 +517,7 @@ func (d *CSIDriver) GetPool(ctx context.Context, pool string) (out *jrest.Resour
 	return d.re.GetPool(ctx, pool)
 }
 
-func (d *CSIDriver) PublishVolume(ctx context.Context, pool string, ld LunDesc, iqnPrefix string, readonly bool) (iscsiContext *map[string]string, rErr jrest.RestError) {
+func (d *CSINFSDriver) PublishVolume(ctx context.Context, pool string, ld LunDesc, iqnPrefix string, readonly bool) (iscsiContext *map[string]string, rErr jrest.RestError) {
 	// Create target
 
 	iContext := map[string]string{}
@@ -592,7 +605,7 @@ func (d *CSIDriver) PublishVolume(ctx context.Context, pool string, ld LunDesc, 
 	return nil, jrest.GetError(jrest.RestErrorRequestTimeout, fmt.Sprintf("Unable to ensure that target %s is up and running", iqn))
 }
 
-func (d *CSIDriver) UnpublishVolume(ctx context.Context, pool string, prefix string, ld LunDesc) (rErr jrest.RestError) {
+func (d *CSINFSDriver) UnpublishVolume(ctx context.Context, pool string, prefix string, ld LunDesc) (rErr jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "UnpublishVolume",

@@ -23,9 +23,8 @@ import (
 	"encoding/binary"
 
 	//"encoding/json"
-	"os"
-
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
@@ -81,7 +80,7 @@ var supportedVolumeCapabilities = []csi.VolumeCapability_AccessMode_Mode{
 	// VolumeCapability_AccessMode_UNKNOWN,
 	csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 	csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
-	//csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
+	// csi.VolumeCapability_AccessMode_MULTI_NODE_READER_ONLY,
 	// VolumeCapability_AccessMode_MULTI_NODE_SINGLE_WRITER,
 	// VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
 
@@ -97,12 +96,13 @@ type ControllerPlugin struct {
 	volumesAccess    sync.Mutex
 	volumesInProcess map[string]bool
 
-	pool             string
-	d                *jdrvr.CSIDriver
+	pool string
+	d    *jdrvr.CSIDriver
+
 	re               jrest.RestEndpoint
 	iscsiEndpointCfg jcom.ISCSIEndpointCfg
 	// TODO: add iscsi endpoint
-	//iscsiEndpoint    []*rest.StorageInterface
+	// iscsiEndpoint    []*rest.StorageInterface
 	capabilities []*csi.ControllerServiceCapability
 	vCap         []*csi.VolumeCapability
 }
@@ -144,7 +144,7 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
 	}
 	cp.le = cp.l.WithFields(log.Fields{"section": "controller", "traceId": "setup"})
 
-	if cp.d, err = jdrvr.NewJovianDSSCSIDriver(&cfg.RestEndpointCfg, cp.le); err != nil {
+	if cp.d, err = jdrvr.NewJovianDSSCSINFSDriver(&cfg.RestEndpointCfg, cp.le); err != nil {
 		return err
 	}
 
@@ -155,7 +155,7 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
 	}
 	cp.iqnPrefix = cfg.ISCSIEndpointCfg.Iqn
 	cp.iscsiEndpointCfg = cfg.ISCSIEndpointCfg
-	//cp.le.Debugf("Iscsi config %+v", cfg.ISCSIEndpointCfg)
+	// cp.le.Debugf("Iscsi config %+v", cfg.ISCSIEndpointCfg)
 	cp.pool = cfg.Pool
 	// cp.volumesInProcess = make(map[string]bool)
 
@@ -243,7 +243,7 @@ func (cp *ControllerPlugin) getRandomPassword(l int) (s string) {
 func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.ResourceVolume, error) {
 	// return nil, nil
 	l := cp.l.WithField("traceId", ctx.Value("traceId"))
-	//Value("traceId").(string))
+	// Value("traceId").(string))
 
 	l.Debugf("context %+v", ctx)
 	l.Debugf("Get volume with id: %s", vID)
@@ -283,7 +283,6 @@ func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.R
 }
 
 func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.VolumeDesc, capr *csi.CapacityRange, vSource *csi.VolumeContentSource) (volumeSize int64, csierr error) {
-
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
 		"func":    "createNeVolume",
@@ -359,7 +358,6 @@ func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.Volu
 // if volume does not exists it fails with NOT_FOUND
 // if volume do exists and fit requirmnets it will return csi volume struct and nil as error
 func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDesc, caprage *csi.CapacityRange, source *csi.VolumeContentSource) (*int64, error) {
-
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
 		"func":    "VolumeComply",
@@ -391,7 +389,6 @@ func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDe
 	if source != nil {
 
 		if sv := source.GetVolume(); sv != nil {
-
 			if ov := vdata.OriginVolume(); ov != sv.GetVolumeId() {
 				if len(ov) == 0 && len(sv.GetVolumeId()) > 0 {
 					return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Volume with name %s exists and it is not derived from any volume", vd.Name()))
@@ -401,7 +398,6 @@ func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDe
 		}
 
 		if sv := source.GetSnapshot(); sv != nil {
-
 			if vol, err := jdrvr.NewVolumeDescFromVDS(vdata.OriginVolume()); err != nil {
 				return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Volume %s exists, but driver is not able to identify correctly its origin %s", vd.Name(), vdata.OriginVolume()))
 			} else {
@@ -423,7 +419,6 @@ func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDe
 
 // CreateVolume create volume with properties
 func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
-
 	l := cp.l.WithFields(log.Fields{
 		"request": "CreateVolume",
 		"func":    "CreateVolume",
@@ -459,7 +454,7 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 		return nil, status.Error(codes.InvalidArgument, "Volume Capabilities missing in request")
 	}
 
-	//volumeSize := req.GetCapacityRange().GetRequiredBytes()
+	// volumeSize := req.GetCapacityRange().GetRequiredBytes()
 	maxVSize := req.GetCapacityRange().GetLimitBytes()
 
 	if maxVSize > 0 {
@@ -498,7 +493,6 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 
 // DeleteVolume deletes volume or hides it for later deletion
 func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
-
 	l := cp.l.WithFields(log.Fields{
 		"request": "DeleteVolume",
 		"func":    "DeleteVolume",
@@ -541,7 +535,6 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 
 // ListVolumes return the list of volumes
 func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolumesRequest) (*csi.ListVolumesResponse, error) {
-
 	var rErr jrest.RestError
 	var token *jdrvr.CSIListingToken
 	var resp csi.ListVolumesResponse
@@ -581,12 +574,10 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 			return &resp, nil
 		}
 	}
-
 }
 
 // CreateSnapshot creates snapshot
 func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateSnapshotRequest) (*csi.CreateSnapshotResponse, error) {
-
 	l := cp.l.WithFields(log.Fields{
 		"request": "CreateSnapshot",
 		"func":    "CreateSnapshot",
@@ -664,7 +655,6 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 // DeleteSnapshot deletes snapshot
 func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteSnapshotRequest) (*csi.DeleteSnapshotResponse, error) {
-
 	l := cp.l.WithFields(log.Fields{
 		"request": "DeleteSnapshot",
 		"func":    "DeleteSnapshot",
@@ -709,7 +699,6 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 
 // ListSnapshots return the list of valid snapshots
 func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnapshotsRequest) (rsp *csi.ListSnapshotsResponse, err error) {
-
 	var rErr jrest.RestError
 	var token *jdrvr.CSIListingToken
 	var resp csi.ListSnapshotsResponse
@@ -800,7 +789,6 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 
 // ControllerPublishVolume create iscsi target for the volume
 func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
-
 	l := cp.l.WithFields(log.Fields{
 		"request": "ControllerPublishVolume",
 		"func":    "ControllerPublishVolume",
@@ -875,7 +863,6 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 
 // ControllerUnpublishVolume remove iscsi target for the volume
 func (cp *ControllerPlugin) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
-
 	l := cp.l.WithFields(log.Fields{
 		"request": "ControllerUnpublishVolume",
 		"func":    "ControllerUnpublishVolume",
@@ -899,7 +886,6 @@ func (cp *ControllerPlugin) ControllerUnpublishVolume(ctx context.Context, req *
 
 // ValidateVolumeCapabilities checks if volume have give capability
 func (cp *ControllerPlugin) ValidateVolumeCapabilities(ctx context.Context, req *csi.ValidateVolumeCapabilitiesRequest) (*csi.ValidateVolumeCapabilitiesResponse, error) {
-
 	l := cp.l.WithFields(log.Fields{
 		"request": "ValidateVolumeCapabilities",
 		"func":    "ValidateVolumeCapabilitiese",
@@ -978,7 +964,6 @@ func (cp *ControllerPlugin) ControllerGetVolume(ctx context.Context, in *csi.Con
 
 // GetCapacity gets storage capacity
 func (cp *ControllerPlugin) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
-
 	// TODO: add capability check
 	pool, rErr := cp.d.GetPool(ctx, cp.pool)
 	if rErr != nil {

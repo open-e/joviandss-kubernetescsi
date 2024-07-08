@@ -150,15 +150,15 @@ type TargetLunDescriptor struct {
 }
 
 type CreateShareDescriptor struct {
-	Name    string     `json:"name"`
-	Path    string     `json:"path"`
-	Comment *string    `json:"comment,omitempty"`
-	Active  *bool      `json:"active,omitempty"`
-	NFS     *NFSConfig `json:"nfs,omitempty"`
-	SMB     *SMBConfig `json:"smb,omitempty"`
+	Name    string              `json:"name"`
+	Path    string              `json:"path"`
+	Comment *string             `json:"comment,omitempty"`
+	Active  *bool               `json:"active,omitempty"`
+	NFS     *ShareNFSDescriptor `json:"nfs,omitempty"`
+	SMB     *ShareSMBDescriptor `json:"smb,omitempty"`
 }
 
-type NFSConfig struct {
+type ShareNFSDescriptor struct {
 	Enabled               *bool    `json:"enabled,omitempty"`
 	AllowAccessIP         []string `json:"allow_access_ip,omitempty"`
 	AllowWriteIP          []string `json:"allow_write_ip,omitempty"`
@@ -169,7 +169,7 @@ type NFSConfig struct {
 	NoRootSquash          *bool    `json:"no_root_squash,omitempty"`
 }
 
-type SMBConfig struct {
+type ShareSMBDescriptor struct {
 	Enabled           *bool   `json:"enabled,omitempty"`
 	ReadOnly          *bool   `json:"read_only,omitempty"`
 	Visible           *bool   `json:"visible,omitempty"`
