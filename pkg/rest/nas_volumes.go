@@ -25,17 +25,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (s *RestEndpoint) CreateShare(ctx context.Context, desc *CreateShareDescriptor) RestError {
+func (s *RestEndpoint) CreateNASVolume(ctx context.Context, desc *CreateNASVolumeDescriptor) RestError {
 	addr := fmt.Sprintf("api/v3/shares")
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func":    "CreateShares",
+		"func":    "CreateNASVolume",
 		"section": "rest",
 		"url":     addr,
 	})
 
-	var share ResourceShare
+	var share ResourceN
 	rsp := GeneralResponse{Data: &share}
 
 	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, GetVolumeRCode)
@@ -55,34 +55,3 @@ func (s *RestEndpoint) CreateShare(ctx context.Context, desc *CreateShareDescrip
 
 	return getError(ctx, body)
 }
-
-// func (s *RestEndpoint) DeleteShare(ctx context.Context, desc *DeleteShareDescriptor) RestError {
-// 	addr := fmt.Sprintf("api/v3/shares")
-//
-// 	l := jcom.LFC(ctx)
-// 	l = l.WithFields(log.Fields{
-// 		"func":    "CreateShares",
-// 		"section": "rest",
-// 		"url":     addr,
-// 	})
-//
-// 	var share ResourceShare
-// 	rsp := GeneralResponse{Data: &share}
-//
-// 	stat, body, err := s.rp.Send(ctx, "POST", addr, rsp, GetVolumeRCode)
-// 	if err != nil {
-// 		msg := fmt.Sprintf("Unable to create share %s ", desc. Name)
-// 		l.Warn(msg)
-// 		return GetError(RestErrorRequestMalfunction, msg)
-// 	}
-//
-// 	if errU := s.unmarshal(body, &rsp); errU != nil {
-// 		return errU
-// 	}
-//
-// 	if stat == CodeOK || stat == CodeCreated {
-// 		return nil
-// 	}
-//
-// 	return getError(ctx, body)
-// }

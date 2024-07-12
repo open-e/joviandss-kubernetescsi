@@ -46,32 +46,44 @@ const (
 	LZ4     Compression = "lz4"
 )
 
-// Define Logbias as a type with specific allowed values
-type Logbias string
+type SyncSetting string
 
 const (
-	Latency    Logbias = "latency"
-	Throughput Logbias = "throughput"
+	Always   SyncSetting = "always"
+	Standard SyncSetting = "standard"
+	Disabled SyncSetting = "disabled"
 )
 
-// Define Sync as a type with specific allowed values
-type Sync string
+type CacheSetting string
 
 const (
-	Always   Sync = "always"
-	Standard Sync = "standard"
-	Disabled Sync = "disabled"
+	CacheAll      CacheSetting = "all"
+	CacheNone     CacheSetting = "none"
+	CacheMetadata CacheSetting = "metadata"
 )
 
-// Define Dedup as a type with specific allowed values
-type Dedup string
+type LogBias string
 
 const (
-	DedupOff     Dedup = "off"
-	DedupOn      Dedup = "on"
-	Verify       Dedup = "verify"
-	SHA256       Dedup = "sha256"
-	SHA256Verify Dedup = "sha256,verify"
+	LogBiasLatency    LogBias = "latency"
+	LogBiasThroughput LogBias = "throughput"
+)
+
+type AtimeSetting string
+
+const (
+	AtimeOn  AtimeSetting = "on"
+	AtimeOff AtimeSetting = "off"
+)
+
+type DedupSetting string
+
+const (
+	DedupOn           DedupSetting = "on"
+	DedupOff          DedupSetting = "off"
+	DedupVerify       DedupSetting = "verify"
+	DedupSha256       DedupSetting = "sha256"
+	DedupSha256Verify DedupSetting = "sha256,verify"
 )
 
 // Define Copies as a type
@@ -82,9 +94,9 @@ type CreateVolumeProperties struct {
 	Primarycache   *Primarycache `json:"primarycache,omitempty"`
 	Secondarycache *Primarycache `json:"secondarycache,omitempty"`
 	Compression    *Compression  `json:"compression,omitempty"`
-	Logbias        *Logbias      `json:"logbias,omitempty"`
-	Sync           *Sync         `json:"sync,omitempty"`
-	Dedup          *Dedup        `json:"dedup,omitempty"`
+	Logbias        *LogBias      `json:"logbias,omitempty"`
+	Sync           *SyncSetting  `json:"sync,omitempty"`
+	Dedup          *DedupSetting `json:"dedup,omitempty"`
 	Copies         *Copies       `json:"copies,omitempty"`
 }
 
@@ -185,4 +197,18 @@ type ShareSMBDescriptor struct {
 type DeleteShareDescriptor struct {
 	RecursivelyChildren *bool `json:"recursively_children,omitempty"`
 	ForceUnmount        *bool `json:"force_umount,omitempty"`
+}
+
+type CreateNASVolumeDescriptor struct {
+	Compression    *Compression  `json:"compression,omitempty"`
+	PrimaryCache   *CacheSetting `json:"primarycache,omitempty"`
+	LogBias        *LogBias      `json:"logbias,omitempty"`
+	Dedup          *DedupSetting `json:"dedup,omitempty"`
+	Copies         *Copies       `json:"copies,omitempty"`
+	Sync           *SyncSetting  `json:"sync,omitempty"`
+	Quota          *string       `json:"quota,omitempty"`
+	RefReservation *string       `json:"refreservation,omitempty"`
+	Atime          *AtimeSetting `json:"atime,omitempty"`
+	SecondaryCache *CacheSetting `json:"secondarycache,omitempty"`
+	Name           string        `json:"name"` // Name field without omitempty
 }

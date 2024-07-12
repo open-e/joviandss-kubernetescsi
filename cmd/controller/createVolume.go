@@ -23,7 +23,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/sirupsen/logrus"
-	//humanize "github.com/dustin/go-humanize"
+	// humanize "github.com/dustin/go-humanize"
 
 	"github.com/open-e/joviandss-kubernetescsi/pkg/common"
 	"github.com/open-e/joviandss-kubernetescsi/pkg/controller"
@@ -32,11 +32,11 @@ import (
 )
 
 var (
-//volumeName string
-//volumeSize string
+// volumeName string
+// volumeSize string
 
-//volumeSizeRequired string
-//volumeSizeLimit string
+// volumeSizeRequired string
+// volumeSizeLimit string
 )
 
 func createVolume(cmd *cobra.Command, args []string) {
@@ -64,7 +64,7 @@ func createVolume(cmd *cobra.Command, args []string) {
 	req.CapacityRange = &cr
 
 	req.Name = volumeName
-	var supportedVolumeCapabilities = []csi.VolumeCapability_AccessMode_Mode{
+	supportedVolumeCapabilities := []csi.VolumeCapability_AccessMode_Mode{
 		// VolumeCapability_AccessMode_UNKNOWN,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		csi.VolumeCapability_AccessMode_SINGLE_NODE_READER_ONLY,
@@ -99,7 +99,6 @@ func createVolume(cmd *cobra.Command, args []string) {
 		req.CapacityRange = &csi.CapacityRange{
 			LimitBytes: volumeSizeLimit,
 		}
-
 	}
 
 	if volumeSizeRequired != 0 {
@@ -132,9 +131,7 @@ to quickly create a Cobra application.`,
 }
 
 func init() {
-
 	createVolumeCmd.Flags().StringVarP(&volumeName, "name", "n", "", "Name of volume to create")
-	//createVolumeCmd.Flags().StringVarP(&volumeSize,"size",	"s",		"", "Size of volume to create")
 	createVolumeCmd.Flags().Int64VarP(&volumeSizeRequired, "srq", "", 0, "Required size of volume to create")
 	createVolumeCmd.Flags().Int64VarP(&volumeSizeLimit, "slm", "", 0, "Limit size of volume to create")
 	createVolumeCmd.Flags().StringVarP(&sourceVolumeName, "volume", "", "", "Name of source volume to use")

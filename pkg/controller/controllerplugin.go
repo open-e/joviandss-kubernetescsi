@@ -97,7 +97,7 @@ type ControllerPlugin struct {
 	volumesInProcess map[string]bool
 
 	pool string
-	d    *jdrvr.CSIDriver
+	d    jdrvr.CSIDriver
 
 	re               jrest.RestEndpoint
 	iscsiEndpointCfg jcom.ISCSIEndpointCfg
