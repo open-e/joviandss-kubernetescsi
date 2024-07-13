@@ -30,6 +30,19 @@ import (
 	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
+const (
+	kib    int64 = 1024
+	mib    int64 = kib * 1024
+	gib    int64 = mib * 1024
+	gib100 int64 = gib * 100
+	tib    int64 = gib * 1024
+	tib100 int64 = tib * 100
+)
+
+const (
+	minSupportedVolumeSize = 16 * mib
+)
+
 // JovianDSS CSI plugin
 type CSINFSDriver struct {
 	re jrest.RestEndpoint
@@ -67,18 +80,47 @@ func (d *CSINFSDriver) cloneLUN(ctx context.Context, pool string, source LunDesc
 	return err
 }
 
-func (d *CSINFSDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDesc, volumeSize int64) jrest.RestError {
-	enable_NFS := true
-	all_squash_NFS := true
-	active_share := true
-	name := nvd.VDS()
-	path := fmt.Sprintf("%s/%s/%s", pool, name, name)
-
+func (d *CSINFSDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDesc, requiredBytes int64, limitBytes int64) jrest.RestError {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "CreateVolume",
 		"section": "NFSDriver",
 	})
+
+	name := nvd.VDS()
+
+	nasvolume := jrest.CreateNASVolumeDescriptor{
+		Name: name,
+	}
+
+	if requiredBytes > minSupportedVolumeSize {
+		rbs := fmt.Sprintf("%d", requiredBytes)
+		nasvolume.Reservation = &rbs
+	}
+
+	if limitBytes >= minSupportedVolumeSize {
+		lbs := fmt.Sprintf("%d", limitBytes)
+		nasvolume.Quota = &lbs
+	}
+
+	err := d.re.CreateNASVolume(ctx, pool, &nasvolume)
+
+	switch jrest.ErrCode(err) {
+	case jrest.RestErrorOk:
+		break
+	case jrest.RestErrorResourceExists:
+		l.Warnf("NAS Volume %s exists", name)
+		break
+	default:
+		l.Debugf("Unable to create nas volume %s, error had happaned %+v", nvd.Name(), err.Error())
+		return err
+	}
+
+	enable_NFS := true
+	all_squash_NFS := true
+	active_share := true
+
+	path := fmt.Sprintf("%s/%s/%s", pool, name, name)
 	l.Debugf("Create share with path %s", path)
 
 	nfs := jrest.ShareNFSDescriptor{
@@ -97,8 +139,13 @@ func (d *CSINFSDriver) CreateVolume(ctx context.Context, pool string, nvd *Volum
 }
 
 func (d *CSINFSDriver) CreateVolumeFromSnapshot(ctx context.Context, pool string, sd *SnapshotDesc, nvd *VolumeDesc) jrest.RestError {
-	clonedata := jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: sd.SDS()}
-	return d.re.CreateClone(ctx, pool, sd.ld.VDS(), clonedata)
+	// clonedata := jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: sd.SDS()}
+	// TODO: implement create from clone
+
+	return jrest.GetError(jrest.RestErrorFailureUnknown,
+		fmt.Sprintf("Creation of volume from snapshot is not implemented"))
+	// return &jrest.restError{code: jrest.RestErrorFailureUnknown}
+	// return d.re.CreateClone(ctx, pool, sd.ld.VDS(), clonedata)
 }
 
 func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool string, vds string, sds string) (err jrest.RestError) {
@@ -162,49 +209,57 @@ func (d *CSINFSDriver) CreateVolumeFromVolume(ctx context.Context, pool string, 
 		"section": "driver",
 	})
 
-	snapdata := jrest.CreateSnapshotDescriptor{SnapshotName: nvd.VDS()}
+	return jrest.GetError(jrest.RestErrorFailureUnknown,
+		fmt.Sprintf("Creation of volume from volume is not implemented"))
+	// snapdata := jrest.CreateSnapshotDescriptor{SnapshotName: nvd.VDS()}
 
-	if err := d.re.CreateSnapshot(ctx, pool, vd.VDS(), &snapdata); err != nil {
-		code := err.GetCode()
-		// We are not able to create this snapshot for some reason
+	// if err := d.re.CreateSnapshot(ctx, pool, vd.VDS(), &snapdata); err != nil {
+	// 	code := err.GetCode()
+	// 	// We are not able to create this snapshot for some reason
 
-		// Probably it was already created
-		if code == jrest.RestErrorResourceExists {
-			d.deleteIntermediateSnapshot(ctx, pool, vd.VDS(), nvd.VDS())
-		}
-		return err
-	}
+	// 	// Probably it was already created
+	// 	if code == jrest.RestErrorResourceExists {
+	// 		d.deleteIntermediateSnapshot(ctx, pool, vd.VDS(), nvd.VDS())
+	// 	}
+	// 	return err
+	// }
 
-	clonedata := jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: nvd.VDS()}
-	if err = d.re.CreateClone(ctx, pool, vd.VDS(), clonedata); err != nil {
-		l.Warnf("Unable to create volume %s from snapshot %s of volume %s, because of error %+v. Removing intermediate snapshot", nvd.VDS(), nvd.VDS(), vd.VDS(), err.Error())
+	// clonedata := jrest.CloneVolumeDescriptor{Name: nvd.VDS(), Snapshot: nvd.VDS()}
+	// if err = d.re.CreateClone(ctx, pool, vd.VDS(), clonedata); err != nil {
+	// 	l.Warnf("Unable to create volume %s from snapshot %s of volume %s, because of error %+v. Removing intermediate snapshot", nvd.VDS(), nvd.VDS(), vd.VDS(), err.Error())
 
-		d.deleteIntermediateSnapshot(ctx, pool, vd.VDS(), nvd.VDS())
-		return err
-	}
+	// 	d.deleteIntermediateSnapshot(ctx, pool, vd.VDS(), nvd.VDS())
+	// 	return err
+	// }
 
-	return nil
+	// return nil
 }
 
 // cleanIntermediateSnapshots request list of snapshots related to particular volume and check if there are intermediate one that can be deleted
 //
 //	return list of snapshots that does not contain 'handing' one or error
-func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (snaps []jrest.ResourceSnapshot, err jrest.RestError) {
+func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (out []jrest.ResourceSnapshot, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "cleanIntermediateSnapshots",
 		"section": "driver",
 	})
 	token := NewCSIListingToken()
-	snaps, _, gserr := d.ListVolumeSnapshots(ctx, pool, vd, 0, token)
+	isnaps, _, gserr := d.ListVolumeSnapshots(ctx, pool, vd, 0, token)
 
+	var snaps []jrest.ResourceSnapshot
+
+	if val, ok := isnaps.([]jrest.ResourceSnapshot); ok == true {
+		snaps = val
+	} else {
+		err = jrest.GetError(jrest.RestErrorFailureUnknown, "Unable to typecast snapshot data")
+		return nil, err
+	}
 	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
 	if gserr != nil {
 		l.Debugf("Unable to get list of snapshots for volume %s", vd.Name())
 		return nil, gserr
 	}
-
-	var out []jrest.ResourceSnapshot
 
 	for _, snap := range snaps {
 		if IsVDS(snap.Name) {
@@ -213,7 +268,7 @@ func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool stri
 				forceUnmount := true
 				snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUnmount: &forceUnmount}
 
-				err = d.re.DeleteSnapshot(ctx, pool, vd.VDS(), snap.Name, snapdeldata)
+				err = d.re.DeleteNASVolumeSnapshot(ctx, pool, vd.VDS(), snap.Name, snapdeldata)
 				if err != nil {
 					return nil, err
 				}
@@ -228,6 +283,38 @@ func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool stri
 	return out, nil
 }
 
+func (d *CSINFSDriver) deleteNASVolAndShare(ctx context.Context, pool string, vd *VolumeDesc) (err jrest.RestError) {
+	l := jcom.LFC(ctx)
+	l = l.WithFields(logrus.Fields{
+		"func":    "deleteLUN",
+		"section": "driver",
+	})
+
+	err = d.re.DeleteShare(ctx, vd.VDS())
+	switch jrest.ErrCode(err) {
+	case jrest.RestErrorResourceDNE:
+		break
+	case jrest.RestErrorOk:
+		break
+	default:
+		l.Debugf("Unable to delete share %s, error had happaned %+v", vd.Name(), err.Error())
+		return err
+	}
+
+	err = d.re.DeleteNASVolume(ctx, pool, vd.VDS())
+	switch jrest.ErrCode(err) {
+	case jrest.RestErrorResourceDNE:
+		break
+	case jrest.RestErrorOk:
+		break
+	default:
+		l.Debugf("Unable to delete nas volume %s, error had happaned %+v", vd.Name(), err.Error())
+		return err
+	}
+
+	return nil
+}
+
 func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) (err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
@@ -235,9 +322,10 @@ func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDes
 		"section": "driver",
 	})
 
-	forceUmount := true
-	deldata := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
-	err = d.re.DeleteVolume(ctx, pool, vd.VDS(), deldata)
+	// forceUmount := true
+	err = d.deleteNASVolAndShare(ctx, pool, vd)
+	// deldata := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
+	// err = d.re.DeleteVolume(ctx, pool, vd.VDS(), deldata)
 
 	switch jrest.ErrCode(err) {
 	case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusyVolumeHasSnapshots:
@@ -291,7 +379,7 @@ func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDes
 			msg += fmt.Sprintf(" snapshots: %s", strings.Join(dsnaps[:], ","))
 		}
 		if len(ncsi) > 0 {
-			msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(ncsi[:], ","))
+			msg += fmt.Sprintf(" not CSI related snapshots: %s", strings.Join(ncsi[:], ","))
 		}
 		err = jrest.GetError(jrest.RestErrorResourceBusy, msg)
 		// fmt.Sprintf("%s %v %v", msg, dsnaps, dvols))
@@ -369,31 +457,31 @@ func (d *CSINFSDriver) ListAllSnapshots(ctx context.Context, pool string, maxret
 
 // ListVolumeSnapshots provides maxret records of snapshots of volume starting from token
 // if no token nor limit on number of snapshot is given it will list all snapshots of particular volume
-func (d *CSINFSDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token CSIListingToken) (snaps []jrest.ResourceSnapshot, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSINFSDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func":    "ListVolumeSnapshots",
+		"func":    "ListNASVolumeSnapshots",
+		"proto":   "NFS",
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceSnapshot, err jrest.RestError) {
+	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceNASVolumeSnapshot, err jrest.RestError) {
 		l.Debugln("Getting Volume Snapshots entries")
-		entr, err := d.re.GetVolumeSnapshotsEntries(ctx, pool, vid.VDS(), token.Page(), token.DC())
+		entr, err := d.re.GetNASVolumeSnapshotsEntries(ctx, pool, vid.VDS(), token.Page(), token.DC())
 		if err != nil {
 			return nil, err
 		}
 
-		if entries, ok := entr.Entries.(*[]jrest.ResourceSnapshot); ok == true {
+		if entries, ok := entr.Entries.(*[]jrest.ResourceNASVolumeSnapshot); ok == true {
 			return *entries, nil
 		}
 		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
 		return nil, nil
 	}
 
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestSnapshotEntryBasedID); err != nil {
+	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestNASVolumeSnapshotEntryBasedID); err != nil {
 		return nil, nil, err
 	} else {
-		// ts := csitoken.Token()
 		return entries, csitoken, nil
 	}
 }

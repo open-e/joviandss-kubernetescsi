@@ -21,6 +21,7 @@ import (
 	//"fmt"
 	//"strings"
 	"context"
+
 	log "github.com/sirupsen/logrus"
 
 	// "encoding/base64"
@@ -35,7 +36,6 @@ import (
 )
 
 func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshotShort) (err error) {
-
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
 		"func":    "completeListResponseFromSnapshotShort",
@@ -43,7 +43,7 @@ func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSna
 	})
 
 	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
-	var i = 0
+	i := 0
 
 	lsr.Entries = entries
 	for _, s := range snaps {
@@ -75,43 +75,102 @@ func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSna
 	return nil
 }
 
-func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshot, ld jdrvr.LunDesc) (err error) {
+// func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshot, ld jdrvr.LunDesc) (err error) {
+// 	l := jcom.LFC(ctx)
+// 	l = l.WithFields(log.Fields{
+// 		"func":    "completeListResponseFromSnapshotShort",
+// 		"section": "controller",
+// 	})
+// 	i := 0
+//
+// 	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
+// 	lsr.Entries = entries
+// 	for i, s := range snaps {
+// 		ts := timestamppb.New(s.Creation)
+//
+// 		sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
+// 		if err != nil {
+// 			l.Warnf("Snapshot name has incompatible format %s", s.Name)
+// 			continue
+// 		}
+//
+// 		entries[i] = &csi.ListSnapshotsResponse_Entry{
+// 			Snapshot: &csi.Snapshot{
+// 				SnapshotId:     sd.CSIID(),
+// 				SourceVolumeId: ld.CSIID(),
+// 				CreationTime:   ts,
+// 				ReadyToUse:     true,
+// 			},
+// 		}
+// 		i += 1
+// 	}
+// 	lsr.Entries = entries[:i]
+//
+// 	return nil
+// }
 
+func completeListResponseFromVolumeSnapshots(ctx context.Context, lsr *csi.ListSnapshotsResponse, gsnaps interface{}, ld jdrvr.LunDesc) (err error) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func":    "completeListResponseFromSnapshotShort",
+		"func":    "completeListResponseFromNASVolumeSnapshotShort",
 		"section": "controller",
 	})
-	var i = 0
+	i := 0
 
-	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
-	lsr.Entries = entries
-	for i, s := range snaps {
-		ts := timestamppb.New(s.Creation)
+	switch snaps := gsnaps.(type) {
+	case []jrest.ResourceSnapshot:
+		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
+		lsr.Entries = entries
+		for _, s := range snaps {
+			ts := timestamppb.New(s.Creation)
 
-		sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
-		if err != nil {
-			l.Warnf("Snapshot name has incompatible format %s", s.Name)
-			continue
+			sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
+			if err != nil {
+				l.Warnf("Snapshot name has incompatible format %s", s.Name)
+				continue
+			}
+
+			entries[i] = &csi.ListSnapshotsResponse_Entry{
+				Snapshot: &csi.Snapshot{
+					SnapshotId:     sd.CSIID(),
+					SourceVolumeId: ld.CSIID(),
+					CreationTime:   ts,
+					ReadyToUse:     true,
+				},
+			}
+			i += 1
 		}
+		lsr.Entries = entries[:i]
+	case []jrest.ResourceNASVolumeSnapshot:
+		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
+		lsr.Entries = entries
 
-		entries[i] = &csi.ListSnapshotsResponse_Entry{
-			Snapshot: &csi.Snapshot{
-				SnapshotId:     sd.CSIID(),
-				SourceVolumeId: ld.CSIID(),
-				CreationTime:   ts,
-				ReadyToUse:     true,
-			},
+		for _, s := range snaps {
+			ts := timestamppb.New(s.Creation)
+
+			sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
+			if err != nil {
+				l.Warnf("Snapshot name has incompatible format %s", s.Name)
+				continue
+			}
+
+			entries[i] = &csi.ListSnapshotsResponse_Entry{
+				Snapshot: &csi.Snapshot{
+					SnapshotId:     sd.CSIID(),
+					SourceVolumeId: ld.CSIID(),
+					CreationTime:   ts,
+					ReadyToUse:     true,
+				},
+			}
+			i += 1
 		}
-		i += 1
+		lsr.Entries = entries[:i]
 	}
-	lsr.Entries = entries[:i]
 
 	return nil
 }
 
 func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesResponse, vols []jrest.ResourceVolume) (err error) {
-
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
 		"func":    "completeListResponseFromVolume",
@@ -119,7 +178,7 @@ func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesRes
 	})
 
 	entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
-	var i = 0
+	i := 0
 	for _, v := range vols {
 
 		vd, err := jdrvr.NewVolumeDescFromVDS(v.Name)
@@ -151,7 +210,6 @@ func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesRes
 						},
 					}
 				}
-
 			}
 		}
 

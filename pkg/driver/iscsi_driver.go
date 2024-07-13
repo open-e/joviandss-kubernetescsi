@@ -67,7 +67,16 @@ func (d *CSIISCSiDriver) cloneLUN(ctx context.Context, pool string, source LunDe
 	return err
 }
 
-func (d *CSIISCSiDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDesc, volumeSize int64) jrest.RestError {
+func (d *CSIISCSiDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDesc, requiredBytes int64, limitBytes int64) jrest.RestError {
+	var volumeSize int64
+	if limitBytes == requiredBytes {
+		volumeSize = limitBytes
+	} else if requiredBytes < minSupportedVolumeSize {
+		volumeSize = minSupportedVolumeSize
+	} else {
+		volumeSize = requiredBytes
+	}
+
 	vd := jrest.CreateVolumeDescriptor{
 		Name: nvd.VDS(),
 		Size: fmt.Sprintf("%d", volumeSize),
@@ -169,22 +178,29 @@ func (d *CSIISCSiDriver) CreateVolumeFromVolume(ctx context.Context, pool string
 // cleanIntermediateSnapshots request list of snapshots related to particular volume and check if there are intermediate one that can be deleted
 //
 //	return list of snapshots that does not contain 'handing' one or error
-func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (snaps []jrest.ResourceSnapshot, err jrest.RestError) {
+func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (out []jrest.ResourceSnapshot, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "cleanIntermediateSnapshots",
 		"section": "driver",
 	})
 	token := NewCSIListingToken()
-	snaps, _, gserr := d.ListVolumeSnapshots(ctx, pool, vd, 0, token)
+	isnaps, _, gserr := d.ListVolumeSnapshots(ctx, pool, vd, 0, token)
+
+	var snaps []jrest.ResourceSnapshot
+
+	if val, ok := isnaps.([]jrest.ResourceSnapshot); ok == true {
+		snaps = val
+	} else {
+		err = jrest.GetError(jrest.RestErrorFailureUnknown, "Unable to typecast snapshot data")
+		return nil, err
+	}
 
 	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
 	if gserr != nil {
 		l.Debugf("Unable to get list of snapshots for volume %s", vd.Name())
 		return nil, gserr
 	}
-
-	var out []jrest.ResourceSnapshot
 
 	for _, snap := range snaps {
 		if IsVDS(snap.Name) {
@@ -349,7 +365,7 @@ func (d *CSIISCSiDriver) ListAllSnapshots(ctx context.Context, pool string, maxr
 
 // ListVolumeSnapshots provides maxret records of snapshots of volume starting from token
 // if no token nor limit on number of snapshot is given it will list all snapshots of particular volume
-func (d *CSIISCSiDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token CSIListingToken) (snaps []jrest.ResourceSnapshot, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSIISCSiDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListVolumeSnapshots",

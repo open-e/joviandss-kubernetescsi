@@ -29,8 +29,10 @@ const resourceNamePattern = `/([\w\-\/]+)`
 
 const originNamePattern = `(?P<pool>[\w\-\.]+)/(?P<volume>[\w\-\.]+)@(?P<snapshot>[\w\-\.]+)`
 
-var resourceNameRegexp = regexp.MustCompile(resourceNamePattern)
-var originNameRegexp = regexp.MustCompile(originNamePattern)
+var (
+	resourceNameRegexp = regexp.MustCompile(resourceNamePattern)
+	originNameRegexp   = regexp.MustCompile(originNamePattern)
+)
 
 type GeneralResponse struct {
 	Data  interface{} `json:"data,omitempty"`
@@ -190,7 +192,6 @@ type ResourceSnapshot struct {
 }
 
 func (m *ResourceSnapshot) UnmarshalJSON(data []byte) error {
-
 	type Alias ResourceSnapshot
 	aux := &struct {
 		Creation string `json:"creation,omitempty"`
@@ -243,7 +244,6 @@ type ResourceSnapshotShortProperties struct {
 }
 
 func (m *ResourceSnapshotShortProperties) UnmarshalJSON(data []byte) error {
-
 	type Alias ResourceSnapshotShortProperties
 	aux := &struct {
 		Creation string `json:"creation,omitempty"`
@@ -298,7 +298,6 @@ type ResourcePool struct {
 }
 
 func (m *ResourcePool) UnmarshalJSON(data []byte) error {
-
 	type Alias ResourcePool
 	aux := &struct {
 		Available string `json:"available,omitempty"`
@@ -385,7 +384,6 @@ type ResourceTarget struct {
 	DenyIP              []string                  `json:"deny_ip,omitempty"`
 }
 
-
 type ShareNFS struct {
 	NoRootSquash          bool     `json:"no_root_squash"`
 	AllowWriteIP          []net.IP `json:"allow_write_ip"`
@@ -398,27 +396,114 @@ type ShareNFS struct {
 }
 
 type ShareSMB struct {
-	Enabled            bool   `json:"enabled"`
-	ReadOnly           bool   `json:"read_only"`
-	Visible            bool   `json:"visible"`
-	HandlingLargeDirs  bool   `json:"handling_large_dirs"`
-	DefaultCase        string `json:"default_case"`
-	InheritOwner       bool   `json:"inherit_owner"`
-	InheritPerms       bool   `json:"inherit_perms"`
-	AccessMode         string `json:"access_mode"`
-	Timemachine        bool   `json:"timemachine"`
-	Recycle            bool   `json:"recycle"`
-	RecycleName        string `json:"recycle_name"`
+	Enabled           bool   `json:"enabled"`
+	ReadOnly          bool   `json:"read_only"`
+	Visible           bool   `json:"visible"`
+	HandlingLargeDirs bool   `json:"handling_large_dirs"`
+	DefaultCase       string `json:"default_case"`
+	InheritOwner      bool   `json:"inherit_owner"`
+	InheritPerms      bool   `json:"inherit_perms"`
+	AccessMode        string `json:"access_mode"`
+	Timemachine       bool   `json:"timemachine"`
+	Recycle           bool   `json:"recycle"`
+	RecycleName       string `json:"recycle_name"`
 }
 
 type ResourceShare struct {
-	Comment     string	`json:"comment"`
-	Name        string 	`json:"name"`
-	RealPath    string 	`json:"real_path"`
-	NFS         ShareNFS    `json:"nfs"`
-	SMB         ShareSMB    `json:"smb"`
-	Active      bool	`json:"active"`
-	Path        string 	`json:"path"`
-	Conflicted  bool   	`json:"conflicted"`
+	Comment    string   `json:"comment"`
+	Name       string   `json:"name"`
+	RealPath   string   `json:"real_path"`
+	NFS        ShareNFS `json:"nfs"`
+	SMB        ShareSMB `json:"smb"`
+	Active     bool     `json:"active"`
+	Path       string   `json:"path"`
+	Conflicted bool     `json:"conflicted"`
 }
 
+type ResourceNASVolume struct {
+	ID                        string       `json:"id,omitempty"`
+	Name                      string       `json:"name"`
+	FullName                  string       `json:"fullName,omitempty"`
+	ScreenName                string       `json:"screenName,omitempty"`
+	Deduplication             DedupSetting `json:"deduplication,omitempty"`
+	Compression               Compression  `json:"compression,omitempty"`
+	RecordSize                int64        `json:"recordsize,omitempty"`
+	Sync                      SyncSetting  `json:"sync,omitempty"`
+	LogBias                   LogBias      `json:"logBias,omitempty"`
+	PrimaryCache              CacheSetting `json:"primaryCache,omitempty"`
+	SecondaryCache            CacheSetting `json:"secondaryCache,omitempty"`
+	AccessTime                AtimeSetting `json:"accessTime,omitempty"`
+	Copies                    Copies       `json:"copies,omitempty"`
+	Quota                     string       `json:"quota,omitempty"`
+	Reservation               string       `json:"reservation,omitempty"`
+	ResWithDescendents        bool         `json:"resWithDescendents,omitempty"`
+	RefquotaWithDescendents   bool         `json:"refquotaWithDescendents,omitempty"`
+	Pool                      string       `json:"pool,omitempty"`
+	Type                      string       `json:"type,omitempty"`
+	SharesCount               int          `json:"sharesCount,omitempty"`
+	OdpLocalRetention         bool         `json:"odpLocalRetention,omitempty"`
+	OdpLocalEnabled           bool         `json:"odpLocalEnabled,omitempty"`
+	OdpRemoteRetention        bool         `json:"odpRemoteRetention,omitempty"`
+	OdpRemoteSrcPath          string       `json:"odpRemoteSrcPath,omitempty"`
+	OdpRemoteSrcHostname      string       `json:"odpRemoteSrcHostname,omitempty"`
+	OdpIsReceivingDataStopped bool         `json:"odpIsReceivingDataStopped,omitempty"`
+	UsedByTracker             bool         `json:"usedByTracker,omitempty"`
+}
+
+type ResourceNASVolumeSnapshot struct {
+	SetUID            string    `json:"setuid,omitempty"`
+	AclType           string    `json:"acltype,omitempty"`
+	UserRefs          string    `json:"userrefs,omitempty"`
+	PrimaryCache      string    `json:"primarycache,omitempty"`
+	Creation          time.Time `json:"creation,omitempty"`
+	Referenced        string    `json:"referenced,omitempty"`
+	CreateTXG         string    `json:"createtxg,omitempty"`
+	CaseSensitivity   string    `json:"casesensitivity,omitempty"`
+	GUID              string    `json:"guid,omitempty"`
+	XAttr             string    `json:"xattr,omitempty"`
+	CompressRatio     string    `json:"compressratio,omitempty"`
+	RootContext       string    `json:"rootcontext,omitempty"`
+	UTF8Only          string    `json:"utf8only,omitempty"`
+	Encryption        string    `json:"encryption,omitempty"`
+	DefContext        string    `json:"defcontext,omitempty"`
+	Written           string    `json:"written,omitempty"`
+	Version           string    `json:"version,omitempty"`
+	MlsLabel          string    `json:"mlslabel,omitempty"`
+	SecondaryCache    string    `json:"secondarycache,omitempty"`
+	Used              string    `json:"used,omitempty"`
+	Exec              string    `json:"exec,omitempty"`
+	RefCompressRatio  string    `json:"refcompressratio,omitempty"`
+	FsContext         string    `json:"fscontext,omitempty"`
+	Normalization     string    `json:"normalization,omitempty"`
+	ObjSetID          string    `json:"objsetid,omitempty"`
+	Name              string    `json:"name"`
+	DeferDestroy      string    `json:"defer_destroy,omitempty"`
+	Type              string    `json:"type,omitempty"`
+	Devices           string    `json:"devices,omitempty"`
+	LogicalReferenced string    `json:"logicalreferenced,omitempty"`
+	Context           string    `json:"context,omitempty"`
+	NbMand            string    `json:"nbmand,omitempty"`
+}
+
+func (m *ResourceNASVolumeSnapshot) UnmarshalJSON(data []byte) error {
+	type Alias ResourceNASVolumeSnapshot
+	aux := &struct {
+		Creation string `json:"creation,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	const layout = "2006-01-02 15:04:05"
+	if aux.Creation != "" { // Only parse if non-empty
+		parsedTime, err := time.Parse(layout, aux.Creation)
+		if err != nil {
+			return err
+		}
+		m.Creation = parsedTime
+	}
+
+	return nil
+}

@@ -329,7 +329,7 @@ func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.Volu
 			volumeSize = capr.GetRequiredBytes()
 		}
 
-		err = cp.d.CreateVolume(ctx, cp.pool, nvd, volumeSize)
+		err = cp.d.CreateVolume(ctx, cp.pool, nvd, capr.GetRequiredBytes(), capr.GetLimitBytes())
 	}
 
 	switch jrest.ErrCode(err) {
@@ -736,7 +736,8 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 				if ts != nil {
 					resp.NextToken = ts.Token()
 				}
-				if err = completeListResponseFromVolumeSnapshot(ctx, &resp, snapList, vd); err != nil {
+
+				if err = completeListResponseFromVolumeSnapshots(ctx, &resp, snapList, vd); err != nil {
 					return nil, err
 				} else {
 					return &resp, nil

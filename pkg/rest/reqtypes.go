@@ -200,15 +200,18 @@ type DeleteShareDescriptor struct {
 }
 
 type CreateNASVolumeDescriptor struct {
-	Compression    *Compression  `json:"compression,omitempty"`
-	PrimaryCache   *CacheSetting `json:"primarycache,omitempty"`
-	LogBias        *LogBias      `json:"logbias,omitempty"`
-	Dedup          *DedupSetting `json:"dedup,omitempty"`
-	Copies         *Copies       `json:"copies,omitempty"`
-	Sync           *SyncSetting  `json:"sync,omitempty"`
-	Quota          *string       `json:"quota,omitempty"`
-	RefReservation *string       `json:"refreservation,omitempty"`
-	Atime          *AtimeSetting `json:"atime,omitempty"`
-	SecondaryCache *CacheSetting `json:"secondarycache,omitempty"`
-	Name           string        `json:"name"` // Name field without omitempty
+	Compression             *Compression  `json:"compression,omitempty"`
+	PrimaryCache            *CacheSetting `json:"primarycache,omitempty"`
+	LogBias                 *LogBias      `json:"logbias,omitempty"`
+	Dedup                   *DedupSetting `json:"dedup,omitempty"`
+	Copies                  *Copies       `json:"copies,omitempty"`
+	Sync                    *SyncSetting  `json:"sync,omitempty"`
+	Quota                   *string       `json:"quota,omitempty"`
+	RefReservation          *string       `json:"refreservation,omitempty"`
+	Reservation             *string       `json:"reservation,omitempty"`
+	ResWithDescendents      *bool         `json:"resWithDescendents,omitempty"`
+	RefquotaWithDescendents *bool         `json:"refquotaWithDescendents,omitempty"`
+	Atime                   *AtimeSetting `json:"atime,omitempty"`
+	SecondaryCache          *CacheSetting `json:"secondarycache,omitempty"`
+	Name                    string        `json:"name"`
 }

@@ -36,8 +36,10 @@ var (
 	volumeName string
 	volumeSize int64
 
-// volumeSizeRequired string
-// volumeSizeLimit string
+	sourceVolumeName   string
+	sourceSnapshotName string
+	volumeSizeRequired int64
+	volumeSizeLimit    int64
 )
 
 var readOnly bool
@@ -75,7 +77,7 @@ func createVolume(cmd *cobra.Command, args []string) {
 		panic(err)
 	}
 
-	if err = d.CreateVolume(ctx, "Pool-0", nvid, volumeSize); err != nil {
+	if err = d.CreateVolume(ctx, "Pool-0", nvid, volumeSizeRequired, volumeSizeRequired); err != nil {
 		panic(err)
 	}
 }
@@ -91,8 +93,14 @@ var CreateVolumeCmd = &cobra.Command{
 }
 
 func init() {
-	CreateVolumeCmd.Flags().StringVarP(&volumeName, "name", "n", "", "Name of NFS share create")
-	CreateVolumeCmd.Flags().Int64VarP(&volumeSize, "size", "s", 0, "Size of volume to create")
+	// CreateVolumeCmd.Flags().StringVarP(&volumeName, "name", "n", "", "Name of NFS share create")
+	// CreateVolumeCmd.Flags().Int64VarP(&volumeSize, "size", "s", 0, "Size of volume to create")
+
+	CreateVolumeCmd.Flags().StringVarP(&volumeName, "name", "n", "", "Name of volume to create")
+	CreateVolumeCmd.Flags().Int64VarP(&volumeSizeRequired, "sreq", "r", 0, "Required size of volume to create")
+	CreateVolumeCmd.Flags().Int64VarP(&volumeSizeLimit, "slim", "m", 0, "Limit size of volume to create")
+	CreateVolumeCmd.Flags().StringVarP(&sourceVolumeName, "volume", "v", "", "Name of source volume to use")
+	CreateVolumeCmd.Flags().StringVarP(&sourceSnapshotName, "snapshot", "s", "", "Name of source snapshot to use")
 
 	if err := CreateVolumeCmd.MarkFlagRequired("name"); err != nil {
 		fmt.Println(err)
