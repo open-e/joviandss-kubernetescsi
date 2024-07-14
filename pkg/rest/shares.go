@@ -56,7 +56,7 @@ func (s *RestEndpoint) CreateShare(ctx context.Context, desc *CreateShareDescrip
 	return getError(ctx, body)
 }
 
-func (s *RestEndpoint) DeleteShare(ctx context.Context, snds string) RestError {
+func (s *RestEndpoint) DeleteShare(ctx context.Context, snds string, data DeleteShareDescriptor) RestError {
 	addr := fmt.Sprintf("api/v3/shares/%s", snds)
 
 	l := jcom.LFC(ctx)
@@ -69,7 +69,7 @@ func (s *RestEndpoint) DeleteShare(ctx context.Context, snds string) RestError {
 	var share ResourceShare
 	rsp := GeneralResponse{Data: &share}
 
-	stat, body, err := s.rp.Send(ctx, "POST", addr, nil, CodeNoContent)
+	stat, body, err := s.rp.Send(ctx, "POST", addr, &data, CodeNoContent)
 	if err != nil {
 		msg := fmt.Sprintf("Unable to delete share %s ", snds)
 		l.Warn(msg)

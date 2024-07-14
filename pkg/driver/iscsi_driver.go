@@ -96,8 +96,8 @@ func (d *CSIISCSiDriver) deleteIntermediateSnapshot(ctx context.Context, pool st
 		"func":    "deleteIntermediateSnapshot",
 		"section": "driver",
 	})
-	forceUnmount := true
-	snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUnmount: &forceUnmount}
+	forceUmount := true
+	snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 	// Just in case lets delete this snapshot and do everything from groud up
 	if err = d.re.DeleteSnapshot(ctx, pool, vds, sds, snapdeldata); err != nil {
 		code := err.GetCode()
@@ -206,8 +206,8 @@ func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool st
 		if IsVDS(snap.Name) {
 			clones := snap.ClonesNames()
 			if len(clones) == 0 {
-				forceUnmount := true
-				snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUnmount: &forceUnmount}
+				forceUmount := true
+				snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 
 				err = d.re.DeleteSnapshot(ctx, pool, vd.VDS(), snap.Name, snapdeldata)
 				if err != nil {
@@ -306,7 +306,7 @@ func (d *CSIISCSiDriver) DeleteVolume(ctx context.Context, pool string, vid *Vol
 	return d.deleteLUN(ctx, pool, vid)
 }
 
-func (d *CSIISCSiDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (vols []jrest.ResourceVolume, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSIISCSiDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (vols interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllVolumes",
@@ -451,7 +451,7 @@ func (d *CSIISCSiDriver) DeleteSnapshot(ctx context.Context, pool string, ld Lun
 	l.Debugf("Delete snapshot %s for volume %s", sd.SDS(), ld.VDS())
 
 	forceUmount := true
-	deldata := jrest.DeleteSnapshotDescriptor{ForceUnmount: &forceUmount}
+	deldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 
 	err := d.re.DeleteSnapshot(ctx, pool, ld.VDS(), sd.SDS(), deldata)
 

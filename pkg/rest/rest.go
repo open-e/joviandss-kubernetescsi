@@ -19,23 +19,21 @@ package rest
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
-var (
-	vendorVersion = "dev"
-)
+var vendorVersion = "dev"
 
 type StorageInterface interface {
-
 	// General information
 	GetAddress() (string, int)
 
 	// Pools
 	GetPool() (*ResourcePool, RestError)
-	//GetPools() ([]PoolShort, error)
+	// GetPools() ([]PoolShort, error)
 
 	// Volumes
 	CreateVolume(poolName string, vol ResourceVolume) RestError
@@ -59,7 +57,7 @@ type StorageInterface interface {
 	AddUserToTarget(tname string, name string, pass string) RestError
 
 	CreateClone(vname string, sname string, cname string) RestError
-	//DeleteClone(vname string, sname string, cname string, rChildren bool, rDependent bool) RestError
+	// DeleteClone(vname string, sname string, cname string, rChildren bool, rDependent bool) RestError
 	PromoteClone(vname string, sname string, cname string) RestError
 }
 
@@ -97,7 +95,6 @@ func (re *RestEndpoint) String() string {
 }
 
 func SetupEndpoint(rn *RestEndpoint, cfg *jcom.RestEndpointCfg, logger *logrus.Entry) (err error) {
-
 	rn.rec = *cfg
 
 	rn.l = logger.WithFields(logrus.Fields{"section": "rest"})

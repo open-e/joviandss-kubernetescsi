@@ -135,7 +135,7 @@ type CreateSnapshotDescriptor struct {
 
 type DeleteSnapshotDescriptor struct {
 	RecursivelyChildren *bool `json:"recursively_children,omitempty"`
-	ForceUnmount        *bool `json:"force_umount,omitempty"`
+	ForceUmount         *bool `json:"force_umount,omitempty"`
 }
 
 type CreateTargetDescriptor struct {
@@ -196,7 +196,7 @@ type ShareSMBDescriptor struct {
 
 type DeleteShareDescriptor struct {
 	RecursivelyChildren *bool `json:"recursively_children,omitempty"`
-	ForceUnmount        *bool `json:"force_umount,omitempty"`
+	ForceUmount         *bool `json:"force_umount,omitempty"`
 }
 
 type CreateNASVolumeDescriptor struct {
@@ -214,4 +214,9 @@ type CreateNASVolumeDescriptor struct {
 	Atime                   *AtimeSetting `json:"atime,omitempty"`
 	SecondaryCache          *CacheSetting `json:"secondarycache,omitempty"`
 	Name                    string        `json:"name"`
+}
+
+type DeleteNASVolumeDescriptor struct {
+	RecursivelyChildren *bool `json:"recursively_children,omitempty"`
+	ForceUmount         *bool `json:"force_umount,omitempty"`
 }

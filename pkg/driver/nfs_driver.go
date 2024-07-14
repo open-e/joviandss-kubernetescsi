@@ -154,8 +154,8 @@ func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool stri
 		"func":    "deleteIntermediateSnapshot",
 		"section": "driver",
 	})
-	forceUnmount := true
-	snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUnmount: &forceUnmount}
+	forceUmount := true
+	snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 	// Just in case lets delete this snapshot and do everything from groud up
 	if err = d.re.DeleteSnapshot(ctx, pool, vds, sds, snapdeldata); err != nil {
 		code := err.GetCode()
@@ -265,10 +265,11 @@ func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool stri
 		if IsVDS(snap.Name) {
 			clones := snap.ClonesNames()
 			if len(clones) == 0 {
-				forceUnmount := true
-				snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUnmount: &forceUnmount}
+				// TODO: think about arguments for deletion command
+				// forceUmount := true
+				// snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 
-				err = d.re.DeleteNASVolumeSnapshot(ctx, pool, vd.VDS(), snap.Name, snapdeldata)
+				err = d.re.DeleteNASVolumeSnapshot(ctx, pool, vd.VDS(), snap.Name)
 				if err != nil {
 					return nil, err
 				}
@@ -289,8 +290,10 @@ func (d *CSINFSDriver) deleteNASVolAndShare(ctx context.Context, pool string, vd
 		"func":    "deleteLUN",
 		"section": "driver",
 	})
+	forceUmountShare := true
+	delshare := jrest.DeleteShareDescriptor{ForceUmount: &forceUmountShare}
 
-	err = d.re.DeleteShare(ctx, vd.VDS())
+	err = d.re.DeleteShare(ctx, vd.VDS(), delshare)
 	switch jrest.ErrCode(err) {
 	case jrest.RestErrorResourceDNE:
 		break
@@ -301,7 +304,10 @@ func (d *CSINFSDriver) deleteNASVolAndShare(ctx context.Context, pool string, vd
 		return err
 	}
 
-	err = d.re.DeleteNASVolume(ctx, pool, vd.VDS())
+	forceUmountNASVolume := true
+	delnas := jrest.DeleteNASVolumeDescriptor{ForceUmount: &forceUmountNASVolume}
+
+	err = d.re.DeleteNASVolume(ctx, pool, vd.VDS(), delnas)
 	switch jrest.ErrCode(err) {
 	case jrest.RestErrorResourceDNE:
 		break
@@ -382,7 +388,6 @@ func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDes
 			msg += fmt.Sprintf(" not CSI related snapshots: %s", strings.Join(ncsi[:], ","))
 		}
 		err = jrest.GetError(jrest.RestErrorResourceBusy, msg)
-		// fmt.Sprintf("%s %v %v", msg, dsnaps, dvols))
 	}
 
 	return err
@@ -394,32 +399,32 @@ func (d *CSINFSDriver) DeleteVolume(ctx context.Context, pool string, vid *Volum
 		"func":    "DeleteVolume",
 		"section": "driver",
 	})
-
+	l.Debugf("Deleting volume %s", vid.Name())
 	return d.deleteLUN(ctx, pool, vid)
 }
 
-func (d *CSINFSDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (vols []jrest.ResourceVolume, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSINFSDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (vols interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllVolumes",
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceVolume, err jrest.RestError) {
+	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceNASVolume, err jrest.RestError) {
 		l.Debugln("Getting Volume entries")
-		entr, err := d.re.GetVolumesEntries(ctx, pool, token.Page(), token.DC())
+		entr, err := d.re.GetNASVolumesEntries(ctx, pool, token.Page(), token.DC())
 		if err != nil {
 			return nil, err
 		}
 
-		if entries, ok := entr.Entries.(*[]jrest.ResourceVolume); ok == true {
+		if entries, ok := entr.Entries.(*[]jrest.ResourceNASVolume); ok == true {
 			return *entries, nil
 		}
 		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
 		return nil, nil
 	}
 
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestVolumeEntryBasedID); err != nil {
+	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestNASVolumeEntryBasedID); err != nil {
 		return nil, nil, err
 	} else {
 		return entries, csitoken, nil
@@ -543,7 +548,7 @@ func (d *CSINFSDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDe
 	l.Debugf("Delete snapshot %s for volume %s", sd.SDS(), ld.VDS())
 
 	forceUmount := true
-	deldata := jrest.DeleteSnapshotDescriptor{ForceUnmount: &forceUmount}
+	deldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 
 	err := d.re.DeleteSnapshot(ctx, pool, ld.VDS(), sd.SDS(), deldata)
 

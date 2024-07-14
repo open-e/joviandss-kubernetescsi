@@ -448,6 +448,69 @@ type ResourceNASVolume struct {
 	OdpRemoteSrcHostname      string       `json:"odpRemoteSrcHostname,omitempty"`
 	OdpIsReceivingDataStopped bool         `json:"odpIsReceivingDataStopped,omitempty"`
 	UsedByTracker             bool         `json:"usedByTracker,omitempty"`
+	Origin                    string       `json:"origin,omitempty"`
+}
+
+func (v *ResourceNASVolume) GetSize() int64 {
+	if i, err := strconv.ParseInt(v.Quota, 10, 64); err != nil {
+		return 0
+	} else {
+		return i
+	}
+}
+
+func (v *ResourceNASVolume) OriginVolume() string {
+	if len(v.Origin) > 0 {
+		if originNameRegexp.MatchString(v.Origin) {
+			match := originNameRegexp.FindStringSubmatch(v.Origin)
+			volume := originNameRegexp.SubexpIndex("volume")
+			return match[volume]
+		}
+	}
+	return ""
+}
+
+func (v *ResourceNASVolume) OriginSnapshot() string {
+	if len(v.Origin) > 0 {
+		if originNameRegexp.MatchString(v.Origin) {
+			match := originNameRegexp.FindStringSubmatch(v.Origin)
+			snapshot := originNameRegexp.SubexpIndex("snapshot")
+			return match[snapshot]
+		}
+	}
+	return ""
+}
+
+func (m *ResourceNASVolume) UnmarshalJSON(data []byte) error {
+	type Alias ResourceNASVolume
+	aux := &struct {
+		Copies     string `json:"copies,omitempty"`
+		RecordSize string `json:"recordsize,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	if aux.Copies != "" {
+		num, err := strconv.Atoi(aux.Copies)
+		if err != nil {
+			return err
+		}
+		m.Copies = Copies(num)
+	}
+
+	if aux.RecordSize != "" {
+
+		num, err := strconv.ParseInt(aux.RecordSize, 10, 64)
+		if err != nil {
+			return err
+		}
+		m.RecordSize = num
+	}
+
+	return nil
 }
 
 type ResourceNASVolumeSnapshot struct {

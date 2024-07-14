@@ -170,59 +170,109 @@ func completeListResponseFromVolumeSnapshots(ctx context.Context, lsr *csi.ListS
 	return nil
 }
 
-func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesResponse, vols []jrest.ResourceVolume) (err error) {
+func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesResponse, gvols interface{}) (err error) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
 		"func":    "completeListResponseFromVolume",
 		"section": "controller",
 	})
 
-	entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
 	i := 0
-	for _, v := range vols {
 
-		vd, err := jdrvr.NewVolumeDescFromVDS(v.Name)
-		if err != nil {
-			l.Warnf("Volume name has incompatible format %s", v.Name)
-			continue
-		}
-		var contentSource *csi.VolumeContentSource
+	switch vols := gvols.(type) {
+	case []jrest.ResourceVolume:
+		entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
+		for _, v := range vols {
 
-		osds := v.OriginSnapshot()
-		if len(osds) > 0 {
-			if jdrvr.IsSDS(osds) {
-				if sd, err := jdrvr.NewSnapshotDescFromSDS(vd, osds); err != nil {
-					contentSource = &csi.VolumeContentSource{
-						Type: &csi.VolumeContentSource_Snapshot{
-							Snapshot: &csi.VolumeContentSource_SnapshotSource{
-								SnapshotId: sd.CSIID(),
+			vd, err := jdrvr.NewVolumeDescFromVDS(v.Name)
+			if err != nil {
+				l.Warnf("Volume name has incompatible format %s", v.Name)
+				continue
+			}
+			var contentSource *csi.VolumeContentSource
+
+			osds := v.OriginSnapshot()
+			if len(osds) > 0 {
+				if jdrvr.IsSDS(osds) {
+					if sd, err := jdrvr.NewSnapshotDescFromSDS(vd, osds); err != nil {
+						contentSource = &csi.VolumeContentSource{
+							Type: &csi.VolumeContentSource_Snapshot{
+								Snapshot: &csi.VolumeContentSource_SnapshotSource{
+									SnapshotId: sd.CSIID(),
+								},
 							},
-						},
+						}
 					}
-				}
-			} else if jdrvr.IsVDS(osds) {
-				if vd, err := jdrvr.NewVolumeDescFromVDS(osds); err == nil {
-					contentSource = &csi.VolumeContentSource{
-						Type: &csi.VolumeContentSource_Volume{
-							Volume: &csi.VolumeContentSource_VolumeSource{
-								VolumeId: vd.CSIID(),
+				} else if jdrvr.IsVDS(osds) {
+					if vd, err := jdrvr.NewVolumeDescFromVDS(osds); err == nil {
+						contentSource = &csi.VolumeContentSource{
+							Type: &csi.VolumeContentSource_Volume{
+								Volume: &csi.VolumeContentSource_VolumeSource{
+									VolumeId: vd.CSIID(),
+								},
 							},
-						},
+						}
 					}
 				}
 			}
-		}
 
-		entries[i] = &csi.ListVolumesResponse_Entry{
-			Volume: &csi.Volume{
-				CapacityBytes: v.GetSize(),
-				VolumeId:      vd.CSIID(),
-				ContentSource: contentSource,
-			},
+			entries[i] = &csi.ListVolumesResponse_Entry{
+				Volume: &csi.Volume{
+					CapacityBytes: v.GetSize(),
+					VolumeId:      vd.CSIID(),
+					ContentSource: contentSource,
+				},
+			}
+			i += 1
 		}
-		i += 1
+		lsr.Entries = entries[:i]
+	case []jrest.ResourceNASVolume:
+		entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
+		for _, v := range vols {
+
+			vd, err := jdrvr.NewVolumeDescFromVDS(v.Name)
+			if err != nil {
+				l.Warnf("Volume name has incompatible format %s", v.Name)
+				continue
+			}
+			var contentSource *csi.VolumeContentSource
+
+			osds := v.OriginSnapshot()
+			if len(osds) > 0 {
+				if jdrvr.IsSDS(osds) {
+					if sd, err := jdrvr.NewSnapshotDescFromSDS(vd, osds); err != nil {
+						contentSource = &csi.VolumeContentSource{
+							Type: &csi.VolumeContentSource_Snapshot{
+								Snapshot: &csi.VolumeContentSource_SnapshotSource{
+									SnapshotId: sd.CSIID(),
+								},
+							},
+						}
+					}
+				} else if jdrvr.IsVDS(osds) {
+					if vd, err := jdrvr.NewVolumeDescFromVDS(osds); err == nil {
+						contentSource = &csi.VolumeContentSource{
+							Type: &csi.VolumeContentSource_Volume{
+								Volume: &csi.VolumeContentSource_VolumeSource{
+									VolumeId: vd.CSIID(),
+								},
+							},
+						}
+					}
+				}
+			}
+
+			entries[i] = &csi.ListVolumesResponse_Entry{
+				Volume: &csi.Volume{
+					CapacityBytes: v.GetSize(),
+					VolumeId:      vd.CSIID(),
+					ContentSource: contentSource,
+				},
+			}
+			i += 1
+		}
+		lsr.Entries = entries[:i]
 	}
-	lsr.Entries = entries[:i]
 
 	return nil
 }

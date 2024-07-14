@@ -34,7 +34,7 @@ type CSIDriver interface {
 	CreateVolume(ctx context.Context, pool string, vd *VolumeDesc, requiredBytes int64, limitBytes int64) jrest.RestError
 	DeleteVolume(ctx context.Context, pool string, vd *VolumeDesc) jrest.RestError
 	GetVolume(ctx context.Context, pool string, vd *VolumeDesc) (*jrest.ResourceVolume, jrest.RestError)
-	ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) ([]jrest.ResourceVolume, *CSIListingToken, jrest.RestError)
+	ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (interface{}, *CSIListingToken, jrest.RestError)
 
 	// Snapshot operations
 	CreateSnapshot(ctx context.Context, pool string, vd *VolumeDesc, sd *SnapshotDesc) jrest.RestError

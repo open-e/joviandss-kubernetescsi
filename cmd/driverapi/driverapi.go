@@ -24,6 +24,7 @@ import (
 	"github.com/spf13/cobra"
 
 	create_volume "github.com/open-e/joviandss-kubernetescsi/cmd/driverapi/createvolume"
+	delete_nas_volume "github.com/open-e/joviandss-kubernetescsi/cmd/driverapi/deletenasvolume"
 	cli_common "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 	// cliStageVolume "github.com/open-e/joviandss-kubernetescsi/cmd/node/stagevolume"
 )
@@ -39,6 +40,7 @@ var DriverCmd = &cobra.Command{
 
 func addSubCmds() {
 	DriverCmd.AddCommand(create_volume.CreateVolumeCmd)
+	DriverCmd.AddCommand(delete_nas_volume.DeleteVolumeCmd)
 }
 
 func init() {

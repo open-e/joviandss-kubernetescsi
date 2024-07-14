@@ -56,8 +56,8 @@ func (s *RestEndpoint) CreateNASVolumeSnapshot(ctx context.Context, pool string,
 	return getError(ctx, body)
 }
 
-func (s *RestEndpoint) DeleteNASVolumeSnapshots(ctx context.Context, pool string, nvds string) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s", pool, nvds)
+func (s *RestEndpoint) DeleteNASVolumeSnapshot(ctx context.Context, pool string, nvds string, nvsds string) RestError {
+	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s", pool, nvds, nvsds)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
