@@ -69,19 +69,19 @@ func (s *RestEndpoint) DeleteNASVolume(ctx context.Context, pool string, nvds st
 	var nasvolume ResourceNASVolumeSnapshot
 	rsp := GeneralResponse{Data: &nasvolume}
 
-	stat, body, err := s.rp.Send(ctx, "POST", addr, &data, CodeNoContent)
+	stat, body, err := s.rp.Send(ctx, "DELETE", addr, nil, CodeNoContent)
 	if err != nil {
 		msg := fmt.Sprintf("Unable to delete nas volume %s ", nvds)
 		l.Warn(msg)
 		return GetError(RestErrorRequestMalfunction, msg)
 	}
 
-	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return errU
-	}
-
 	if stat == CodeNoContent {
 		return nil
+	}
+
+	if errU := s.unmarshal(body, &rsp); errU != nil {
+		return errU
 	}
 
 	return getError(ctx, body)

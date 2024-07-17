@@ -99,8 +99,13 @@ type ControllerPlugin struct {
 	pool string
 	d    jdrvr.CSIDriver
 
+	nfsd   jdrvr.CSIDriver
+	iscsid jdrvr.CSIDriver
+
 	re               jrest.RestEndpoint
 	iscsiEndpointCfg jcom.ISCSIEndpointCfg
+	nfsEndpointCfg   jcom.NFSEndpointCfg
+
 	// TODO: add iscsi endpoint
 	// iscsiEndpoint    []*rest.StorageInterface
 	capabilities []*csi.ControllerServiceCapability
@@ -144,20 +149,48 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
 	}
 	cp.le = cp.l.WithFields(log.Fields{"section": "controller", "traceId": "setup"})
 
-	if cp.d, err = jdrvr.NewJovianDSSCSINFSDriver(&cfg.RestEndpointCfg, cp.le); err != nil {
+	// cp.le.Debugf("CFG %+v", cfg)
+	// cp.le.Debugf("CFG nfs %+v", cfg.NFSEndpointCfg)
+	// cp.le.Debugf("PluginProtocolCompileString %+v", jcom.PluginProtocolCompileString)
+	// cp.le.Debugf("PluginProtocolCS %+v", jcom.StorageAccessProtocolType(jcom.PluginProtocolCompileString))
+	// cp.le.Debugf("PluginProtocol %+v", jcom.PluginProtocol)
+
+	if jcom.PluginProtocol == jcom.ISCSI {
+		if cfg.ISCSIEndpointCfg != nil {
+			// TODO: check what ip address nfs plugin takes
+			cp.le.Debug("Setting driver iSCSI")
+			if cp.d, err = jdrvr.NewJovianDSSCSIISCSiDriver(&cfg.RestEndpointCfg, cp.le); err != nil {
+				return err
+			}
+
+			cp.iscsiEndpointCfg = *cfg.ISCSIEndpointCfg
+
+			if len(cfg.ISCSIEndpointCfg.Iqn) == 0 {
+				cfg.ISCSIEndpointCfg.Iqn = "iqn.csi.2019-04"
+			}
+			cp.iqnPrefix = cfg.ISCSIEndpointCfg.Iqn
+		}
+	} else if jcom.PluginProtocol == jcom.NFS {
+		cp.le.Debug("Plugin protocol NFS")
+		if cfg.NFSEndpointCfg != nil {
+			// TODO: check what ip address nfs plugin takes
+			cp.le.Debug("Setting driver NFS")
+			if cp.d, err = jdrvr.NewJovianDSSCSINFSDriver(&cfg.RestEndpointCfg, cp.le); err != nil {
+				return err
+			}
+		} else {
+			return status.Errorf(codes.InvalidArgument, "Unable to identify NFS config section")
+		}
+	} else {
+		cp.le.Warn("Unable to settup driver")
+
+		err = status.Errorf(codes.InvalidArgument, "Unable to identify driver type")
 		return err
 	}
 
 	jrest.SetupEndpoint(&cp.re, &cfg.RestEndpointCfg, cp.le)
 
-	if len(cfg.ISCSIEndpointCfg.Iqn) == 0 {
-		cfg.ISCSIEndpointCfg.Iqn = "iqn.csi.2019-04"
-	}
-	cp.iqnPrefix = cfg.ISCSIEndpointCfg.Iqn
-	cp.iscsiEndpointCfg = cfg.ISCSIEndpointCfg
-	// cp.le.Debugf("Iscsi config %+v", cfg.ISCSIEndpointCfg)
 	cp.pool = cfg.Pool
-	// cp.volumesInProcess = make(map[string]bool)
 
 	return nil
 }
@@ -544,6 +577,7 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 		"func":    "ListVolumes",
 		"section": "controller",
 	})
+
 	ctx = jcom.WithLogger(ctx, l)
 
 	l.Debugf("Request: %+v", req)
@@ -559,7 +593,7 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 	if maxEnt < 0 {
 		return nil, status.Errorf(codes.Internal, "Number of Entries must not be negative.")
 	}
-
+	l.Debugf("Driver %+v", cp.d)
 	if volList, ts, rErr := cp.d.ListAllVolumes(ctx, cp.pool, int(maxEnt), *token); rErr != nil {
 		l.Debugf("Unable to comlete listing %s", rErr.Error())
 		return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error())
@@ -822,16 +856,16 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 
 	//////////////////////////////////////////////////////////////////////////////
 
-	iscsiContext, rErr := cp.d.PublishVolume(ctx, cp.pool, vd, cp.iqnPrefix, roMode)
+	context, rErr := cp.d.PublishVolume(ctx, cp.pool, vd, cp.iqnPrefix, roMode)
 
 	switch jrest.ErrCode(rErr) {
 	case jrest.RestErrorOk:
 
-		(*iscsiContext)["addrs"] = fmt.Sprintf(strings.Join(cp.iscsiEndpointCfg.Addrs, ","))
-		(*iscsiContext)["port"] = fmt.Sprintf("%d", cp.iscsiEndpointCfg.Port)
+		(*context)["addrs"] = fmt.Sprintf(strings.Join(cp.iscsiEndpointCfg.Addrs, ","))
+		(*context)["port"] = fmt.Sprintf("%d", cp.iscsiEndpointCfg.Port)
 
 		resp := csi.ControllerPublishVolumeResponse{
-			PublishContext: *iscsiContext,
+			PublishContext: *context,
 		}
 		// TODO: Delete this log
 		l.Debugf("Publish Response %+v", resp)
@@ -950,6 +984,7 @@ func (cp *ControllerPlugin) ValidateVolumeCapabilities(ctx context.Context, req 
 
 // ControllerExpandVolume expands capacity of given volume
 func (cp *ControllerPlugin) ControllerExpandVolume(ctx context.Context, in *csi.ControllerExpandVolumeRequest) (*csi.ControllerExpandVolumeResponse, error) {
+	// TODO: implement expand volume functionality
 	return nil, status.Error(codes.Unimplemented, "")
 }
 

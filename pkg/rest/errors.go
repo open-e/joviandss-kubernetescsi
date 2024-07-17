@@ -44,6 +44,7 @@ const (
 	RestErrorOutOfSpace                     = 13
 	RestErrorResourceDNEVolume              = 14
 	RestErrorResourceDNETarget              = 15
+	RestErrorResourceDNEShare               = 16
 )
 
 type RestError interface {
@@ -80,6 +81,7 @@ const (
 	resourceDneMsgPattern       = `Zfs resource: (.+\/.+) not found in this collection`
 	volumeDneMsgPattern         = `Volume (?P<volume>[\w\-/\.]+) not found in pool (?P<pool>[\w\-/\.]+).`
 	itemNotFoundClassPattern    = `opene.exceptions.ItemNotFoundError`
+	shareNotFoundClassPattern   = `werkzeug.exceptions.NotFound`
 	snapshotDneMsgPatterm       = `cannot open '([\w\-\/\.]+@[\w\-\.]+)': dataset does not exist`
 	resourceHasClonesMsgPattern = `^In order to delete a zvol, you must delete all of its clones first\.$`
 	volumeHasChildrenMsgPattern = `^cannot destroy '(?P<volume>[\w\-/\.]+)': volume has children[\s\S]use '-r' to destroy the following datasets:(?P<datasets>[.\s\S]*)`
@@ -95,6 +97,7 @@ const (
 	lunIdUsedMsgPattern              = `LUN ([\d]+) is already used in (?P<target>[a-z0-9\.:\-]*).`
 	volumeAlreadyUsedPattern         = `Volume (?P<volumesyspath>.*) is already used.`
 	lunItemConflictClassPattern      = `opene.exceptions.ItemConflictError`
+	shareNotExistsMsgPattern         = `Share .* not exists.`
 )
 
 var (
@@ -121,6 +124,11 @@ var (
 	lunIdUsedMsgRegexp         = regexp.MustCompile(lunIdUsedMsgPattern)
 	volumeAlteadyUsedRegexp    = regexp.MustCompile(volumeAlreadyUsedPattern)
 	lunItemConflictClassRegexp = regexp.MustCompile(lunItemConflictClassPattern)
+)
+
+var (
+	shareNotExistsMsgRegexp  = regexp.MustCompile(shareNotExistsMsgPattern)
+	shareNotFoundClassRegexp = regexp.MustCompile(shareNotFoundClassPattern)
 )
 
 func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restError {
@@ -238,6 +246,11 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 					}
 					if targetDneMsgRegexp.MatchString(*err.Message) {
 						return &restError{code: RestErrorResourceDNETarget, msg: *err.Message}
+					}
+				}
+				if shareNotFoundClassRegexp.MatchString(*err.Class) {
+					if shareNotExistsMsgRegexp.MatchString(*err.Message) {
+						return &restError{code: RestErrorResourceDNEShare, msg: *err.Message}
 					}
 				}
 			}

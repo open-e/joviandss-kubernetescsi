@@ -2,9 +2,20 @@ GOCMD := go
 GOBUILD := $(GOCMD) build
 ENV_PROD := "CGO_ENABLED=0 GOOS=linux"
 IMAGE_VERSION=$(shell git describe --long --tags)
-FLAGS_PROD := "-a -ldflags '-s -w -X github.com/open-e/joviandss-kubernetescsi/pkg/common.Version=$(IMAGE_VERSION) -extldflags \"-static\"'"
 ENV_DEV := "CGO_ENABLED=1 GOOS=linux"
-FLAGS_DEV := "-a -race -gcflags 'all=-N -l' -ldflags '-X github.com/open-e/joviandss-kubernetescsi/pkg/common.Version=$(IMAGE_VERSION) -extldflags \"-static\"'"
+
+PROTOCOL_TYPE ?= "iSCSI"
+
+FLAGS_PROD := "-a -ldflags ' \
+				-s \
+				-w \
+				-X github.com/open-e/joviandss-kubernetescsi/pkg/common.Version=$(IMAGE_VERSION) \
+				-X github.com/open-e/joviandss-kubernetescsi/pkg/common.PluginProtocolCompileString=$(PROTOCOL_TYPE) \
+				-extldflags \"-static\"'"
+FLAGS_DEV := "-a -race -gcflags 'all=-N -l' -ldflags ' \
+				-X github.com/open-e/joviandss-kubernetescsi/pkg/common.Version=$(IMAGE_VERSION) \
+				-X github.com/open-e/joviandss-kubernetescsi/pkg/common.PluginProtocolCompileString=$(PROTOCOL_TYPE) \
+				-extldflags \"-static\"'"
 
 ENV=$(shell echo $(ENV_DEV))
 
@@ -22,7 +33,8 @@ IMAGE_LATEST_UBUNTU=$(REGISTRY_NAME)/$(IMAGE_NAME)-u:latest
 IMAGE_LATEST_UBUNTU_16=$(REGISTRY_NAME)/$(IMAGE_NAME)-u-16:latest
 
 
-.PHONY: default all joviandss clean hostpath-container iscsi rest
+
+.PHONY: default all bin dev prod cli plugin container clean
 
 default: bin
 

@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
+
 	"github.com/open-e/joviandss-kubernetescsi/pkg/common"
 	"github.com/open-e/joviandss-kubernetescsi/pkg/pluginserver"
-
-	"os"
 
 	"github.com/sirupsen/logrus"
 	//"joviandss-kubernetescsi/pkg/joviandss"
@@ -37,7 +37,6 @@ var (
 )
 
 func main() {
-
 	cfg := handleArgs()
 
 	// TODO: check if logging parametrs a properly parse
@@ -49,6 +48,13 @@ func main() {
 	}
 	l.Debugf("Version %s", common.Version)
 
+	if err := common.InitVars(); err != nil {
+		l.Error(err)
+		return
+	}
+	l.Debugf("Version %s", common.Version)
+	l.Debugf("Driver %s", common.PluginProtocol)
+
 	routine(cfg, l)
 	os.Exit(0)
 }
@@ -56,7 +62,6 @@ func main() {
 func initLogging(logLevel string, toFile string) *logrus.Entry {
 	log := logrus.New()
 	formater := logrus.TextFormatter{
-
 		DisableColors: false,
 		FullTimestamp: true,
 	}

@@ -18,6 +18,7 @@ under the License.
 package common
 
 import (
+	"context"
 	"encoding/base32"
 	"fmt"
 	"os"
@@ -25,22 +26,25 @@ import (
 
 	"gopkg.in/yaml.v3"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	// "joviandss-kubernetescsi/pkg/rest"
 	uuid "github.com/google/uuid"
 
-	"context"
 	"github.com/sirupsen/logrus"
 )
 
-var replacertojbase32 = strings.NewReplacer("=", "-")
-var replacerfromjbase32 = strings.NewReplacer("-", "=")
-
+var (
+	replacertojbase32   = strings.NewReplacer("=", "-")
+	replacerfromjbase32 = strings.NewReplacer("-", "=")
+)
 
 type StorageAccessProtocolType string
 
 const (
-	iSCSI StorageAccessProtocolType = "iscsi"
-	NFS StorageAccessProtocolType = "nfs"
+	ISCSI StorageAccessProtocolType = "iscsi"
+	NFS   StorageAccessProtocolType = "nfs"
 )
 
 type RestEndpointCfg struct {
@@ -61,14 +65,19 @@ type ISCSIEndpointCfg struct {
 	Port     int      `json:"port,omitempty"`
 }
 
+type NFSEndpointCfg struct {
+	Addrs []string `json:"addrs,omitempty"`
+}
+
 // ControllerCfg stores configaration properties of controller instance
 type JovianDSSCfg struct {
 	LLevel string `yaml:"loglevel"`
 	LDest  string `yaml:"logfile"`
 	Pool   string `yaml:"pool"`
 
-	RestEndpointCfg  RestEndpointCfg  `yaml:"endpoint"`
-	ISCSIEndpointCfg ISCSIEndpointCfg `yaml:"iscsi"`
+	RestEndpointCfg  RestEndpointCfg   `yaml:"endpoint"`
+	ISCSIEndpointCfg *ISCSIEndpointCfg `yaml:"iscsi"`
+	NFSEndpointCfg   *NFSEndpointCfg   `yaml:"nfs"`
 }
 
 func GetLogger(logLevel string, toFile string) (*logrus.Logger, error) {
@@ -77,7 +86,6 @@ func GetLogger(logLevel string, toFile string) (*logrus.Logger, error) {
 	// fmt.Printf("Getting logger with loglevel %s and logfile path %s", logLevel, toFile)
 
 	formater := logrus.TextFormatter{
-
 		DisableColors: false,
 		FullTimestamp: true,
 	}
@@ -127,7 +135,6 @@ type JDSSLoggerContextID int
 const loggerKey JDSSLoggerContextID = iota
 
 func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
-
 	var traceId string
 
 	id := ctx.Value("traceId")
@@ -151,7 +158,6 @@ func WithLogger(ctx context.Context, logger *logrus.Entry) context.Context {
 
 // Logger From Context
 func LFC(ctx context.Context) *logrus.Entry {
-
 	l, ok := ctx.Value(loggerKey).(*logrus.Entry)
 
 	if !ok {
@@ -179,4 +185,25 @@ func GetContext(traceId string) context.Context {
 	ctxuuid := uuid.Must(uuid.NewRandom()).String()
 	ctx := context.Background()
 	return context.WithValue(ctx, "traceId", ctxuuid)
+}
+
+func InitVars() error {
+	PluginProtocol = StorageAccessProtocolType(PluginProtocolCompileString)
+	if PluginProtocol == ISCSI {
+		PluginName = "iscsi.csi.joviandss.open-e.com"
+	} else if PluginProtocol == NFS {
+		PluginName = "nfs.csi.joviandss.open-e.com"
+	} else {
+		return status.Errorf(codes.InvalidArgument, "Unable to identify driver type")
+	}
+	return nil
+}
+
+func init() {
+	PluginProtocol = StorageAccessProtocolType(PluginProtocolCompileString)
+	if PluginProtocol == ISCSI {
+		PluginName = "iscsi.csi.joviandss.open-e.com"
+	} else if PluginProtocol == NFS {
+		PluginName = "nfs.csi.joviandss.open-e.com"
+	}
 }

@@ -3,7 +3,7 @@ apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: joviandss-sc
-provisioner: iscsi.csi.joviandss.open-e.com
+provisioner: nfs.csi.joviandss.open-e.com
 parameters:
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
@@ -14,7 +14,7 @@ apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
 metadata:
   name: joviandss-snapshot-sc
-driver: iscsi.csi.joviandss.open-e.com
+driver: nfs.csi.joviandss.open-e.com
 deletionPolicy: Delete
 
 ---
@@ -22,7 +22,7 @@ deletionPolicy: Delete
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
-  name: iscsi.csi.joviandss.open-e.com
+  name: nfs.csi.joviandss.open-e.com
 spec:
   attachRequired: true
   podInfoOnMount: true

@@ -195,8 +195,9 @@ type ShareSMBDescriptor struct {
 }
 
 type DeleteShareDescriptor struct {
-	RecursivelyChildren *bool `json:"recursively_children,omitempty"`
-	ForceUmount         *bool `json:"force_umount,omitempty"`
+	RecursivelyChildren *bool  `json:"recursively_children,omitempty"`
+	ForceUmount         *bool  `json:"force_umount,omitempty"`
+	Key                 string `json:"key,omitempty"`
 }
 
 type CreateNASVolumeDescriptor struct {

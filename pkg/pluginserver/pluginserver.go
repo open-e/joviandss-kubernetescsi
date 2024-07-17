@@ -88,6 +88,7 @@ func GetPluginServer(cfg *common.JovianDSSCfg, l *logrus.Entry, netType *string,
 
 		} else {
 			l.Warnf("Unable to create Controller Plugin: %s", err)
+			return nil, err
 		}
 
 	}
@@ -101,11 +102,9 @@ func GetPluginServer(cfg *common.JovianDSSCfg, l *logrus.Entry, netType *string,
 
 			csi.RegisterNodeServer(s.server, np)
 		}
-
 	}
 
 	return s, nil
-
 }
 
 func (s *PluginServer) Run() (err error) {
@@ -128,7 +127,8 @@ func (s *PluginServer) grpcErrorHandler(
 	resp, err := handler(ctx, req)
 	if err != nil {
 		s.l.WithFields(logrus.Fields{
-			"func": "grpcErrorhandler"}).Warn(err.Error())
+			"func": "grpcErrorhandler",
+		}).Warn(err.Error())
 	}
 	return resp, err
 }

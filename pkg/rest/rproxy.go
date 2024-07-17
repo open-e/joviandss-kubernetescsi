@@ -18,6 +18,7 @@ under the License.
 package rest
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -25,6 +26,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	httpUrl "net/url"
 	"strings"
 	"sync"
@@ -75,7 +77,7 @@ type restProxy struct {
 
 // RestProxyInterface - request client interface
 type RestProxyInterface interface {
-	//Send(method, path string, data interface{}, ok int) (int, []byte, error)
+	// Send(method, path string, data interface{}, ok int) (int, []byte, error)
 	Send(ctx context.Context, method string, path string, data interface{}, ok int) (int, []byte, RestError)
 }
 
@@ -84,7 +86,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	// var err restError
 	l := jcom.LFC(ctx)
 	l.Debugf("Path %s", path)
-	//l.Debugf("proto %+v, addr %+v, port %+v, url %+v", )
+	// l.Debugf("proto %+v, addr %+v, port %+v, url %+v", )
 
 	url := fmt.Sprintf("%s://%s:%d/%s", rp.prot, rp.addrs[rp.active_addr], rp.port, path)
 
@@ -97,15 +99,16 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 
 	l.Debugf("Available addrs %+v", rp.addrs)
 
-	//rp.mu.Lock()
-	//rp.requestID++
-	//rp.mu.Unlock()
+	// rp.mu.Lock()
+	// rp.requestID++
+	// rp.mu.Unlock()
 
 	// send request data as json
 	var reader io.Reader
 	if data == nil {
+		emptyJsonData := []byte("{}")
+		reader = bytes.NewBuffer(emptyJsonData)
 		l.Debug("sending with no data")
-		reader = nil
 	} else {
 		l.Debugf("sending data %+v", data)
 		jdata, err := json.Marshal(data)
@@ -119,13 +122,14 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	req, err := http.NewRequest(method, url, reader)
 	req.SetBasicAuth(rp.user, rp.pass)
 	if err != nil {
-		//rp.l.Warnf("Unable to create req: %s", err)
+		// rp.l.Warnf("Unable to create req: %s", err)
 		return 0, nil, &restError{RestErrorRequestMalfunction, err.Error()}
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Kubernetes CSI Plugin")
+	dump, err := httputil.DumpRequestOut(req, true)
+	l.Debugf("Request:\n%v\nEnd request\n", string(dump))
 	res, err = rp.httpRestProxy.Do(req)
-
 	if err != nil {
 		if urlErr, ok := err.(*httpUrl.Error); ok {
 			if opErr, ok := urlErr.Err.(*net.OpError); ok {
@@ -228,7 +232,6 @@ type RestProxyCfg struct {
 // }
 
 func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) (err error) {
-
 	// rp.l = l.WithField("section", "restproxy")
 	rp.l = l.WithFields(logrus.Fields{"section": "restproxy", "addrs": cfg.Addrs, "port": cfg.Port})
 
@@ -236,7 +239,6 @@ func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) (
 	var timeoutDuration time.Duration
 
 	timeoutDuration, err = time.ParseDuration(cfg.IdleTimeOut)
-
 	if err != nil {
 		logrus.Warnf("Uncorrect IdleTimeOut value: %s, Error %s", cfg.IdleTimeOut, err)
 		return err

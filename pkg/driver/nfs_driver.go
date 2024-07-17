@@ -18,10 +18,10 @@ under the License.
 package driver
 
 import (
-	"crypto/sha256"
+	// "crypto/sha256"
 	"fmt"
 	"strings"
-	"time"
+	// "time"
 
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
@@ -290,12 +290,10 @@ func (d *CSINFSDriver) deleteNASVolAndShare(ctx context.Context, pool string, vd
 		"func":    "deleteLUN",
 		"section": "driver",
 	})
-	forceUmountShare := true
-	delshare := jrest.DeleteShareDescriptor{ForceUmount: &forceUmountShare}
 
-	err = d.re.DeleteShare(ctx, vd.VDS(), delshare)
+	err = d.re.DeleteShare(ctx, vd.VDS(), nil)
 	switch jrest.ErrCode(err) {
-	case jrest.RestErrorResourceDNE:
+	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNEShare:
 		break
 	case jrest.RestErrorOk:
 		break
@@ -309,7 +307,8 @@ func (d *CSINFSDriver) deleteNASVolAndShare(ctx context.Context, pool string, vd
 
 	err = d.re.DeleteNASVolume(ctx, pool, vd.VDS(), delnas)
 	switch jrest.ErrCode(err) {
-	case jrest.RestErrorResourceDNE:
+	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNEVolume:
+		l.Debugf("NAS volume %s do not exists. Do nothing.", vd.Name())
 		break
 	case jrest.RestErrorOk:
 		break
@@ -328,15 +327,13 @@ func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDes
 		"section": "driver",
 	})
 
-	// forceUmount := true
 	err = d.deleteNASVolAndShare(ctx, pool, vd)
-	// deldata := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
-	// err = d.re.DeleteVolume(ctx, pool, vd.VDS(), deldata)
 
 	switch jrest.ErrCode(err) {
 	case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusyVolumeHasSnapshots:
 		break
-	case jrest.RestErrorResourceDNE:
+	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNEVolume:
+		l.Debugf("NAS volume %s do not exists. Do nothing.", vd.Name())
 		return nil
 	case jrest.RestErrorOk:
 		return nil
@@ -622,32 +619,9 @@ func (d *CSINFSDriver) PublishVolume(ctx context.Context, pool string, ld LunDes
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "PublishVolume",
+		"proto":   "NFS",
 		"section": "driver",
 	})
-
-	// We want target name to be uniquee
-	tname := fmt.Sprintf("%x", sha256.Sum256([]byte(ld.VDS())))
-	iqn := fmt.Sprintf("%s:%s", iqnPrefix, tname)
-
-	if len(tname) > 255 {
-		return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Resulting target name is too long %s", tname))
-	}
-
-	var ctDesc jrest.CreateTargetDescriptor
-	active := true
-	ctDesc.Name = iqn
-	ctDesc.Active = &active
-
-	rErr = d.re.CreateTarget(ctx, pool, &ctDesc)
-
-	switch jrest.ErrCode(rErr) {
-	case jrest.RestErrorOk:
-		l.Debugf("target %s created", tname)
-	case jrest.RestErrorResourceExists:
-		l.Debugf("target %s already exists", tname)
-	default:
-		return nil, rErr
-	}
 
 	// Attach to target
 	var mode string = "wt"
@@ -655,93 +629,97 @@ func (d *CSINFSDriver) PublishVolume(ctx context.Context, pool string, ld LunDes
 		mode = "ro"
 	}
 
-	var attachLun jrest.TargetLunDescriptor
+	// var attachLun jrest.TargetLunDescriptor
 
-	attachLun.Name = ld.VDS()
-	attachLun.Mode = &mode
-	lunID := 0
-	attachLun.LUN = &lunID
+	// attachLun.Name = ld.VDS()
+	// attachLun.Mode = &mode
+	// lunID := 0
+	// attachLun.LUN = &lunID
 
-	rErr = d.re.AttachVolumeToTarget(ctx, pool, iqn, &attachLun)
+	// rErr = d.re.AttachVolumeToTarget(ctx, pool, iqn, &attachLun)
 
-	if rErr != nil {
-		code := rErr.GetCode()
-		switch code {
-		case jrest.RestErrorResourceDNEVolume:
-			d.re.DeleteTarget(ctx, pool, tname)
-			return nil, rErr
-		case jrest.RestErrorResourceBusy:
-			// According to specification from
-			// TODO: check that resource indeed properly assigned and continue if everything is ok
-			l.Debugf("Volume %s already attached", ld.Name())
-		default:
-			return nil, rErr
-		}
-	}
+	// if rErr != nil {
+	// 	code := rErr.GetCode()
+	// 	switch code {
+	// 	case jrest.RestErrorResourceDNEVolume:
+	// 		d.re.DeleteTarget(ctx, pool, tname)
+	// 		return nil, rErr
+	// 	case jrest.RestErrorResourceBusy:
+	// 		// According to specification from
+	// 		// TODO: check that resource indeed properly assigned and continue if everything is ok
+	// 		l.Debugf("Volume %s already attached", ld.Name())
+	// 	default:
+	// 		return nil, rErr
+	// 	}
+	// }
+	iContext["protocol_type"] = "NFS"
+	iContext["read_only"] = mode
+	iContext["share_path"] = fmt.Sprintf("%s_%s", pool, ld.VDS())
 
-	iContext["iqn"] = iqn
-	iContext["target"] = tname
-	iContext["lun"] = fmt.Sprintf("%d", lunID)
+	// iContext["target"] = tname
+	// iContext["lun"] = fmt.Sprintf("%d", lunID)
+	return &iContext, nil
 
-	for i := 0; i < 3; i++ {
-		target, rErr := d.re.GetTarget(ctx, pool, iqn)
-		switch jrest.ErrCode(rErr) {
-		case jrest.RestErrorOk:
-			if target.Active == true {
-				return &iContext, nil
-			}
-		case jrest.RestErrorResourceDNE:
-			// According to specification from
-			time.Sleep(time.Second)
-			continue
-		default:
-			continue
-		}
-	}
+	// for i := 0; i < 3; i++ {
+	// 	target, rErr := d.re.GetTarget(ctx, pool, iqn)
+	// 	switch jrest.ErrCode(rErr) {
+	// 	case jrest.RestErrorOk:
+	// 		if target.Active == true {
+	// 			return &iContext, nil
+	// 		}
+	// 	case jrest.RestErrorResourceDNE:
+	// 		// According to specification from
+	// 		time.Sleep(time.Second)
+	// 		continue
+	// 	default:
+	// 		continue
+	// 	}
+	// }
 
-	return nil, jrest.GetError(jrest.RestErrorRequestTimeout, fmt.Sprintf("Unable to ensure that target %s is up and running", iqn))
+	// return nil, jrest.GetError(jrest.RestErrorRequestTimeout, fmt.Sprintf("Unable to ensure that target %s is up and running", iqn))
 }
 
 func (d *CSINFSDriver) UnpublishVolume(ctx context.Context, pool string, prefix string, ld LunDesc) (rErr jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "UnpublishVolume",
+		"proto":   "NFS",
 		"section": "driver",
 	})
 
 	// We want target name to be uniquee
-	iqn, rErr := TargetIQN(prefix, ld)
+	// iqn, rErr := TargetIQN(prefix, ld)
 
-	if rErr != nil {
-		return rErr
-	}
+	// if rErr != nil {
+	// 	return rErr
+	// }
 
-	rErr = d.re.DettachVolumeFromTarget(ctx, pool, *iqn, ld.VDS())
+	// rErr = d.re.DettachVolumeFromTarget(ctx, pool, *iqn, ld.VDS())
 
-	if rErr != nil {
-		code := rErr.GetCode()
-		switch code {
-		case jrest.RestErrorOk:
-			l.Debugf("Volume %s was detached from target %s", ld.Name(), *iqn)
-		case jrest.RestErrorResourceDNEVolume, jrest.RestErrorResourceDNE:
-			l.Debugf("Volume %s is not attached from target %s", ld.Name(), *iqn)
-		case jrest.RestErrorResourceDNETarget:
-			return nil
-		default:
-			return rErr
-		}
-	}
+	// if rErr != nil {
+	// 	code := rErr.GetCode()
+	// 	switch code {
+	// 	case jrest.RestErrorOk:
+	// 		l.Debugf("Volume %s was detached from target %s", ld.Name(), *iqn)
+	// 	case jrest.RestErrorResourceDNEVolume, jrest.RestErrorResourceDNE:
+	// 		l.Debugf("Volume %s is not attached from target %s", ld.Name(), *iqn)
+	// 	case jrest.RestErrorResourceDNETarget:
+	// 		return nil
+	// 	default:
+	// 		return rErr
+	// 	}
+	// }
 
-	rErr = d.re.DeleteTarget(ctx, pool, *iqn)
+	// rErr = d.re.DeleteTarget(ctx, pool, *iqn)
 
-	switch jrest.ErrCode(rErr) {
-	case jrest.RestErrorOk:
-		l.Debugf("target %s deleted", *iqn)
-	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNETarget:
-		l.Debugf("target %s do not exists", *iqn)
-	default:
-		return rErr
-	}
+	// switch jrest.ErrCode(rErr) {
+	// case jrest.RestErrorOk:
+	// 	l.Debugf("target %s deleted", *iqn)
+	// case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNETarget:
+	// 	l.Debugf("target %s do not exists", *iqn)
+	// default:
+	// 	return rErr
+	// }
 
 	return nil
 }

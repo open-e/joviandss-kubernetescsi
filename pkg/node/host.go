@@ -22,10 +22,8 @@ import (
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
-//var nodeId = ""
-
+// var nodeId = ""
 func GetNodeId(l *log.Entry) (string, error) {
-
 	if len(jcom.NodeID) > 0 {
 		l.Debugf("Node id identified %s", jcom.NodeID)
 
@@ -44,11 +42,11 @@ func GetNodeId(l *log.Entry) (string, error) {
 	if len(infostr) == 0 {
 		return "", status.Errorf(codes.Internal, "Unable to identify node")
 	}
-	//l.Debugf("Node id %s", infostr)
+	// l.Debugf("Node id %s", infostr)
 	rawID := sha256.Sum256([]byte(infostr))
 	jcom.NodeID = base64.StdEncoding.EncodeToString(rawID[:])
 
-	//nodeId = string(rawID[:])
+	// nodeId = string(rawID[:])
 
 	return jcom.NodeID, nil
 }
@@ -94,17 +92,18 @@ func FormatMountVolume(ctx context.Context, volumeCapability csi.VolumeCapabilit
 	var msg string
 	m := mount.SafeFormatAndMount{
 		Interface: mount.New(""),
-		Exec:      kexec.New()}
+		Exec:      kexec.New(),
+	}
 
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
-		"func":    "FormatMountVolume",
+		"func": "FormatMountVolume",
 	})
 
 	l.Debugf("Mounting %s to %s", device, location)
 	if exists, err := mount.PathExists(location); exists == false {
-		if err = os.MkdirAll(location, 0640); err != nil {
+		if err = os.MkdirAll(location, 0o640); err != nil {
 			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", location, err.Error())
 			return status.Error(codes.Internal, msg)
 		}
@@ -125,19 +124,51 @@ func FormatMountVolume(ctx context.Context, volumeCapability csi.VolumeCapabilit
 	return nil
 }
 
+func MountNFSVolume(ctx context.Context, volumeCapability csi.VolumeCapability, addr string, nfsPath string, destination string) error {
+	l := jcom.LFC(ctx)
+
+	l = l.WithFields(log.Fields{
+		"func":    "MountNFSVolume",
+		"section": "node",
+	})
+	mounter := mount.New("") // empty string for the default mount path
+
+	// if err := m.Mount(source, to, "", opts); err != nil {
+	// 	l.Errorf("Unable to bind %s to %s: %s", from, to, err.Error())
+	// 	return status.Error(codes.Internal, err.Error())
+	// }
+	// l.Debugf("Binded %s to %s with opts %s", from, to, opts)
+
+	// Define the NFS server and the path
+	// nfsServer := "192.168.1.100"
+	// nfsPath := "/nfs/path"
+	// mountPoint := "/local/mount/point"
+
+	// Options that you need to pass to the mount command
+	// options := []string{"vers=4.2"}
+
+	// Mount the NFS share
+	if err := mounter.Mount(fmt.Sprintf("%s:%s", addr, nfsPath), destination, "nfs", nil); err != nil {
+		l.Warnf("Failed to mount NFS volume %s because of %v", nfsPath, err)
+		return err
+	}
+
+	return nil
+}
+
 // UnMountVolume unmounts volume
 func UMountDevice(ctx context.Context, umounter mount.MounterForceUnmounter, device string) error {
-
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
 		"func":    "UnMountVolume",
 		"section": "node",
 	})
-	
+
 	m := mount.SafeFormatAndMount{
 		Interface: mount.New(""),
-		Exec:      kexec.New()}
+		Exec:      kexec.New(),
+	}
 
 	if mounts, err := m.GetMountRefs(device); err != nil {
 		return err
@@ -151,7 +182,6 @@ func UMountDevice(ctx context.Context, umounter mount.MounterForceUnmounter, dev
 }
 
 func BindVolume(ctx context.Context, mounter mount.SafeFormatAndMount, from string, to string, ro bool) error {
-
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
@@ -163,7 +193,7 @@ func BindVolume(ctx context.Context, mounter mount.SafeFormatAndMount, from stri
 	if ro {
 		opts = append(opts, "ro")
 	}
-	if err := mounter.Mount(from, to, "", opts ); err != nil {
+	if err := mounter.Mount(from, to, "", opts); err != nil {
 		l.Errorf("Unable to bind %s to %s: %s", from, to, err.Error())
 		return status.Error(codes.Internal, err.Error())
 	}

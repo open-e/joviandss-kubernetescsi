@@ -35,21 +35,20 @@ import (
 )
 
 var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
-
 	csi.NodeServiceCapability_RPC_UNKNOWN,
 	csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 }
 
 // NodePlugin responsible for attaching and detaching volumes to host
 type NodePlugin struct {
-	//cfg *NodeCfg
-	l		*log.Entry
-	mounter	mount.Interface
+	// cfg *NodeCfg
+	l       *log.Entry
+	mounter mount.Interface
 }
 
 // GetNodePlugin inits NodePlugin
 func GetNodePlugin(l *log.Entry) (*NodePlugin, error) {
-	//TODO: rework getting node ID
+	// TODO: rework getting node ID
 	nid, err := GetNodeId(l)
 	if err != nil {
 		return nil, err
@@ -71,14 +70,15 @@ func GetNodePlugin(l *log.Entry) (*NodePlugin, error) {
 func (np *NodePlugin) NodeExpandVolume(ctx context.Context, in *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	np.l.Trace("Expanding Volume")
 	out := new(csi.NodeExpandVolumeResponse)
+	// TODO: implement volume expansion
 	return out, nil
 }
 
 // NodeGetInfo returns node info
 func (np *NodePlugin) NodeGetInfo(
 	ctx context.Context,
-	req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-
+	req *csi.NodeGetInfoRequest,
+) (*csi.NodeGetInfoResponse, error) {
 	l := np.l.WithFields(log.Fields{
 		"request": "NoneGetInfo",
 		"func":    "NodeGetInfo",
@@ -101,7 +101,6 @@ func (np *NodePlugin) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest,
 ) (*csi.NodeStageVolumeResponse, error) {
-
 	l := np.l.WithFields(log.Fields{
 		"request": "NoneStageVolume",
 		"func":    "NodeStageVolume",
@@ -114,14 +113,9 @@ func (np *NodePlugin) NodeStageVolume(
 	l.Debugf("StagingTargetPath %s", req.GetStagingTargetPath())
 	l.Debugf("VolumeCapability %+v", req.GetVolumeCapability())
 	var msg string
-
-	t, err := GetTargetFromReq(ctx, *req)
-	l.Debugf("Target %+v", t)
-
-	if err != nil {
-		return nil, err
-	}
+	var err error
 	var exists bool
+
 	if exists, err = mount.PathExists(req.GetStagingTargetPath()); err != nil {
 		msg = fmt.Sprintf("Staging target path %s error: %s", req.GetStagingTargetPath(), err.Error())
 		l.Warn(msg)
@@ -131,16 +125,16 @@ func (np *NodePlugin) NodeStageVolume(
 	// Some activity are taking place with target staging path
 	if exists == false {
 		l.Debugf("STP dne, creating")
-		if err = os.MkdirAll(req.GetStagingTargetPath(), 0640); err != nil {
-			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", t.TPath, err.Error())
+		if err = os.MkdirAll(req.GetStagingTargetPath(), 0o640); err != nil {
+			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", req.GetStagingTargetPath(), err.Error())
 			return nil, status.Error(codes.Internal, msg)
 		}
 	}
 
-	if err := StageVolume(ctx, req); err != nil {
+	if err := np.StageVolume(ctx, req); err != nil {
 		return nil, err
 	}
-	return &csi.NodeStageVolumeResponse{}, 	nil
+	return &csi.NodeStageVolumeResponse{}, nil
 }
 
 // NodeUnstageVolume remove volume from host
@@ -196,7 +190,6 @@ func (np *NodePlugin) NodePublishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
 ) (*csi.NodePublishVolumeResponse, error) {
-
 	// TODO: ValidateCapability()
 
 	l := np.l.WithFields(log.Fields{
@@ -221,7 +214,6 @@ func (np *NodePlugin) NodeUnpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
 ) (*csi.NodeUnpublishVolumeResponse, error) {
-
 	l := np.l.WithFields(log.Fields{
 		"request": "NodeUnpublishVolume",
 		"func":    "NodeUnpublishVolume",
@@ -267,7 +259,6 @@ func (ns *NodePlugin) NodeGetCapabilities(
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: capabilities,
 	}, nil
-
 }
 
 // NodeGetVolumeStats volume total and available space

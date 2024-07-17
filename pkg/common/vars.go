@@ -19,16 +19,21 @@ package common
 
 // Plugin name
 // This variable should be consistent with value that is used in StorageClass deffinition
-var PluginName = "iscsi.csi.joviandss.open-e.com"
+var PluginName string
+
+//"iscsi.csi.joviandss.open-e.com"
 
 // CLI Protocol Type variable used in CLI
 // Specifyes what protocol to use for providing volumes
 // available iscsi and nfs
-var CLIStorageAccessProtocolType StorageAccessProtocolType = "iscsi"
+var (
+	PluginProtocol              StorageAccessProtocolType
+	PluginProtocolCompileString string
+)
 
 // Version of plugin
 // Version gets initialized during compilation
-var Version  string
+var Version string
 
 // Node ID
 // Stores Node Identifier for host that is running plugin
@@ -42,10 +47,8 @@ var LogLevel string
 
 // Log Path
 // Where to store log file
-var LogPath  string
-
+var LogPath string
 
 // Controller Config Path
 // Path to config file
 var ControllerConfigPath string
-

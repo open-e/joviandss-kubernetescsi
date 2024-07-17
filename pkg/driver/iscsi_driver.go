@@ -39,7 +39,9 @@ type CSIISCSiDriver struct {
 func (d *CSIISCSiDriver) cloneLUN(ctx context.Context, pool string, source LunDesc, clone LunDesc, snap *SnapshotDesc) jrest.RestError {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
-		"func": "cloneLUN",
+		"proto":   "iSCSI",
+		"func":    "cloneLUN",
+		"section": "driver",
 	})
 
 	l.Debugf("Start cloning")
@@ -94,6 +96,7 @@ func (d *CSIISCSiDriver) deleteIntermediateSnapshot(ctx context.Context, pool st
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "deleteIntermediateSnapshot",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 	forceUmount := true
@@ -148,6 +151,7 @@ func (d *CSIISCSiDriver) CreateVolumeFromVolume(ctx context.Context, pool string
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "CreateVolumeFromVolume",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -182,6 +186,7 @@ func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool st
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "cleanIntermediateSnapshots",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 	token := NewCSIListingToken()
@@ -228,6 +233,7 @@ func (d *CSIISCSiDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeD
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "deleteLUN",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -300,6 +306,7 @@ func (d *CSIISCSiDriver) DeleteVolume(ctx context.Context, pool string, vid *Vol
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "DeleteVolume",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -310,6 +317,7 @@ func (d *CSIISCSiDriver) ListAllVolumes(ctx context.Context, pool string, maxret
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllVolumes",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -338,6 +346,7 @@ func (d *CSIISCSiDriver) ListAllSnapshots(ctx context.Context, pool string, maxr
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllSnapshots",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -369,6 +378,7 @@ func (d *CSIISCSiDriver) ListVolumeSnapshots(ctx context.Context, pool string, v
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListVolumeSnapshots",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -394,7 +404,7 @@ func (d *CSIISCSiDriver) ListVolumeSnapshots(ctx context.Context, pool string, v
 	}
 }
 
-func NewJovianDSSCSIDriver(cfg *jcom.RestEndpointCfg, l *logrus.Entry) (d CSIDriver, err error) {
+func NewJovianDSSCSIISCSiDriver(cfg *jcom.RestEndpointCfg, l *logrus.Entry) (d CSIDriver, err error) {
 	var drvr CSIISCSiDriver
 	jrest.SetupEndpoint(&drvr.re, cfg, l)
 
@@ -407,6 +417,7 @@ func (d *CSIISCSiDriver) GetVolume(ctx context.Context, pool string, vd *VolumeD
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "GetVolume",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -419,6 +430,7 @@ func (d *CSIISCSiDriver) GetSnapshot(ctx context.Context, pool string, vd LunDes
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "GetSnapshot",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -431,6 +443,7 @@ func (d *CSIISCSiDriver) CreateSnapshot(ctx context.Context, pool string, vd *Vo
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "CreateSnapshot",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -445,6 +458,7 @@ func (d *CSIISCSiDriver) DeleteSnapshot(ctx context.Context, pool string, ld Lun
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "DeleteSnapshot",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -509,6 +523,7 @@ func (d *CSIISCSiDriver) GetPool(ctx context.Context, pool string) (out *jrest.R
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "GetPool",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
@@ -525,6 +540,7 @@ func (d *CSIISCSiDriver) PublishVolume(ctx context.Context, pool string, ld LunD
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "PublishVolume",
+		"proto":   "iSCSI",
 		"section": "driver",
 	})
 
