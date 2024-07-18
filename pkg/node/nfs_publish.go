@@ -52,9 +52,9 @@ func (np *NodePlugin) NFSPublishVolume(ctx context.Context, req *csi.NodePublish
 	if mp, _ := np.mounter.IsMountPoint(req.GetTargetPath()); mp == true {
 		return nil
 	}
-	mounter := np.mounter.(mount.SafeFormatAndMount)
+	// mounter := np.mounter.(mount.SafeFormatAndMount)
 
-	BindVolume(ctx, mounter, req.GetStagingTargetPath(), req.GetTargetPath(), req.GetReadonly())
+	BindVolume(ctx, np.mounter, req.GetStagingTargetPath(), req.GetTargetPath(), req.GetReadonly())
 	return nil
 }
 
@@ -68,7 +68,10 @@ func (np *NodePlugin) NFSUnpublishVolume(ctx context.Context, req *csi.NodeUnpub
 	})
 
 	l.Debugf("Unpublish Volume %+v", req.GetVolumeId())
-	mounter := np.mounter.(mount.MounterForceUnmounter)
 
-	return UmountVolume(ctx, mounter, req.GetTargetPath())
+	if mounter, ok := np.mounter.(mount.MounterForceUnmounter); ok {
+		return UmountVolume(ctx, mounter, req.GetTargetPath())
+	} else {
+		return status.Error(codes.Internal, "Unable to unmount")
+	}
 }

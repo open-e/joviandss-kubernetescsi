@@ -654,7 +654,7 @@ func (d *CSINFSDriver) PublishVolume(ctx context.Context, pool string, ld LunDes
 	// }
 	iContext["protocol_type"] = "NFS"
 	iContext["read_only"] = mode
-	iContext["share_path"] = fmt.Sprintf("%s_%s", pool, ld.VDS())
+	iContext["share_path"] = fmt.Sprintf("/%s", ld.VDS())
 
 	// iContext["target"] = tname
 	// iContext["lun"] = fmt.Sprintf("%d", lunID)

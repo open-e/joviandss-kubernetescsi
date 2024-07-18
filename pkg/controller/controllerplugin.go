@@ -174,6 +174,8 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
 		cp.le.Debug("Plugin protocol NFS")
 		if cfg.NFSEndpointCfg != nil {
 			// TODO: check what ip address nfs plugin takes
+
+			cp.nfsEndpointCfg = *cfg.NFSEndpointCfg
 			cp.le.Debug("Setting driver NFS")
 			if cp.d, err = jdrvr.NewJovianDSSCSINFSDriver(&cfg.RestEndpointCfg, cp.le); err != nil {
 				return err
@@ -860,10 +862,13 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 
 	switch jrest.ErrCode(rErr) {
 	case jrest.RestErrorOk:
+		if jcom.PluginProtocol == jcom.ISCSI {
 
-		(*context)["addrs"] = fmt.Sprintf(strings.Join(cp.iscsiEndpointCfg.Addrs, ","))
-		(*context)["port"] = fmt.Sprintf("%d", cp.iscsiEndpointCfg.Port)
-
+			(*context)["addrs"] = fmt.Sprintf(strings.Join(cp.iscsiEndpointCfg.Addrs, ","))
+			(*context)["port"] = fmt.Sprintf("%d", cp.iscsiEndpointCfg.Port)
+		} else if jcom.PluginProtocol == jcom.NFS {
+			(*context)["addrs"] = fmt.Sprintf(strings.Join(cp.nfsEndpointCfg.Addrs, ","))
+		}
 		resp := csi.ControllerPublishVolumeResponse{
 			PublishContext: *context,
 		}

@@ -20,20 +20,18 @@ package node
 import "context"
 
 import (
- 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/container-storage-interface/spec/lib/go/csi"
 
 	mount "k8s.io/mount-utils"
 
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
- 
+
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
-
-func (np *NodePlugin)PublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) error {
-
+func (np *NodePlugin) PublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) error {
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
@@ -53,16 +51,15 @@ func (np *NodePlugin)PublishVolume(ctx context.Context, req *csi.NodePublishVolu
 	if mp, _ := np.mounter.IsMountPoint(req.GetTargetPath()); mp == true {
 		return nil
 	}
-	mounter := np.mounter.(mount.SafeFormatAndMount)
+	mounter := np.mounter // .(mount.SafeFormatAndMount)
 
-	BindVolume(ctx, mounter, req.GetStagingTargetPath(), req.GetTargetPath(), req.GetReadonly())
-	return nil
+	return BindVolume(ctx, mounter, req.GetStagingTargetPath(), req.GetTargetPath(), req.GetReadonly())
 }
 
 func (np *NodePlugin) UnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) error {
-
-	mounter := np.mounter.(mount.MounterForceUnmounter)
-
-	return UmountVolume(ctx, mounter, req.GetTargetPath())
-
+	if mounter, ok := np.mounter.(mount.MounterForceUnmounter); ok {
+		return UmountVolume(ctx, mounter, req.GetTargetPath())
+	} else {
+		return status.Error(codes.Internal, "Unable to unmount")
+	}
 }

@@ -148,7 +148,10 @@ func MountNFSVolume(ctx context.Context, volumeCapability csi.VolumeCapability, 
 	// options := []string{"vers=4.2"}
 
 	// Mount the NFS share
-	if err := mounter.Mount(fmt.Sprintf("%s:%s", addr, nfsPath), destination, "nfs", nil); err != nil {
+	options := []string{
+		"nolock",
+	}
+	if err := mounter.Mount(fmt.Sprintf("%s:%s", addr, nfsPath), destination, "nfs", options); err != nil {
 		l.Warnf("Failed to mount NFS volume %s because of %v", nfsPath, err)
 		return err
 	}
@@ -181,7 +184,7 @@ func UMountDevice(ctx context.Context, umounter mount.MounterForceUnmounter, dev
 	return nil
 }
 
-func BindVolume(ctx context.Context, mounter mount.SafeFormatAndMount, from string, to string, ro bool) error {
+func BindVolume(ctx context.Context, mounter mount.Interface, from string, to string, ro bool) error {
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
@@ -203,8 +206,22 @@ func BindVolume(ctx context.Context, mounter mount.SafeFormatAndMount, from stri
 }
 
 func UmountVolume(ctx context.Context, umounter mount.MounterForceUnmounter, mnt string) error {
+	l := jcom.LFC(ctx)
+
+	l = l.WithFields(log.Fields{
+		"func":    "UmountVolume",
+		"section": "node",
+	})
+
+	l.Debugf("Umounting %s", mnt)
 	if mp, _ := umounter.IsMountPoint(mnt); mp == true {
-		umounter.UnmountWithForce(mnt, time.Minute)
+		if err := umounter.UnmountWithForce(mnt, time.Minute); err != nil {
+			l.Warnf("Unmounting %s failed because of %s", mnt, err.Error())
+			return err
+		}
+	} else {
+		l.Warnf("%s is not a mountpoint", mnt)
 	}
+
 	return nil
 }

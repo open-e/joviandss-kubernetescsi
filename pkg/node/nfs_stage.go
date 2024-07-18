@@ -20,7 +20,7 @@ package node
 import (
 	"fmt"
 	"strings"
-	"time"
+	// "time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	log "github.com/sirupsen/logrus"
@@ -79,22 +79,50 @@ func (np *NodePlugin) NFSStageVolume(ctx context.Context, req *csi.NodeStageVolu
 
 // StageVolume discovers iscsi target and attachs it
 func (np *NodePlugin) NFSUnStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) error {
-	var msg string
-
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
 		"func":    "StageVolume",
+		"proto":   "NFS",
 		"section": "node",
 	})
-	umounter := np.mounter.(mount.MounterForceUnmounter)
-	if mp, _ := np.mounter.IsMountPoint(req.GetStagingTargetPath()); mp == true {
-		if err := umounter.UnmountWithForce(req.GetStagingTargetPath(), time.Minute); err != nil {
-			msg = fmt.Sprintf("Failure in umounting %s unmounting %s", req.GetStagingTargetPath(), err.Error())
-			l.Warn(msg)
-			return status.Error(codes.Internal, msg)
+	l.Debugf("Unstaging volume %s", req.GetVolumeId())
+	var ok bool
+	var umounter mount.MounterForceUnmounter
+	if umounter, ok = np.mounter.(mount.MounterForceUnmounter); ok {
+		if err := UmountVolume(ctx, umounter, req.GetStagingTargetPath()); err != nil {
+			return err
 		}
+	} else {
+		return status.Error(codes.Internal, "Unable to identify umounter")
 	}
 
+	pubContext := req.GetPublishContext()
+	var addrs []string
+	if len(pubContext["addrs"]) > 0 {
+		l.Debugf("addrs %s", pubContext["addrs"])
+		addrs = strings.Split(pubContext["addrs"], ",")
+		if len(addrs) == 0 {
+			return status.Errorf(codes.InvalidArgument, "Addrs are empty. No addresses provided.")
+		}
+	} else {
+		l.Errorf("No JovianDSS address provideed in context %+v", pubContext)
+		return status.Errorf(codes.InvalidArgument, "Request context does not contain joviandss addresses")
+	}
+
+	sharePath := pubContext["share_path"]
+
+	if len(sharePath) == 0 {
+		msg := fmt.Sprintf("Context do not contain share_path value")
+		l.Error(msg)
+		return status.Error(codes.InvalidArgument, msg)
+	}
+
+	for _, addr := range addrs {
+		mnt := fmt.Sprintf("%s:%s", addr, sharePath)
+		if err := UmountVolume(ctx, umounter, mnt); err != nil {
+			return err
+		}
+	}
 	return nil
 }
