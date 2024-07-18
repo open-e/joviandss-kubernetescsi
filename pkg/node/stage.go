@@ -47,20 +47,21 @@ func (np *NodePlugin) StageVolume(ctx context.Context, req *csi.NodeStageVolumeR
 }
 
 // StageVolume discovers iscsi target and attachs it
-func (np *NodePlugin) UnStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) error {
+func (np *NodePlugin) UnStageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) error {
 	l := jcom.LFC(ctx)
 
 	l = l.WithFields(log.Fields{
 		"func":    "UnStageVolume",
 		"section": "node",
 	})
-	pubContext := req.GetPublishContext()
+	// pubContext := req.GetPublishContext()
 
-	protocol := pubContext["protocol_type"]
+	// protocol := pubContext["protocol_type"]
 
-	if len(protocol) > 0 && protocol == "NFS" {
-		return np.NFSUnStageVolume(ctx, req)
-	} else {
-		return np.ISCSiUnStageVolume(ctx, req)
-	}
+	// if len(protocol) > 0 && protocol == "NFS" {
+	// 	return np.NFSUnStageVolume(ctx, req)
+	// } else {
+	// 	return np.ISCSiUnStageVolume(ctx, req)
+	// }
+	return nil
 }

@@ -36,6 +36,7 @@ func (np *NodePlugin) PublishVolume(ctx context.Context, req *csi.NodePublishVol
 
 	l = l.WithFields(log.Fields{
 		"func":    "PublishVolume",
+		"proto":   "NFS",
 		"section": "node",
 	})
 
@@ -57,6 +58,15 @@ func (np *NodePlugin) PublishVolume(ctx context.Context, req *csi.NodePublishVol
 }
 
 func (np *NodePlugin) UnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) error {
+	l := jcom.LFC(ctx)
+
+	l = l.WithFields(log.Fields{
+		"func":    "PublishVolume",
+		"proto":   "NFS",
+		"section": "node",
+	})
+	l.Debugf("Unpublish volume request %+v", *req)
+
 	if mounter, ok := np.mounter.(mount.MounterForceUnmounter); ok {
 		return UmountVolume(ctx, mounter, req.GetTargetPath())
 	} else {

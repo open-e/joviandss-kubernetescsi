@@ -143,7 +143,6 @@ func (np *NodePlugin) NodeUnstageVolume(
 	req *csi.NodeUnstageVolumeRequest,
 ) (*csi.NodeUnstageVolumeResponse, error) {
 	// Log out from specified target
-	var msg string
 	l := np.l.WithFields(log.Fields{
 		"request": "NoneUnstageVolume",
 		"func":    "NodeUnstageVolume",
@@ -152,36 +151,16 @@ func (np *NodePlugin) NodeUnstageVolume(
 	ctx = jcom.WithLogger(ctx, l)
 
 	l.Debugf("Node Unstage Volume %s", req.GetVolumeId())
-
-	vname := req.GetVolumeId()
-	if len(vname) == 0 {
-		msg = fmt.Sprintf("Request do not contain volume id")
-		l.Warn(msg)
-		return nil, status.Error(codes.InvalidArgument, msg)
+	var ok bool
+	var umounter mount.MounterForceUnmounter
+	if umounter, ok = np.mounter.(mount.MounterForceUnmounter); ok {
+		if err := UmountVolume(ctx, umounter, req.GetStagingTargetPath()); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, status.Error(codes.Internal, "Unable to identify umounter")
 	}
 
-	stp := req.GetStagingTargetPath()
-	if len(stp) == 0 {
-		msg = fmt.Sprintf("Request do not contain staging target path")
-		l.Warn(msg)
-		return nil, status.Error(codes.InvalidArgument, msg)
-	}
-
-	if GetStageStatus(stp) == false {
-		return &csi.NodeUnstageVolumeResponse{}, nil
-	}
-	t, err := GetTargetFromPath(np.l, stp)
-	// TODO: implement recovery using target path
-	if err != nil {
-		msg = fmt.Sprintf("Unable to get info about target: %s", err.Error())
-		l.Warn(msg)
-		return nil, err
-	}
-	err = t.UnStageVolume(ctx)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	t.DeleteSerialization()
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
@@ -201,6 +180,25 @@ func (np *NodePlugin) NodePublishVolume(
 	ctx = jcom.WithLogger(ctx, l)
 
 	l.Debugf("Node Publish Volume %s", req.GetVolumeId())
+
+	var msg string
+	var err error
+	var exists bool
+
+	if exists, err = mount.PathExists(req.GetTargetPath()); err != nil {
+		msg = fmt.Sprintf("Target path %s error: %s", req.GetTargetPath(), err.Error())
+		l.Warn(msg)
+		return nil, status.Error(codes.Internal, msg)
+	}
+
+	// Some activity are taking place with target staging path
+	if exists == false {
+		l.Debugf("Target path do not exists, creating")
+		if err = os.MkdirAll(req.GetTargetPath(), 0o640); err != nil {
+			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", req.GetTargetPath(), err.Error())
+			return nil, status.Error(codes.Internal, msg)
+		}
+	}
 
 	if err := np.PublishVolume(ctx, req); err != nil {
 		return nil, err
