@@ -530,9 +530,12 @@ func (d *CSINFSDriver) CreateSnapshot(ctx context.Context, pool string, vd *Volu
 
 	l.Debugf("Create snapshot %s for volume %s", sd.SDS(), vd.VDS())
 
-	snapdata := jrest.CreateSnapshotDescriptor{SnapshotName: sd.SDS()}
+	return jrest.GetError(jrest.RestErrorFailureUnknown,
+		fmt.Sprintf("Creation of snapshot is not implemented"))
 
-	return d.re.CreateSnapshot(ctx, pool, vd.VDS(), &snapdata)
+	// snapdata := jrest.CreateSnapshotDescriptor{SnapshotName: sd.SDS()}
+
+	// return d.re.CreateSnapshot(ctx, pool, vd.VDS(), &snapdata)
 }
 
 func (d *CSINFSDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDesc, sd *SnapshotDesc) jrest.RestError {
@@ -544,57 +547,60 @@ func (d *CSINFSDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDe
 
 	l.Debugf("Delete snapshot %s for volume %s", sd.SDS(), ld.VDS())
 
-	forceUmount := true
-	deldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
+	return jrest.GetError(jrest.RestErrorFailureUnknown,
+		fmt.Sprintf("Creation of snapshot is not implemented"))
 
-	err := d.re.DeleteSnapshot(ctx, pool, ld.VDS(), sd.SDS(), deldata)
+	// forceUmount := true
+	// deldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 
-	var dvols []string
-	var dsnaps []string
-	var ncsi []string
-	var msg string
+	// err := d.re.DeleteSnapshot(ctx, pool, ld.VDS(), sd.SDS(), deldata)
 
-	if err.GetCode() == jrest.RestErrorResourceBusy || err.GetCode() == jrest.RestErrorResourceBusySnapshotHasClones {
-		if clones, rErr := d.re.GetVolumeSnapshotClones(ctx, pool, ld.VDS(), sd.SDS()); rErr != nil {
-			return rErr
-		} else {
-			for _, clone := range clones {
-				if IsSDS(clone.Name) {
-					dsnaps = append(dsnaps, clone.Name)
-				} else if IsVDS(clone.Name) {
-					dvols = append(dvols, clone.Name)
-				} else {
-					ncsi = append(ncsi, clone.Name)
-				}
-			}
-		}
-	} else {
-		return err
-	}
+	// var dvols []string
+	// var dsnaps []string
+	// var ncsi []string
+	// var msg string
 
-	if len(dsnaps) > 0 {
-		forceUmount := true
-		delclone := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
+	// if err.GetCode() == jrest.RestErrorResourceBusy || err.GetCode() == jrest.RestErrorResourceBusySnapshotHasClones {
+	// 	if clones, rErr := d.re.GetVolumeSnapshotClones(ctx, pool, ld.VDS(), sd.SDS()); rErr != nil {
+	// 		return rErr
+	// 	} else {
+	// 		for _, clone := range clones {
+	// 			if IsSDS(clone.Name) {
+	// 				dsnaps = append(dsnaps, clone.Name)
+	// 			} else if IsVDS(clone.Name) {
+	// 				dvols = append(dvols, clone.Name)
+	// 			} else {
+	// 				ncsi = append(ncsi, clone.Name)
+	// 			}
+	// 		}
+	// 	}
+	// } else {
+	// 	return err
+	// }
 
-		for _, snapclone := range dsnaps {
-			if rErr := d.re.DeleteClone(ctx, pool, ld.VDS(), sd.SDS(), snapclone, delclone); rErr != nil {
-				msg = fmt.Sprintf("Unable to delete snapshot %s with ID %s because it has volume associated with it %s that cant be deleted, please delete physical zvol first", sd.Name(), sd.CSIID(), snapclone)
-				return jrest.GetError(jrest.RestErrorResourceBusy, msg)
-			}
-		}
-	}
+	// if len(dsnaps) > 0 {
+	// 	forceUmount := true
+	// 	delclone := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
 
-	msg = fmt.Sprintf("Snapshot %s with ID %s is dependent upon by", sd.Name(), sd.CSIID())
+	// 	for _, snapclone := range dsnaps {
+	// 		if rErr := d.re.DeleteClone(ctx, pool, ld.VDS(), sd.SDS(), snapclone, delclone); rErr != nil {
+	// 			msg = fmt.Sprintf("Unable to delete snapshot %s with ID %s because it has volume associated with it %s that cant be deleted, please delete physical zvol first", sd.Name(), sd.CSIID(), snapclone)
+	// 			return jrest.GetError(jrest.RestErrorResourceBusy, msg)
+	// 		}
+	// 	}
+	// }
 
-	if len(dvols) > 0 {
-		msg += fmt.Sprintf(" clones: %s", strings.Join(dvols[:], ","))
-	}
-	if len(ncsi) > 0 {
-		msg += fmt.Sprintf(" not CSI related clones: %s", strings.Join(ncsi[:], ","))
-	}
+	// msg = fmt.Sprintf("Snapshot %s with ID %s is dependent upon by", sd.Name(), sd.CSIID())
 
-	err = jrest.GetError(jrest.RestErrorResourceBusy, msg)
-	return err
+	// if len(dvols) > 0 {
+	// 	msg += fmt.Sprintf(" clones: %s", strings.Join(dvols[:], ","))
+	// }
+	// if len(ncsi) > 0 {
+	// 	msg += fmt.Sprintf(" not CSI related clones: %s", strings.Join(ncsi[:], ","))
+	// }
+
+	// err = jrest.GetError(jrest.RestErrorResourceBusy, msg)
+	// return err
 }
 
 func (d *CSINFSDriver) GetPool(ctx context.Context, pool string) (out *jrest.ResourcePool, err jrest.RestError) {
