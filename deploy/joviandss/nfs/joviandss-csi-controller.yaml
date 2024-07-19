@@ -1,13 +1,4 @@
 ---
-
-apiVersion: snapshot.storage.k8s.io/v1
-kind: VolumeSnapshotClass
-metadata:
-  name: joviandss-snapshot-nfs-sc
-driver: nfs.csi.joviandss.open-e.com
-deletionPolicy: Delete
-
----
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
