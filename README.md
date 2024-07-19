@@ -11,7 +11,11 @@ JovianDSS CSI plugin been tested on following platforms: Talos OS 1.6
 
 ## Plugin installation
 
-[Here is a guide](doc/install.md) on how user can install plugin using `kubectl`.
+### iSCSI
+[Here is a guide](doc/install.md) on how user can install iSCSI plugin using `kubectl`.
+
+### NFS
+[Here is a guide](doc/install-nfs.md) on how user can install NFS plugin.
 
 `Helm` charts are comming...
 
@@ -19,9 +23,12 @@ JovianDSS CSI plugin been tested on following platforms: Talos OS 1.6
 
 General plugin configuration gets done by passing config file in form of kubernetes `secret`.
 You can check for example on how to expose config file to plugin in [installation guide](doc/install.md). 
-Check [configuration document](doc/configuration.md) to learn about configurational options.
+Check [iSCSI configuration document](doc/configuration.md) to learn about configurational options.
+For NFS please check [nfs installation guide](doc/install-nfs.md) and [NFS configuration document](doc/configuration.md)
 
-## Deploy example applications
+## Deploy iSCSI example applications
+
+This section describes installing application with iSCSI.
 
 Once `plugin` installation is completed user can deploy applications that use volumes from *JovianDSS* as [persistent volumes](https://kubernetes.io/docs/concepts/storage/persistent-volumes/)
 
@@ -66,4 +73,17 @@ kubectl apply -f ./deploy/example/pv-test-pvc-nginx.yaml
 Snapshot of volume associated with *pvc* `pv-test-pvc` provided in previous example can be created by:
 ```bash
 kubectl apply -f ./deploy/example/pv-test-pvc-snapshot.yaml
+```
+
+## Deploy NFS example applications
+
+User can use same approach to for NFS based volumes.
+Examples for NFS volumes can be found in folder:
+```
+deploy/examples/nfs
+```
+For instance installation of NGINX with NFS can be done by 
+
+``` bash
+kubectl apply -f ./deploy/example/nfs/nginx-pvc.yaml
 ```
