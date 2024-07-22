@@ -17,6 +17,13 @@ under the License.
 
 package rest
 
+type JovianDSSStorageProtocolType int
+
+const (
+	ProtocolNFS   JovianDSSStorageProtocolType = 1
+	ProtocolISCSI JovianDSSStorageProtocolType = 4
+)
+
 type Primarycache string
 
 const (
@@ -220,4 +227,17 @@ type CreateNASVolumeDescriptor struct {
 type DeleteNASVolumeDescriptor struct {
 	RecursivelyChildren *bool `json:"recursively_children,omitempty"`
 	ForceUmount         *bool `json:"force_umount,omitempty"`
+}
+
+// TODO: Expand create NAS snapshot properties
+// type CreateNASSnapshotProperties struct {
+// 	Primarycache   *Primarycache `json:"primarycache,omitempty"`
+// 	Secondarycache *Primarycache `json:"secondarycache,omitempty"`
+// }
+
+type CreateNASSnapshotDescriptor struct {
+	Name string `json:"name"` // string with name of the new snapshot.
+	// TODO: expand deffinition according to newes version of rest specification
+	// Recursive    *bool                     `json:"recursive,omitempty"`  // boolean indicating if recursively create snapshots of all descendant datasets
+	// Properties   *CreateSnapshotProperties `json:"properties,omitempty"` // object containing properties of new snapshot.
 }

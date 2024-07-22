@@ -56,7 +56,7 @@ func (s *RestEndpoint) CreateNASVolume(ctx context.Context, pool string, desc *C
 	return getError(ctx, body)
 }
 
-func (s *RestEndpoint) DeleteNASVolume(ctx context.Context, pool string, nvds string, data DeleteNASVolumeDescriptor) RestError {
+func (s *RestEndpoint) DeleteNASVolume(ctx context.Context, pool string, nvds string) RestError {
 	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s", pool, nvds)
 
 	l := jcom.LFC(ctx)

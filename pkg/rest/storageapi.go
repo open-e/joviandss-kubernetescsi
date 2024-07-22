@@ -81,9 +81,8 @@ func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string)
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s", pool, vname)
 
 	l := s.l.WithFields(log.Fields{
-		"func":    "GetVolume",
-		"traceId": ctx.Value("traceId"),
-		"url":     addr,
+		"func": "GetVolume",
+		"url":  addr,
 	})
 
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumeRCode)
@@ -220,7 +219,7 @@ func (s *RestEndpoint) GetVolumeSnapshot(ctx context.Context, pool string, vname
 	return nil, getError(ctx, body)
 }
 
-// # Create Snapshot from existing volumes
+// # Create Snapshot from existing volume
 //
 // Arguments:
 //

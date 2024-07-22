@@ -30,18 +30,18 @@ import (
 )
 
 // deleteVolumeCmd represents the deleteVolume command
-var deleteVolumeCmd = &cobra.Command{
-	Use:   "deleteVolume",
-	Short: "Delete specified volume",
+var deleteSnapshotCmd = &cobra.Command{
+	Use:   "deleteSnapshot",
+	Short: "Delete specified snapshot",
 	Long:  ``,
-	Run:   deleteVolume,
+	Run:   deleteSnapshot,
 	// func(cmd *cobra.Command, args []string) {
 	// 	fmt.Println("deleteVolume called")
 	// },
 }
 
-func deleteVolume(cmd *cobra.Command, args []string) {
-	logrus.Debug("delete volumes")
+func deleteSnapshot(cmd *cobra.Command, args []string) {
+	logrus.Debug("delete snapshot")
 	var cfg common.JovianDSSCfg
 	// controller.ControllerCfg
 	// var cp csi_controller.ControllerPlugin
@@ -53,21 +53,21 @@ func deleteVolume(cmd *cobra.Command, args []string) {
 	}
 	controller.SetupControllerPlugin(&cp, &cfg)
 
-	var req csi.DeleteVolumeRequest
-	var ctx context.Context = common.GetContext("delete_volume")
-	req.VolumeId = volumeId
-	_, err := cp.DeleteVolume(ctx, &req)
+	var req csi.DeleteSnapshotRequest
+	var ctx context.Context = common.GetContext("delete_snapshot")
+	req.SnapshotId = snapshotId
+	_, err := cp.DeleteSnapshot(ctx, &req)
 	if err != nil {
-		logrus.Errorln("delete volume failes, error is ", err.Error())
+		logrus.Errorln("delete snapshot failes, error is ", err.Error())
 	}
 }
 
 func init() {
-	deleteVolumeCmd.Flags().StringVarP(&volumeId, "name", "n", "", "Name of volume to delete")
+	deleteSnapshotCmd.Flags().StringVarP(&snapshotId, "name", "n", "", "Name of snapshot to delete")
 
-	if err := deleteVolumeCmd.MarkFlagRequired("name"); err != nil {
+	if err := deleteSnapshotCmd.MarkFlagRequired("name"); err != nil {
 		fmt.Println(err)
 	}
 
-	ControllerCmd.AddCommand(deleteVolumeCmd)
+	ControllerCmd.AddCommand(deleteSnapshotCmd)
 }

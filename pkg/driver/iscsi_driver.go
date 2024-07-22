@@ -342,7 +342,7 @@ func (d *CSIISCSiDriver) ListAllVolumes(ctx context.Context, pool string, maxret
 	}
 }
 
-func (d *CSIISCSiDriver) ListAllSnapshots(ctx context.Context, pool string, maxret int, token CSIListingToken) (snaps []jrest.ResourceSnapshotShort, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSIISCSiDriver) ListAllSnapshots(ctx context.Context, pool string, maxret int, token CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllSnapshots",

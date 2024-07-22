@@ -721,13 +721,13 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 
 	switch jrest.ErrCode(rErr) {
 	case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusySnapshotHasClones:
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 	case jrest.RestErrorResourceDNE:
 		l.Warnf("snapshot %s do not exists", sd.Name())
 	case jrest.RestErrorOk:
 		l.Debugf("snapshot %s was deleted before", sd.Name())
 	default:
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, rErr.Error())
 	}
 
 	return &csi.DeleteSnapshotResponse{}, nil

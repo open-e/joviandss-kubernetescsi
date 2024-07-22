@@ -4,7 +4,8 @@ ENV_PROD := "CGO_ENABLED=0 GOOS=linux"
 IMAGE_VERSION=$(shell git describe --long --tags)
 ENV_DEV := "CGO_ENABLED=1 GOOS=linux"
 
-PROTOCOL_TYPE ?= "iSCSI"
+PROTOCOL_TYPE ?= "nfs"
+SUPPORTED_PROTOCOL_TYPES := iscsi nfs
 
 FLAGS_PROD := "-a -ldflags ' \
 				-s \
@@ -39,24 +40,31 @@ IMAGE_LATEST_UBUNTU_16=$(REGISTRY_NAME)/$(IMAGE_NAME)-u-16:latest
 default: bin
 
 
-all: prod
+all: check-protocol-type prod
 
+check-protocol-type:
+	@echo "Checking protocol type selection..."
+	@if ! echo "$(SUPPORTED_PROTOCOL_TYPES)" | grep -wq "$(PROTOCOL_TYPE)"; then \
+		echo "Error: Protocol $(PROTOCOL_TYPE) is not supported. Choose from $(SUPPORTED_PROTOCOL_TYPES)"; \
+		exit 1; \
+	fi
+	@echo "Building $(PROTOCOL_TYPE)"; \
 
-bin:
+bin:  check-protocol-type
 	@$(MAKE) cli FLAGS=$(FLAGS_DEV) ENV=$(ENV_DEV)
 	@$(MAKE) plugin FLAGS=$(FLAGS_DEV) ENV=$(ENV_DEV)
 
-dev:
+dev: check-protocol-type
 	$(MAKE) container FLAGS=$(FLAGS_DEV)  IMAGE_TAG=$(IMAGE_TAG_DEV)  IMAGE_TAG_LATEST=$(IMAGE_TAG_LATEST_DEV)  ENV=$(ENV_DEV)
 
-prod:
+prod: check-protocol-type
 	$(MAKE) container FLAGS=$(FLAGS_PROD) IMAGE_TAG=$(IMAGE_TAG_PROD) IMAGE_TAG_LATEST=$(IMAGE_TAG_LATEST_PROD) ENV=$(ENV_PROD)
 
-cli:
+cli: check-protocol-type
 	$(GOCMD) mod tidy
 	$(ENV) $(GOBUILD) $(FLAGS) -o _output/jdss-csi-cli ./app/jdss-csi-cli
 
-plugin:
+plugin: check-protocol-type
 	$(GOCMD) mod tidy
 	$(ENV) $(GOBUILD) $(FLAGS) -o _output/jdss-csi-plugin ./app/joviandssplugin
 

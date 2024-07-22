@@ -51,3 +51,8 @@ func RestNASVolumeSnapshotEntryBasedID(entry jrest.ResourceNASVolumeSnapshot) st
 	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
 	return basedid
 }
+
+func RestNASSnapshotShortEntryBasedID(entry jrest.ResourceNASSnapshotShort) string {
+	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
+	return basedid
+}

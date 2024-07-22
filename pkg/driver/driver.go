@@ -41,7 +41,7 @@ type CSIDriver interface {
 	DeleteSnapshot(ctx context.Context, pool string, ld LunDesc, sd *SnapshotDesc) jrest.RestError
 	GetSnapshot(ctx context.Context, pool string, vd LunDesc, sd *SnapshotDesc) (*jrest.ResourceSnapshot, jrest.RestError)
 	ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token CSIListingToken) (interface{}, *CSIListingToken, jrest.RestError)
-	ListAllSnapshots(ctx context.Context, pool string, maxret int, token CSIListingToken) ([]jrest.ResourceSnapshotShort, *CSIListingToken, jrest.RestError)
+	ListAllSnapshots(ctx context.Context, pool string, maxret int, token CSIListingToken) (interface{}, *CSIListingToken, jrest.RestError)
 
 	// Volume cloning and restoration
 	CreateVolumeFromSnapshot(ctx context.Context, pool string, sd *SnapshotDesc, nvd *VolumeDesc) jrest.RestError

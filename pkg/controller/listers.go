@@ -35,79 +35,78 @@ import (
 	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
-func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshotShort) (err error) {
+func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSnapshotsResponse, gsnaps interface{}) (err error) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
 		"func":    "completeListResponseFromSnapshotShort",
 		"section": "controller",
 	})
-
-	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
 	i := 0
 
-	lsr.Entries = entries
-	for _, s := range snaps {
-		ts := timestamppb.New(s.Properties.Creation)
+	switch snaps := gsnaps.(type) {
+	case []jrest.ResourceSnapshotShort:
+		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
 
-		vd, err := jdrvr.NewVolumeDescFromVDS(s.Volume)
-		if err != nil {
-			l.Warnf("Volume name has incompatible format %s", s.Volume)
-			continue
-		}
-		sd, err := jdrvr.NewSnapshotDescFromSDS(vd, s.Name)
-		if err != nil {
-			l.Warnf("Snapshot name has incompatible format %s", s.Name)
-			continue
-		}
+		lsr.Entries = entries
+		for _, s := range snaps {
+			ts := timestamppb.New(s.Properties.Creation)
 
-		entries[i] = &csi.ListSnapshotsResponse_Entry{
-			Snapshot: &csi.Snapshot{
-				SnapshotId:     sd.CSIID(),
-				SourceVolumeId: vd.CSIID(),
-				CreationTime:   ts,
-				ReadyToUse:     true,
-			},
+			vd, err := jdrvr.NewVolumeDescFromVDS(s.Volume)
+			if err != nil {
+				l.Warnf("Volume name has incompatible format %s", s.Volume)
+				continue
+			}
+			sd, err := jdrvr.NewSnapshotDescFromSDS(vd, s.Name)
+			if err != nil {
+				l.Warnf("Snapshot name has incompatible format %s", s.Name)
+				continue
+			}
+
+			entries[i] = &csi.ListSnapshotsResponse_Entry{
+				Snapshot: &csi.Snapshot{
+					SnapshotId:     sd.CSIID(),
+					SourceVolumeId: vd.CSIID(),
+					CreationTime:   ts,
+					ReadyToUse:     true,
+				},
+			}
+			i += 1
 		}
-		i += 1
+		lsr.Entries = entries[:i]
+	case []jrest.ResourceNASSnapshotShort:
+		l.Debug("Processing NAS snapshot response")
+		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
+
+		lsr.Entries = entries
+		for _, s := range snaps {
+			ts := timestamppb.New(s.Properties.Creation)
+
+			vd, err := jdrvr.NewVolumeDescFromVDS(s.Parent.Name)
+			if err != nil {
+				l.Warnf("Volume name has incompatible format %s", s.Parent.Name)
+				continue
+			}
+			sd, err := jdrvr.NewSnapshotDescFromSDS(vd, s.Name)
+			if err != nil {
+				l.Warnf("Snapshot name has incompatible format %s", s.Name)
+				continue
+			}
+
+			entries[i] = &csi.ListSnapshotsResponse_Entry{
+				Snapshot: &csi.Snapshot{
+					SnapshotId:     sd.CSIID(),
+					SourceVolumeId: vd.CSIID(),
+					CreationTime:   ts,
+					ReadyToUse:     true,
+				},
+			}
+			i += 1
+		}
+		lsr.Entries = entries[:i]
 	}
-	lsr.Entries = entries[:i]
 
 	return nil
 }
-
-// func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshot, ld jdrvr.LunDesc) (err error) {
-// 	l := jcom.LFC(ctx)
-// 	l = l.WithFields(log.Fields{
-// 		"func":    "completeListResponseFromSnapshotShort",
-// 		"section": "controller",
-// 	})
-// 	i := 0
-//
-// 	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
-// 	lsr.Entries = entries
-// 	for i, s := range snaps {
-// 		ts := timestamppb.New(s.Creation)
-//
-// 		sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
-// 		if err != nil {
-// 			l.Warnf("Snapshot name has incompatible format %s", s.Name)
-// 			continue
-// 		}
-//
-// 		entries[i] = &csi.ListSnapshotsResponse_Entry{
-// 			Snapshot: &csi.Snapshot{
-// 				SnapshotId:     sd.CSIID(),
-// 				SourceVolumeId: ld.CSIID(),
-// 				CreationTime:   ts,
-// 				ReadyToUse:     true,
-// 			},
-// 		}
-// 		i += 1
-// 	}
-// 	lsr.Entries = entries[:i]
-//
-// 	return nil
-// }
 
 func completeListResponseFromVolumeSnapshots(ctx context.Context, lsr *csi.ListSnapshotsResponse, gsnaps interface{}, ld jdrvr.LunDesc) (err error) {
 	l := jcom.LFC(ctx)

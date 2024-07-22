@@ -570,3 +570,60 @@ func (m *ResourceNASVolumeSnapshot) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
+
+type ResourceNASSnapshotShortProperties struct {
+	Creation     time.Time `json:"creation,omitempty"`
+	ResourceType string    `json:"resource_type,omitempty"`
+	Guid         string    `json:"guid,omitempty"`
+}
+
+func (m *ResourceNASSnapshotShortProperties) UnmarshalJSON(data []byte) error {
+	type Alias ResourceNASSnapshotShortProperties
+	aux := &struct {
+		Creation int64 `json:"creation,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(m), // Point Alias to ResourceSnapshot to reuse JSON tags
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	if aux.Creation > 0 { // Only parse if non-empty
+		//creationTime, err := strconv.ParseInt(aux.Creation, 10, 64)
+		//if err != nil {
+		//	return nil
+		//}
+		m.Creation = time.Unix(aux.Creation, 0)
+	}
+
+	return nil
+}
+
+type ResourceNASSnapshotParent struct {
+	Name       string                             `json:"name"`
+	Type       JovianDSSStorageProtocolType       `json:"type"`
+	Properties ResourceNASSnapshotShortProperties `json:"properties"`
+}
+
+func (m *ResourceNASSnapshotParent) UnmarshalJSON(data []byte) error {
+	type Alias ResourceNASSnapshotParent
+	aux := &struct {
+		Type int `json:"copies,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	m.Type = JovianDSSStorageProtocolType(aux.Type)
+
+	return nil
+}
+
+type ResourceNASSnapshotShort struct {
+	Parent     ResourceNASSnapshotParent          `json:"parent"`
+	Name       string                             `json:"name"`
+	Properties ResourceNASSnapshotShortProperties `json:"properties"`
+}
