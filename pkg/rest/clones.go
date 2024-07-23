@@ -27,7 +27,6 @@ import (
 )
 
 func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string, vds string, sds string) (clones []ResourceVolumeSnapshotClones, err RestError) {
-
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones", pool, vds, sds)
 
 	l := s.l.WithFields(log.Fields{
@@ -36,10 +35,9 @@ func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string,
 		"url":     addr,
 	})
 
-	var rsp = GeneralResponse{Data: &clones}
+	rsp := GeneralResponse{Data: &clones}
 
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumeRCode)
-
 	if err != nil {
 		msg := fmt.Sprintf("Unable to get list of clones for snap %s of vol %s ", sds, vds)
 		l.Warn(msg)
@@ -55,7 +53,6 @@ func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string,
 	}
 
 	return nil, getError(ctx, body)
-
 }
 
 // # CreateClone creates clone of a volume from snapshot
@@ -67,7 +64,6 @@ func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string,
 //   - *vid* physical volume id as it used by JovianDSS
 //   - *desc* data, including new volume name, that would be transfered to create clone
 func (s *RestEndpoint) CreateClone(ctx context.Context, pool string, vid string, desc CloneVolumeDescriptor) RestError {
-
 	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/clone", pool, vid)
 
 	l := jcom.LFC(ctx)
@@ -76,10 +72,9 @@ func (s *RestEndpoint) CreateClone(ctx context.Context, pool string, vid string,
 		"url":     addr,
 		"section": "rest",
 	})
-	l.Debugf("Create clone %s from volume %s snapshot %s", vid, desc.Snapshot, desc.Name)
+	l.Debugf("Create clone %s from volume %s snapshot %s", desc.Name, vid, desc.Snapshot)
 
 	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, CreateCloneRCode)
-
 	if err != nil {
 		s.l.Warnln("Unable to create clone ", desc.Name)
 		return err
@@ -104,7 +99,6 @@ func (s *RestEndpoint) DeleteClone(ctx context.Context, pool string, vds string,
 	l.Debugf("Delete clone %s from volume %s snapshot %s", cds, vds, sds)
 
 	stat, body, err := s.rp.Send(ctx, "DELETE", addr, desc, CreateCloneRCode)
-
 	if err != nil {
 		s.l.Warnln("Unable to delete clone ", cds)
 		return err

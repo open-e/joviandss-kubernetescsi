@@ -46,7 +46,7 @@ type ResultEntries struct {
 
 type ResourceVolume struct {
 	Name                 string `json:"name,omitempty"`
-	Size                 string `json:"size,omitempty"`
+	Size                 int64  `json:"size,omitempty"`
 	Origin               string `json:"origin,omitempty"`
 	Relatime             string `json:"relatime,omitempty"`
 	Acltype              string `json:"acltype,omitempty"`
@@ -61,7 +61,7 @@ type ResourceVolume struct {
 	Dedup                string `json:"dedup,omitempty"`
 	ShareNFS             string `json:"sharenfs,omitempty"`
 	ReceiveResumeToken   string `json:"receive_resume_token,omitempty"`
-	VolSize              string `json:"volsize,omitempty"`
+	VolSize              int64  `json:"volsize,omitempty"`
 	Referenced           string `json:"referenced,omitempty"`
 	ShareSMB             string `json:"sharesmb,omitempty"`
 	CreateTxg            string `json:"createtxg,omitempty"`
@@ -133,12 +133,36 @@ type ResourceVolume struct {
 	NBMAND               string `json:"nbmand,omitempty"`
 }
 
-func (v *ResourceVolume) GetSize() int64 {
-	if i, err := strconv.ParseInt(v.VolSize, 10, 64); err != nil {
-		return 0
-	} else {
-		return i
+func (m *ResourceVolume) UnmarshalJSON(data []byte) error {
+	type Alias ResourceVolume
+	aux := &struct {
+		VolSize string `json:"volsize,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
 	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	if aux.VolSize != "" { // Only parse if non-empty
+		parsedVolSize, err := strconv.ParseInt(aux.VolSize, 10, 64)
+		if err != nil {
+			return err
+		}
+		m.VolSize = parsedVolSize
+	}
+
+	return nil
+}
+
+func (v *ResourceVolume) GetSize() int64 {
+	return v.VolSize
+	// if i, err := strconv.ParseInt(v.VolSize, 10, 64); err != nil {
+	// 	return 0
+	// } else {
+	// 	return i
+	// }
 }
 
 func (v *ResourceVolume) OriginVolume() string {
@@ -434,7 +458,7 @@ type ResourceNASVolume struct {
 	SecondaryCache            CacheSetting `json:"secondaryCache,omitempty"`
 	AccessTime                AtimeSetting `json:"accessTime,omitempty"`
 	Copies                    Copies       `json:"copies,omitempty"`
-	Quota                     string       `json:"quota,omitempty"`
+	Quota                     int64        `json:"quota,omitempty"`
 	Reservation               string       `json:"reservation,omitempty"`
 	ResWithDescendents        bool         `json:"resWithDescendents,omitempty"`
 	RefquotaWithDescendents   bool         `json:"refquotaWithDescendents,omitempty"`
@@ -452,11 +476,7 @@ type ResourceNASVolume struct {
 }
 
 func (v *ResourceNASVolume) GetSize() int64 {
-	if i, err := strconv.ParseInt(v.Quota, 10, 64); err != nil {
-		return 0
-	} else {
-		return i
-	}
+	return v.Quota
 }
 
 func (v *ResourceNASVolume) OriginVolume() string {
@@ -486,6 +506,8 @@ func (m *ResourceNASVolume) UnmarshalJSON(data []byte) error {
 	aux := &struct {
 		Copies     string `json:"copies,omitempty"`
 		RecordSize string `json:"recordsize,omitempty"`
+		Quota      string `json:"quota,omitempty"`
+
 		*Alias
 	}{
 		Alias: (*Alias)(m),
@@ -510,6 +532,14 @@ func (m *ResourceNASVolume) UnmarshalJSON(data []byte) error {
 		m.RecordSize = num
 	}
 
+	if aux.Quota != "" {
+
+		num, err := strconv.ParseInt(aux.Quota, 10, 64)
+		if err != nil {
+			return err
+		}
+		m.Quota = num
+	}
 	return nil
 }
 
@@ -546,6 +576,7 @@ type ResourceNASVolumeSnapshot struct {
 	LogicalReferenced string    `json:"logicalreferenced,omitempty"`
 	Context           string    `json:"context,omitempty"`
 	NbMand            string    `json:"nbmand,omitempty"`
+	Clones            string    `json:"clones,omitempty"`
 }
 
 func (m *ResourceNASVolumeSnapshot) UnmarshalJSON(data []byte) error {
@@ -569,6 +600,21 @@ func (m *ResourceNASVolumeSnapshot) UnmarshalJSON(data []byte) error {
 	}
 
 	return nil
+}
+
+func (s *ResourceNASVolumeSnapshot) ClonesNames() (clones []string) {
+	if len(s.Clones) > 0 {
+		matches := resourceNameRegexp.FindAllStringSubmatch(s.Clones, -1)
+
+		for _, v := range matches {
+			clones = append(clones, v[1])
+		}
+	}
+	return clones
+}
+
+func (s *ResourceNASVolumeSnapshot) GetSize() int64 {
+	return 0
 }
 
 type ResourceNASSnapshotShortProperties struct {

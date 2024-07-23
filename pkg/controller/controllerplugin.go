@@ -275,52 +275,52 @@ func (cp *ControllerPlugin) getRandomPassword(l int) (s string) {
 	return string(out[:])
 }
 
-func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.ResourceVolume, error) {
-	// return nil, nil
-	l := cp.l.WithField("traceId", ctx.Value("traceId"))
-	// Value("traceId").(string))
-
-	l.Debugf("context %+v", ctx)
-	l.Debugf("Get volume with id: %s", vID)
-	var err error
-
-	//////////////////////////////////////////////////////////////////////////////
-	/// Checks
-
-	if len(vID) == 0 {
-		msg := "Volume name missing in request"
-		l.Warn(msg)
-		return nil, status.Error(codes.InvalidArgument, msg)
-	}
-
-	//////////////////////////////////////////////////////////////////////////////
-
-	v, rErr := cp.re.GetVolume(ctx, cp.pool, vID) // v for Volume
-
-	l.Debugf("%+v\n", v)
-	l.Debugf("%+v\n", rErr)
-	l.Debugf("%+v\n", rErr.GetCode())
-	if rErr != nil {
-		switch rErr.GetCode() {
-		case jrest.RestErrorRequestMalfunction:
-			// TODO: correctly process error messages
-			err = status.Error(codes.NotFound, rErr.Error())
-		case jrest.RestErrorRPM:
-			err = status.Error(codes.Internal, rErr.Error())
-		case jrest.RestErrorResourceDNE:
-			err = status.Error(codes.NotFound, rErr.Error())
-		default:
-			err = status.Error(codes.Internal, rErr.Error())
-		}
-		return nil, err
-	}
-	return v, nil
-}
+// func (cp *ControllerPlugin) getVolume(ctx context.Context, vID string) (*jrest.ResourceVolume, error) {
+// 	// return nil, nil
+// 	l := cp.l.WithField("traceId", ctx.Value("traceId"))
+// 	// Value("traceId").(string))
+//
+// 	l.Debugf("context %+v", ctx)
+// 	l.Debugf("Get volume with id: %s", vID)
+// 	var err error
+//
+// 	//////////////////////////////////////////////////////////////////////////////
+// 	/// Checks
+//
+// 	if len(vID) == 0 {
+// 		msg := "Volume name missing in request"
+// 		l.Warn(msg)
+// 		return nil, status.Error(codes.InvalidArgument, msg)
+// 	}
+//
+// 	//////////////////////////////////////////////////////////////////////////////
+//
+// 	v, rErr := cp.re.GetVolume(ctx, cp.pool, vID) // v for Volume
+//
+// 	l.Debugf("%+v\n", v)
+// 	l.Debugf("%+v\n", rErr)
+// 	l.Debugf("%+v\n", rErr.GetCode())
+// 	if rErr != nil {
+// 		switch rErr.GetCode() {
+// 		case jrest.RestErrorRequestMalfunction:
+// 			// TODO: correctly process error messages
+// 			err = status.Error(codes.NotFound, rErr.Error())
+// 		case jrest.RestErrorRPM:
+// 			err = status.Error(codes.Internal, rErr.Error())
+// 		case jrest.RestErrorResourceDNE:
+// 			err = status.Error(codes.NotFound, rErr.Error())
+// 		default:
+// 			err = status.Error(codes.Internal, rErr.Error())
+// 		}
+// 		return nil, err
+// 	}
+// 	return v, nil
+// }
 
 func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.VolumeDesc, capr *csi.CapacityRange, vSource *csi.VolumeContentSource) (volumeSize int64, csierr error) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func":    "createNeVolume",
+		"func":    "createNewVolume",
 		"section": "controller",
 	})
 
@@ -330,8 +330,8 @@ func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.Volu
 		if srcSnapshot := vSource.GetSnapshot(); srcSnapshot != nil {
 			// Snapshot
 			sourceSnapshotID := srcSnapshot.GetSnapshotId()
-			sd, err := jdrvr.NewSnapshotDescFromCSIID(sourceSnapshotID)
-			if err == nil {
+			sd, lerr := jdrvr.NewSnapshotDescFromCSIID(sourceSnapshotID)
+			if lerr == nil {
 				l.Debugf("Creating volume %s from snapshot %s", nvd.Name(), sd.Name())
 				err = cp.d.CreateVolumeFromSnapshot(ctx, cp.pool, sd, nvd)
 			} else {
@@ -398,6 +398,8 @@ func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDe
 		"func":    "VolumeComply",
 		"section": "controller",
 	})
+
+	ctx = jcom.WithLogger(ctx, l)
 
 	l.Debugf("Checking if volume %s exists and comply with requirments %+v %+v", vd.Name(), caprage, source)
 
@@ -646,9 +648,9 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	switch jrest.ErrCode(rErr) {
 	case jrest.RestErrorResourceBusy:
-		return nil, status.Error(codes.Aborted, err.Error())
+		return nil, status.Error(codes.Aborted, rErr.Error())
 	case jrest.RestErrorResourceDNE:
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 	case jrest.RestErrorResourceExists:
 		l.Warn("Specified snapshot already exists.")
 	case jrest.RestErrorOutOfSpace:
@@ -658,20 +660,20 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	case jrest.RestErrorOk:
 		l.Debugf("Snapshot %s was created", sd.Name())
 	default:
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, rErr.Error())
 	}
 
 	snap, rErr := cp.d.GetSnapshot(ctx, cp.pool, vd, sd)
 
 	switch jrest.ErrCode(rErr) {
 	case jrest.RestErrorResourceBusy:
-		return nil, status.Error(codes.Aborted, err.Error())
+		return nil, status.Error(codes.Aborted, rErr.Error())
 	case jrest.RestErrorResourceDNE:
-		return nil, status.Error(codes.FailedPrecondition, err.Error())
+		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 	case jrest.RestErrorOk:
 		l.Debugf("Got snapshot %s info %+v", sd.Name(), *snap)
 	default:
-		return nil, status.Errorf(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, rErr.Error())
 	}
 	creationTime := &timestamppb.Timestamp{
 		Seconds: snap.Creation.Unix(),
@@ -723,9 +725,9 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 	case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusySnapshotHasClones:
 		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 	case jrest.RestErrorResourceDNE:
-		l.Warnf("snapshot %s do not exists", sd.Name())
+		l.Warnf("Snapshot %s do not exists", sd.Name())
 	case jrest.RestErrorOk:
-		l.Debugf("snapshot %s was deleted before", sd.Name())
+		l.Debugf("Snapshot %s deleted successfully ", sd.Name())
 	default:
 		return nil, status.Errorf(codes.Internal, rErr.Error())
 	}
@@ -808,7 +810,7 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		l.Debugf("get snapshot %s", snapshotId)
 	} else {
 		l.Debugln("listing all snapshots")
-		if snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, int(maxEnt), *token); err != nil {
+		if snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, int(maxEnt), *token); rErr != nil {
 			return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error())
 		} else {
 			if ts != nil {

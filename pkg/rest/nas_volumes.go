@@ -25,6 +25,36 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func (s *RestEndpoint) GetNASVolume(ctx context.Context, pool string, vname string) (*ResourceNASVolume, RestError) {
+	var resvol ResourceNASVolume
+	rsp := GeneralResponse{Data: &resvol}
+
+	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s", pool, vname)
+
+	l := s.l.WithFields(log.Fields{
+		"func":    "GetNASVolume",
+		"url":     addr,
+		"section": "rest",
+	})
+
+	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetVolumeRCode)
+	if err != nil {
+		msg := fmt.Sprintf("Unable to get volume information")
+		l.Warn(msg)
+		return nil, GetError(RestErrorRequestMalfunction, msg)
+	}
+
+	if errU := s.unmarshal(body, &rsp); errU != nil {
+		return nil, errU
+	}
+
+	if stat == CodeOK || stat == CodeNoContent {
+		return &resvol, nil
+	}
+
+	return nil, getError(ctx, body)
+}
+
 func (s *RestEndpoint) CreateNASVolume(ctx context.Context, pool string, desc *CreateNASVolumeDescriptor) RestError {
 	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes", pool)
 

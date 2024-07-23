@@ -411,7 +411,7 @@ func NewJovianDSSCSIISCSiDriver(cfg *jcom.RestEndpointCfg, l *logrus.Entry) (d C
 	return &drvr, nil
 }
 
-func (d *CSIISCSiDriver) GetVolume(ctx context.Context, pool string, vd *VolumeDesc) (out *jrest.ResourceVolume, err jrest.RestError) {
+func (d *CSIISCSiDriver) GetVolume(ctx context.Context, pool string, vd *VolumeDesc) (out *GeneralVolume, err jrest.RestError) {
 	// return nil, nil
 
 	l := jcom.LFC(ctx)
@@ -423,10 +423,21 @@ func (d *CSIISCSiDriver) GetVolume(ctx context.Context, pool string, vd *VolumeD
 
 	l.Debugf("Get volume with id: %s", vd.VDS())
 
-	return d.re.GetVolume(ctx, pool, vd.VDS()) // v for Volume
+	if v, err := d.re.GetVolume(ctx, pool, vd.VDS()); err != nil {
+		return nil, err
+	} else {
+
+		gv := GeneralVolume{
+			Name:      v.Name,
+			Size:      v.GetSize(),
+			OVolume:   v.OriginVolume(),
+			OSnapshot: v.OriginSnapshot(),
+		}
+		return &gv, nil
+	}
 }
 
-func (d *CSIISCSiDriver) GetSnapshot(ctx context.Context, pool string, vd LunDesc, sd *SnapshotDesc) (out *jrest.ResourceSnapshot, err jrest.RestError) {
+func (d *CSIISCSiDriver) GetSnapshot(ctx context.Context, pool string, vd LunDesc, sd *SnapshotDesc) (out *GeneralSnapshot, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "GetSnapshot",
@@ -436,7 +447,16 @@ func (d *CSIISCSiDriver) GetSnapshot(ctx context.Context, pool string, vd LunDes
 
 	l.Debugf("Get snapshot %s of volume %s", sd.SDS(), vd.VDS())
 
-	return d.re.GetVolumeSnapshot(ctx, pool, vd.VDS(), sd.SDS())
+	if nv, err := d.re.GetVolumeSnapshot(ctx, pool, vd.VDS(), sd.SDS()); err != nil {
+		return nil, err
+	} else {
+		gv := GeneralSnapshot{
+			Name:     nv.Name,
+			VolSize:  nv.GetSize(),
+			Creation: nv.Creation,
+		}
+		return &gv, nil
+	}
 }
 
 func (d *CSIISCSiDriver) CreateSnapshot(ctx context.Context, pool string, vd *VolumeDesc, sd *SnapshotDesc) jrest.RestError {

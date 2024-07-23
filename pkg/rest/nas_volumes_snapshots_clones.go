@@ -27,10 +27,10 @@ import (
 )
 
 func (s *RestEndpoint) GetNASVolumeSnapshotClones(ctx context.Context, pool string, vds string, sds string) (clones []ResourceVolumeSnapshotClones, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones", pool, vds, sds)
+	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, vds, sds)
 
 	l := s.l.WithFields(log.Fields{
-		"func":    "GetVolumeSnapshotClones",
+		"func":    "GetNASVolumeSnapshotClones",
 		"section": "rest",
 		"url":     addr,
 	})
@@ -63,16 +63,16 @@ func (s *RestEndpoint) GetNASVolumeSnapshotClones(ctx context.Context, pool stri
 //   - *pool* name of JovianDSS Pool that is storing volume described with *vid*
 //   - *vid* physical volume id as it used by JovianDSS
 //   - *desc* data, including new volume name, that would be transfered to create clone
-func (s *RestEndpoint) CreateNASClone(ctx context.Context, pool string, vid string, desc CloneVolumeDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/clone", pool, vid)
+func (s *RestEndpoint) CreateNASClone(ctx context.Context, pool string, nvid string, nsds string, desc CloneNASVolumeDescriptor) RestError {
+	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, nvid, nsds)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func":    "CreateClone",
+		"func":    "CreateNASClone",
 		"url":     addr,
 		"section": "rest",
 	})
-	l.Debugf("Create clone %s from volume %s snapshot %s", vid, desc.Snapshot, desc.Name)
+	l.Debugf("Create clone %s from volume %s snapshot %s", desc.Name, nvid, nsds)
 
 	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, CreateCloneRCode)
 	if err != nil {
@@ -87,20 +87,20 @@ func (s *RestEndpoint) CreateNASClone(ctx context.Context, pool string, vid stri
 	return getError(ctx, body)
 }
 
-func (s *RestEndpoint) DeleteNASClone(ctx context.Context, pool string, vds string, sds string, cds string, desc DeleteVolumeDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones/%s", pool, vds, sds, cds)
+func (s *RestEndpoint) DeleteNASClone(ctx context.Context, pool string, nvds string, nsds string, ncds string) RestError {
+	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s/clones/%s", pool, nvds, nsds, ncds)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func":    "DeleteClone",
+		"func":    "DeleteNASClone",
 		"url":     addr,
 		"section": "rest",
 	})
-	l.Debugf("Delete clone %s from volume %s snapshot %s", cds, vds, sds)
+	l.Debugf("Delete clone %s from volume %s snapshot %s", ncds, nvds, nsds)
 
-	stat, body, err := s.rp.Send(ctx, "DELETE", addr, desc, CreateCloneRCode)
+	stat, body, err := s.rp.Send(ctx, "DELETE", addr, nil, CodeNoContent)
 	if err != nil {
-		s.l.Warnln("Unable to delete clone ", cds)
+		s.l.Warnf("Unable to delete NAS clone %s", ncds)
 		return err
 	}
 

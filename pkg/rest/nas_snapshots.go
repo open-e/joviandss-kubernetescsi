@@ -74,6 +74,7 @@ func (s *RestEndpoint) DeleteNASSnapshot(ctx context.Context, pool string, nvid 
 		"section": "rest",
 		"addr":    addr,
 	})
+	ctx = jcom.WithLogger(ctx, l)
 
 	stat, body, err := s.rp.Send(ctx, "DELETE", addr, nil, CodeNoContent)
 	if err != nil {

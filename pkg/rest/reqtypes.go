@@ -241,3 +241,14 @@ type CreateNASSnapshotDescriptor struct {
 	// Recursive    *bool                     `json:"recursive,omitempty"`  // boolean indicating if recursively create snapshots of all descendant datasets
 	// Properties   *CreateSnapshotProperties `json:"properties,omitempty"` // object containing properties of new snapshot.
 }
+
+type CloneNASVolumeDescriptor struct {
+	Name           string        `json:"name"`
+	Primarycache   *Primarycache `json:"primarycache,omitempty"`
+	Secondarycache *Primarycache `json:"secondarycache,omitempty"`
+	Compression    *Compression  `json:"compression,omitempty"`
+	Logbias        *LogBias      `json:"logbias,omitempty"`
+	Sync           *SyncSetting  `json:"sync,omitempty"`
+	Dedup          *DedupSetting `json:"dedup,omitempty"`
+	Copies         *Copies       `json:"copies,omitempty"`
+}
