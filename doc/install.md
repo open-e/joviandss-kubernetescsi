@@ -22,11 +22,10 @@ Installation process of JovianDSS CSI plugin goes through creation of appropriat
 kubectl apply -f ./deploy/joviandss/namespace.yaml
 ```
 
-Grant additional security privileges to `joviandss-csi` namespace:
-
-```bash
-kubectl label ns joviandss-csi pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/warn=privileged
-```
+The namespace manifest sets the Pod Security level of `joviandss-csi` to `privileged`
+(labels `pod-security.kubernetes.io/{enforce,audit,warn}`), because the node plugin needs
+privileged containers, host networking and host paths to attach volumes.
+No cluster-wide security change is required.
 
 ### 2. Install CRDT and classes related snapshot support provided for snapshot support. This CRDT's are inherited from [github.com/kubernetes-csi/external-snapshotter](https://github.com/kubernetes-csi/external-snapshotter/tree/release-5.0/client/config/crd`)
 

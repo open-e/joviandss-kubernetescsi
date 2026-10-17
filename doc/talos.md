@@ -1,105 +1,121 @@
 # Talos Linux Support
 
-Due to specifics of architecture and enforced security policies of Talos OS additional actions have to be taken 
-to to run JovianDSS CSI plugin.
+Talos Linux has no package manager and enforces strict security defaults, so additional
+actions have to be taken before installing the JovianDSS CSI plugin, further `plugin`.
 
-## iSCSI
+Instructions below are written for Talos 1.14. The `plugin` itself has been verified on
+Talos 1.6 only.
 
-JovianDSS CSI plugin relies on iscsi service provided by host, but Talos OS do not provide out of the box, at least not in 1.6 version.
+All steps apply to every node that runs the `plugin` node service. By default these are the
+worker nodes: the node DaemonSet has no tolerations, so it does not run on control plane
+nodes unless they accept workloads (`cluster.allowSchedulingOnControlPlanes`).
 
-To add iSCSI to your Talos distro user have to use Talos extensions.
-Below are links for detailed information:
+## 1. iSCSI tools extension
+
+The `plugin` relies on the iSCSI daemon `iscsid` and the `iscsiadm` tool provided by the host.
+Talos does not ship them; they come from the `siderolabs/iscsi-tools` system extension, which
+has to be part of the installed image.
+
+Further information:
+
 1. [Boot assets](https://www.talos.dev/latest/talos-guides/install/boot-assets/)
 2. [System Extensions](https://www.talos.dev/latest/talos-guides/configuration/system-extensions/)
 3. [Talos Image Factory](https://factory.talos.dev/)
 
-If user is using [Image Factory](https://factory.talos.dev/) to generate OS image, result can be installed by running:
+Create a schematic in the [Image Factory](https://factory.talos.dev/) with the extension:
+
+```yaml
+customization:
+  systemExtensions:
+    officialExtensions:
+      - siderolabs/iscsi-tools
+```
+
+For a new node, boot from the factory ISO and install with the factory installer image, both
+built for that schematic:
+
+```
+https://factory.talos.dev/image/<schematic_id>/<talos_version>/metal-amd64.iso
+factory.talos.dev/metal-installer/<schematic_id>:<talos_version>
+```
+
+For a running node, switch it to the installer image with the extension:
 
 ```bash
-talosctl upgrade --image factory.talos.dev/installer/<new_schematic_id>:<version>
+talosctl upgrade -n node1.my-talos-cluster.lan \
+    --image factory.talos.dev/metal-installer/<schematic_id>:<talos_version>
 ```
 
 For instance
-```bash
-talosctl upgrade --image  factory.talos.dev/installer/c9078f9419961640c712a8bf2bb9174933dfcf1da383fd8ea2b7dc21493f8bac:v1.6.7 
-```
-
-If installation completed successfully user will be able to see `tgtd` and `iscsid` services.
-Please notice that `iscsi` extension have to be present on all working nodes.
 
 ```bash
-talosctl get service -n node2.my-talos-cluster.lan
+talosctl upgrade -n node1.my-talos-cluster.lan \
+    --image factory.talos.dev/metal-installer/c9078f9419961640c712a8bf2bb9174933dfcf1da383fd8ea2b7dc21493f8bac:v1.14.2
 ```
 
-```
-NODE                         NAMESPACE   TYPE      ID           VERSION   RUNNING   HEALTHY   HEALTH UNKNOWN
-cntr1.my-talos-cluster.lan   runtime     Service   ext-iscsid   1         true      false     true
-cntr1.my-talos-cluster.lan   runtime     Service   ext-tgtd     1         true      false     true
-```
-
-and extensions
+Once the extension is installed, the node reports it and runs the `ext-iscsid` service:
 
 ```bash
 talosctl get extensions -n node2.my-talos-cluster.lan
+talosctl get services -n node2.my-talos-cluster.lan
 ```
 
 ```
 NODE                         NAMESPACE   TYPE              ID   VERSION   NAME          VERSION
-node2.my-talos-cluster.lan   runtime     ExtensionStatus   0    1         iscsi-tools   v0.1.4
+node2.my-talos-cluster.lan   runtime     ExtensionStatus   0    1         iscsi-tools   <extension version>
+
+NODE                         NAMESPACE   TYPE      ID           VERSION   RUNNING   HEALTHY   HEALTH UNKNOWN
+node2.my-talos-cluster.lan   runtime     Service   ext-iscsid   1         true      false     true
 ```
 
-Listings above emphasize only services and extensions that is required for `plugin` to operate and does not include all possible services that might be present on your cluster.
+Listings above show only the extension and service required by the `plugin`; the node lists
+more.
 
+## 2. Machine configuration patches
 
-## Patching security
+Two patches are needed, both in `deploy/talos/`:
 
-Talos OS security policies preventing direct interaction of containerised services with extensions and systems of Talos out of the box.
-To give JovianDSS CSI plugin access to iSCSI extension and parts of Talos OS file system(required to attach volumes hosted by JovianDSS to user containers), user have to change Talos OS security policies.
+- `modulepatch.yaml`: loads the `iscsi_tcp` kernel module on every boot.
 
-Change can be done through patching [Patching Talos OS](https://www.talos.dev/v1.6/talos-guides/configuration/patching/).
+  ```yaml
+  apiVersion: v1alpha1
+  kind: KernelModuleConfig
+  name: iscsi_tcp
+  ```
 
-Here is patch.
+- `workload-isolation-patch.yaml`: Talos 1.14 runs kubelet and all pods in an isolated
+  mount/PID namespace by default. The `plugin` node service runs `iscsiadm` of the host and
+  mounts host paths; it has not been verified with workload isolation enabled, so disable it.
 
-```yaml
-cluster:
-  apiServer:
-    admissionControl:
-      - name: PodSecurity
-        configuration:
-          exemptions:
-            namespaces:
-              - joviandss-csi
-```
+  ```yaml
+  apiVersion: v1alpha1
+  kind: SecurityProfileConfig
+  workloadIsolation: false
+  ```
 
-Assuming that user have current Talos node config file `node.yaml`, patch file with context provided above in the same directory and named `securitypatch.yaml` and node with FQDN or ip with name `node.myclaster.lan`
-, patching can be done by:
-
-Additionally user might want to ensure that `iscsi_tcp` will be loaded on machine start, that can be done by adding following patch
-```yaml
-machine:
-    install:
-        extraKernelArgs:
-            - iscsi_tcp=1
-    kernel:
-        # Kernel modules to load.
-        modules:
-            - name: iscsi_tcp # Module name.
-```
-
-
-1. Applying patch to present configuration files of worker node and controller node of your running Talos cluster locally.
-```bash
-talosctl machineconfig patch worker.yaml --patch @securitypatch.yaml -o worker_cfg_v2.yaml
-talosctl machineconfig patch controller.yaml --patch @securitypatch.yaml -o controller_cfg_v2.yaml
-```
-Ensuring module load on start 
-```bash
-talosctl machineconfig patch worker.yaml --patch @modulepatch.yaml -o worker_cfg_v2.yaml
-```
-
-2. Uploading config to Talos
+Apply the patches to running nodes:
 
 ```bash
-talosctl apply-config -n node1.my-talos-cluster.lan,node2.my-talos-cluster.lan,...<and all other worker nodes you have in your cluster>... --file node_cfg_v2.yaml
-talosctl apply-config -n cntr1.my-talos-cluster.lan,cntr2.my-talos-cluster.lan,...<and all other controller nodes you have in your cluster>... --file cntr_cfg_v2.yaml
+talosctl patch machineconfig \
+    -n node1.my-talos-cluster.lan,node2.my-talos-cluster.lan \
+    --patch @deploy/talos/modulepatch.yaml \
+    --patch @deploy/talos/workload-isolation-patch.yaml
 ```
+
+Or, for a new cluster, add them when generating the configuration:
+
+```bash
+talosctl gen config my-talos-cluster https://<endpoint>:6443 \
+    --config-patch-worker @deploy/talos/modulepatch.yaml \
+    --config-patch-worker @deploy/talos/workload-isolation-patch.yaml
+```
+
+Use `--config-patch` instead of `--config-patch-worker` if control plane nodes run the
+`plugin` too.
+
+## 3. Pod Security
+
+Talos enforces the Pod Security level `baseline` cluster-wide, which rejects the privileged
+pods of the `plugin`. No Talos patch is needed for that: the namespace manifest
+`deploy/joviandss/namespace.yaml` labels `joviandss-csi` with the `privileged` level, see
+[installation guide](install.md).
