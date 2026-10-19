@@ -3,8 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"joviandss-kubernetescsi/pkg/common"
-	"joviandss-kubernetescsi/pkg/pluginserver"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/pluginserver"
 
 	"os"
 
@@ -47,7 +47,7 @@ func main() {
 	} else {
 		l = initLogging(logLevel, logPath)
 	}
-	l.Debugf("Version %s", common.Version)
+	l.Debugf("Version %s", jcom.Version)
 
 	routine(cfg, l)
 	os.Exit(0)
@@ -89,7 +89,7 @@ func initLogging(logLevel string, toFile string) *logrus.Entry {
 	return l
 }
 
-func handleArgs() *common.JovianDSSCfg {
+func handleArgs() *jcom.JovianDSSCfg {
 	flag.StringVar(&address, "csi-address", "/var/lib/kubelet/plugins_registry/joviandss-csi-driver/csi.sock", "CSI endpoint socket address")
 	flag.StringVar(&netType, "soc-type", "tcp", "CSI endpoint socket type")
 
@@ -97,15 +97,15 @@ func handleArgs() *common.JovianDSSCfg {
 	flag.BoolVar(&startNode, "node", false, "Start node plugin")
 	flag.BoolVar(&startIdentity, "identity", false, "Start identity plugin")
 
-	flag.StringVar(&common.NodeID, "nodeid", "", "Id of the kubernetes node")
+	flag.StringVar(&jcom.NodeID, "nodeid", "", "Id of the kubernetes node")
 	flag.StringVar(&configPath, "config", "", "Path to configuration file")
 	flag.StringVar(&logLevel, "loglevel", "WARNING", "Log Level, default is Warning")
 	flag.StringVar(&logPath, "logpath", "", "Log file location")
 	flag.Parse()
 
 	if len(configPath) > 0 {
-		var cfg common.JovianDSSCfg
-		if err := common.SetupConfig(configPath, &cfg); err != nil {
+		var cfg jcom.JovianDSSCfg
+		if err := jcom.SetupConfig(configPath, &cfg); err != nil {
 			fmt.Fprintf(os.Stderr, "Unable to process config: %s", err.Error())
 			os.Exit(1)
 		}
@@ -114,7 +114,7 @@ func handleArgs() *common.JovianDSSCfg {
 	return nil
 }
 
-func routine(cfg *common.JovianDSSCfg, l *logrus.Entry) {
+func routine(cfg *jcom.JovianDSSCfg, l *logrus.Entry) {
 	l.Debug("Start app")
 	jdss, _ := pluginserver.GetPluginServer(cfg, l, &netType, &address, startController, startNode, startIdentity)
 

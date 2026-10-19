@@ -24,7 +24,7 @@ import (
 	"fmt"
 
 	//jcom "joviandss-kubernetescsi/pkg/common"
-	jrest "joviandss-kubernetescsi/pkg/rest"
+	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
 func RestVolumeEntryBasedID(entry jrest.ResourceVolume) string {

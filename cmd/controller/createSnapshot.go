@@ -10,12 +10,8 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/sirupsen/logrus"
 
-	csi_common "joviandss-kubernetescsi/pkg/common"
-	csi_controller "joviandss-kubernetescsi/pkg/controller"
-
-	cli_common "joviandss-kubernetescsi/pkg/common"
-
-	"joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	csi_controller "github.com/open-e/joviandss-kubernetescsi/pkg/controller"
 
 	"github.com/spf13/cobra"
 )
@@ -35,11 +31,11 @@ func createSnaposhot(cmd *cobra.Command, args []string) {
 		fmt.Println(err)
 	}
 
-	var cfg csi_common.JovianDSSCfg
+	var cfg jcom.JovianDSSCfg
 
 	var cp csi_controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
+	if err := jcom.SetupConfig(jcom.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -48,7 +44,7 @@ func createSnaposhot(cmd *cobra.Command, args []string) {
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 
 	var req csi.CreateSnapshotRequest
-	var ctx context.Context = common.GetContext("create_snapshot")
+	var ctx context.Context = jcom.GetContext("create_snapshot")
 
 	req.Name = snapshotName
 	req.SourceVolumeId = volumeId

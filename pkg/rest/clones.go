@@ -23,7 +23,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string, vds string, sds string) (clones []ResourceVolumeSnapshotClones, err RestError) {

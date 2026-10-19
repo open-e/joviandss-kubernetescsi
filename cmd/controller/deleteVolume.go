@@ -7,13 +7,10 @@ import (
 	"context"
 	"fmt"
 
-	cli_common "joviandss-kubernetescsi/pkg/common"
-	csi_common "joviandss-kubernetescsi/pkg/common"
-	csi_controller "joviandss-kubernetescsi/pkg/controller"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	csi_controller "github.com/open-e/joviandss-kubernetescsi/pkg/controller"
 
 	// csi_rest "joviandss-kubernetescsi/pkg/rest"
-
-	"joviandss-kubernetescsi/pkg/common"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/sirupsen/logrus"
@@ -34,13 +31,13 @@ var deleteVolumeCmd = &cobra.Command{
 func deleteVolume(cmd *cobra.Command, args []string) {
 
 	logrus.Debug("delete volumes")
-	var cfg csi_common.JovianDSSCfg
+	var cfg jcom.JovianDSSCfg
 	// controller.ControllerCfg
 	// var cp csi_controller.ControllerPlugin
 
 	var cp csi_controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
+	if err := jcom.SetupConfig(jcom.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -49,7 +46,7 @@ func deleteVolume(cmd *cobra.Command, args []string) {
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 
 	var req csi.DeleteVolumeRequest
-	var ctx context.Context = common.GetContext("delete_volume")
+	var ctx context.Context = jcom.GetContext("delete_volume")
 	req.VolumeId = volumeId
 	_, err := cp.DeleteVolume(ctx, &req)
 

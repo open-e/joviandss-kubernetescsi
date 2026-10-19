@@ -32,7 +32,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 const sessionTimeout = 30 * time.Second

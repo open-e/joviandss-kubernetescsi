@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/cobra"
 	//cli_common "joviandss-kubernetescsi/pkg/common"
 
-	cliGetInfo "joviandss-kubernetescsi/cmd/node/getinfo"
-	cliStageVolume "joviandss-kubernetescsi/cmd/node/stagevolume"
+	cliGetInfo "github.com/open-e/joviandss-kubernetescsi/cmd/node/getinfo"
+	cliStageVolume "github.com/open-e/joviandss-kubernetescsi/cmd/node/stagevolume"
 )
 
 // nodeCmd represents the node command

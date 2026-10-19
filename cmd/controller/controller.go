@@ -24,8 +24,8 @@ import (
 	//"github.com/open-e/JovianDSS-KubernetesCSI/pkg/joviandss"
 
 	"github.com/spf13/cobra"
-	cliPublishVolume "joviandss-kubernetescsi/cmd/controller/publishvolume"
-	cli_common "joviandss-kubernetescsi/pkg/common"
+	cliPublishVolume "github.com/open-e/joviandss-kubernetescsi/cmd/controller/publishvolume"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 var (
@@ -62,7 +62,7 @@ func addSubCmds() {
 func init() {
 	cFlags := ControllerCmd.PersistentFlags()
 	cFlags.StringVarP(
-		&cli_common.ControllerConfigPath, "config", "c", "", "Path to controller config")
+		&jcom.ControllerConfigPath, "config", "c", "", "Path to controller config")
 
 	if err := cobra.MarkFlagRequired(cFlags, "config"); err != nil {
 		fmt.Fprintln(os.Stderr, "An error occurred:", err)

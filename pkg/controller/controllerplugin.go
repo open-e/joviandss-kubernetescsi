@@ -41,10 +41,10 @@ import (
 	// "google.golang.org/protobuf/ptypes/timestamp"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 	// "joviandss-kubernetescsi/pkg/driver"
-	jdrvr "joviandss-kubernetescsi/pkg/driver"
-	jrest "joviandss-kubernetescsi/pkg/rest"
+	jdrvr "github.com/open-e/joviandss-kubernetescsi/pkg/driver"
+	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 	// jtypes "joviandss-kubernetescsi/pkg/types"
 )
 

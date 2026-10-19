@@ -7,13 +7,10 @@ import (
 	"context"
 	"fmt"
 
-	cli_common "joviandss-kubernetescsi/pkg/common"
-	csi_common "joviandss-kubernetescsi/pkg/common"
-	csi_controller "joviandss-kubernetescsi/pkg/controller"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	csi_controller "github.com/open-e/joviandss-kubernetescsi/pkg/controller"
 
 	// csi_rest "joviandss-kubernetescsi/pkg/rest"
-
-	"joviandss-kubernetescsi/pkg/common"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/sirupsen/logrus"
@@ -35,13 +32,13 @@ It can provide all snapshots for the given pool, snapshots for specific volume o
 func listSnapshots(cmd *cobra.Command, args []string) {
 
 	logrus.Debug("list snapshots")
-	var cfg csi_common.JovianDSSCfg
+	var cfg jcom.JovianDSSCfg
 	// controller.ControllerCfg
 	// var cp csi_controller.ControllerPlugin
 
 	var cp csi_controller.ControllerPlugin
 
-	if err := csi_common.SetupConfig(cli_common.ControllerConfigPath, &cfg); err != nil {
+	if err := jcom.SetupConfig(jcom.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
@@ -63,7 +60,7 @@ func listSnapshots(cmd *cobra.Command, args []string) {
 		req.MaxEntries = maxent
 	}
 
-	var ctx context.Context = common.GetContext("list_snapshots")
+	var ctx context.Context = jcom.GetContext("list_snapshots")
 	resp, err := cp.ListSnapshots(ctx, &req)
 	if err != nil {
 		panic(err)

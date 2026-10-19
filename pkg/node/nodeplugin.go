@@ -11,7 +11,7 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/utils/mount"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{

@@ -6,7 +6,7 @@ import (
 
 	"gopkg.in/yaml.v2"
 
-	"joviandss-kubernetescsi/pkg/rest"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
 // ControllerCfg stores configaration properties of controller instance

@@ -29,8 +29,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 
-	jcom "joviandss-kubernetescsi/pkg/common"
-	jrest "joviandss-kubernetescsi/pkg/rest"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
 // JovianDSS CSI plugin

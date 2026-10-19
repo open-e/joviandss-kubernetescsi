@@ -26,12 +26,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	//humanize "github.com/dustin/go-humanize"
 
-	csi_common "joviandss-kubernetescsi/pkg/common"
-	csi_node "joviandss-kubernetescsi/pkg/node"
-
-	cli_common "joviandss-kubernetescsi/pkg/common"
-
-	"joviandss-kubernetescsi/pkg/common"
+	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
+	csi_node "github.com/open-e/joviandss-kubernetescsi/pkg/node"
 
 	"github.com/spf13/cobra"
 )
@@ -48,7 +44,7 @@ func getInfo(cmd *cobra.Command, args []string) {
 
 	// var np csi_node.NodePlugin
 
-	logger, err := cli_common.GetLogger(csi_common.LogLevel, csi_common.LogPath)
+	logger, err := jcom.GetLogger(jcom.LogLevel, jcom.LogPath)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Unable to init loging because:", err.Error())
 		os.Exit(1)
@@ -64,7 +60,7 @@ func getInfo(cmd *cobra.Command, args []string) {
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 
 	var req csi.NodeGetInfoRequest
-	var ctx context.Context = common.GetContext("node_getinfo")
+	var ctx context.Context = jcom.GetContext("node_getinfo")
 
 	resp, err := np.NodeGetInfo(ctx, &req)
 	if err != nil {
