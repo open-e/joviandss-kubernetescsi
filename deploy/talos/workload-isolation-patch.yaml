@@ -1,0 +1,7 @@
+# Talos >= 1.14 enables workload isolation by default: kubelet and all pods run
+# in a separate mount/PID namespace. The JovianDSS CSI node plugin runs the host
+# iscsiadm and mounts host paths; it has not been verified with workload
+# isolation enabled, so disable it. See docs/talos.md.
+apiVersion: v1alpha1
+kind: SecurityProfileConfig
+workloadIsolation: false

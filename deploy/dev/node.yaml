@@ -66,7 +66,7 @@ spec:
       hostNetwork: true
       containers:
         - name: csi-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v1.2.0
           lifecycle:
             preStop:
               exec:

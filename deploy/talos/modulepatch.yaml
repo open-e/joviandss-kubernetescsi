@@ -1,8 +1,6 @@
-machine:
-    install:
-        extraKernelArgs:
-            - iscsi_tcp=1
-    kernel:
-        # Kernel modules to load.
-        modules:
-            - name: iscsi_tcp # Module name.
+# Load the iscsi_tcp kernel module on every boot. The JovianDSS CSI node plugin
+# attaches volumes over iSCSI through the host iscsid (siderolabs/iscsi-tools
+# extension). Old single-document format: modulepatch-legacy.yaml.
+apiVersion: v1alpha1
+kind: KernelModuleConfig
+name: iscsi_tcp

@@ -1,0 +1,19 @@
+# Legacy format, kept for reference: Talos machine configuration with a single
+# v1alpha1 document. Replaced by modulepatch.yaml (KernelModuleConfig).
+#
+# Does not work on nodes whose configuration uses the multi-document format
+# (UnattendedInstallConfig): Talos rejects it with "UnattendedInstallConfig
+# config is incompatible with v1alpha1 config (.machine.install)".
+#
+# - machine.kernel.modules: loads iscsi_tcp; now a KernelModuleConfig document.
+# - machine.install.extraKernelArgs: passes iscsi_tcp=1 on the kernel command
+#   line. Only used when Talos is installed or upgraded. Not needed to load the
+#   module; the new patch drops it.
+machine:
+    install:
+        extraKernelArgs:
+            - iscsi_tcp=1
+    kernel:
+        # Kernel modules to load.
+        modules:
+            - name: iscsi_tcp # Module name.
