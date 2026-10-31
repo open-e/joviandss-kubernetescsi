@@ -44,6 +44,7 @@ const (
 	RestErrorOutOfSpace                     = 13
 	RestErrorResourceDNEVolume              = 14
 	RestErrorResourceDNETarget              = 15
+	RestErrorResourceDNEShare               = 16
 )
 
 type RestError interface {
@@ -80,6 +81,7 @@ const (
 	resourceDneMsgPattern       = `Zfs resource: (.+\/.+) not found in this collection`
 	volumeDneMsgPattern         = `Volume (?P<volume>[\w\-/\.]+) not found in pool (?P<pool>[\w\-/\.]+).`
 	itemNotFoundClassPattern    = `opene.exceptions.ItemNotFoundError`
+	shareNotFoundClassPattern   = `werkzeug.exceptions.NotFound`
 	snapshotDneMsgPatterm       = `cannot open '([\w\-\/\.]+@[\w\-\.]+)': dataset does not exist`
 	resourceHasClonesMsgPattern = `^In order to delete a zvol, you must delete all of its clones first\.$`
 	volumeHasChildrenMsgPattern = `^cannot destroy '(?P<volume>[\w\-/\.]+)': volume has children[\s\S]use '-r' to destroy the following datasets:(?P<datasets>[.\s\S]*)`
@@ -95,32 +97,41 @@ const (
 	lunIdUsedMsgPattern              = `LUN ([\d]+) is already used in (?P<target>[a-z0-9\.:\-]*).`
 	volumeAlreadyUsedPattern         = `Volume (?P<volumesyspath>.*) is already used.`
 	lunItemConflictClassPattern      = `opene.exceptions.ItemConflictError`
+	shareNotExistsMsgPattern         = `Share .* not exists.`
 )
 
-var resourceExistsMsgRegexp = regexp.MustCompile(resourceExistsMsgPattern)
-var cloneCreateFailureDatasetExistsRegexp = regexp.MustCompile(cloneCreateFailureDatasetExistsPattern)
-var resourceIsBusyMsgRegexp = regexp.MustCompile(resourceIsBusyMsgPattern)
-var resourceDneMsgRegexp = regexp.MustCompile(resourceDneMsgPattern)
-var volumeDneMsgRegexp = regexp.MustCompile(volumeDneMsgPattern)
-var itemNotFoundClassRegexp = regexp.MustCompile(itemNotFoundClassPattern)
-var snapshotDneMsgRegexp = regexp.MustCompile(snapshotDneMsgPatterm)
-var resourceHasClonesMsgRegexp = regexp.MustCompile(resourceHasClonesMsgPattern)
-var volumeHasChildrenMsgRegexp = regexp.MustCompile(volumeHasChildrenMsgPattern)
-var snapshotHasClonesMsgRegexp = regexp.MustCompile(snapshotHasClonesMsgPattern)
-var resourceHasClonesClassRegexp = regexp.MustCompile(resourceHasClonesClassPattern)
-var resourceHasSnapshotsClassRegexp = regexp.MustCompile(resourceHasSnapshotsClassPattern)
-var zfsCmdErrorRegexp = regexp.MustCompile(zfsCmdErrorPattern)
-var storageResourceExhaustedRegexp = regexp.MustCompile(storageResourceExhaustedPattern)
-var targetNameConflictClassRegexp = regexp.MustCompile(targetNameConflictClassPattern)
-var targetExistsMsgRegexp = regexp.MustCompile(targetExistsMsgPattern)
-var targetDneMsgRegexp = regexp.MustCompile(targetDneMsgPattern)
+var (
+	resourceExistsMsgRegexp               = regexp.MustCompile(resourceExistsMsgPattern)
+	cloneCreateFailureDatasetExistsRegexp = regexp.MustCompile(cloneCreateFailureDatasetExistsPattern)
+	resourceIsBusyMsgRegexp               = regexp.MustCompile(resourceIsBusyMsgPattern)
+	resourceDneMsgRegexp                  = regexp.MustCompile(resourceDneMsgPattern)
+	volumeDneMsgRegexp                    = regexp.MustCompile(volumeDneMsgPattern)
+	itemNotFoundClassRegexp               = regexp.MustCompile(itemNotFoundClassPattern)
+	snapshotDneMsgRegexp                  = regexp.MustCompile(snapshotDneMsgPatterm)
+	resourceHasClonesMsgRegexp            = regexp.MustCompile(resourceHasClonesMsgPattern)
+	volumeHasChildrenMsgRegexp            = regexp.MustCompile(volumeHasChildrenMsgPattern)
+	snapshotHasClonesMsgRegexp            = regexp.MustCompile(snapshotHasClonesMsgPattern)
+	resourceHasClonesClassRegexp          = regexp.MustCompile(resourceHasClonesClassPattern)
+	resourceHasSnapshotsClassRegexp       = regexp.MustCompile(resourceHasSnapshotsClassPattern)
+	zfsCmdErrorRegexp                     = regexp.MustCompile(zfsCmdErrorPattern)
+	storageResourceExhaustedRegexp        = regexp.MustCompile(storageResourceExhaustedPattern)
+	targetNameConflictClassRegexp         = regexp.MustCompile(targetNameConflictClassPattern)
+	targetExistsMsgRegexp                 = regexp.MustCompile(targetExistsMsgPattern)
+	targetDneMsgRegexp                    = regexp.MustCompile(targetDneMsgPattern)
+)
 
-var lunIdUsedMsgRegexp = regexp.MustCompile(lunIdUsedMsgPattern)
-var volumeAlteadyUsedRegexp = regexp.MustCompile(volumeAlreadyUsedPattern)
-var lunItemConflictClassRegexp = regexp.MustCompile(lunItemConflictClassPattern)
+var (
+	lunIdUsedMsgRegexp         = regexp.MustCompile(lunIdUsedMsgPattern)
+	volumeAlteadyUsedRegexp    = regexp.MustCompile(volumeAlreadyUsedPattern)
+	lunItemConflictClassRegexp = regexp.MustCompile(lunItemConflictClassPattern)
+)
+
+var (
+	shareNotExistsMsgRegexp  = regexp.MustCompile(shareNotExistsMsgPattern)
+	shareNotFoundClassRegexp = regexp.MustCompile(shareNotFoundClassPattern)
+)
 
 func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restError {
-
 	l := le.WithFields(logrus.Fields{
 		"func":    "ErrorFromErrorT",
 		"section": "rest",
@@ -166,7 +177,8 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 					return &restError{code: RestErrorResourceDNE, msg: *err.Message}
 				}
 				if resourceExistsMsgRegexp.MatchString(*err.Message) {
-					return &restError{code: RestErrorResourceExists}
+					l.Debugf("Resource exists %s", *err.Message)
+					return &restError{code: RestErrorResourceExists, msg: *err.Message}
 				}
 			}
 
@@ -215,14 +227,17 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 		if err.Class != nil {
 			if err.Message != nil {
 				if targetNameConflictClassRegexp.MatchString(*err.Class) && targetExistsMsgRegexp.MatchString(*err.Message) {
+					l.Debug("Target name conflict!")
 					return &restError{code: RestErrorResourceExists}
 				}
 				if lunItemConflictClassRegexp.MatchString(*err.Class) {
 					if lunIdUsedMsgRegexp.MatchString(*err.Message) {
+						l.Debugf("Lun id used %s", err.String())
 						return &restError{code: RestErrorResourceExists, msg: *err.Message}
 					}
 					if volumeAlteadyUsedRegexp.MatchString(*err.Message) {
-						return &restError{code: RestErrorResourceExists, msg: *err.Message}
+						l.Debugf("Volume already used %s", err.String())
+						return &restError{code: RestErrorResourceBusy, msg: *err.Message}
 					}
 				}
 				if itemNotFoundClassRegexp.MatchString(*err.Class) {
@@ -231,6 +246,11 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 					}
 					if targetDneMsgRegexp.MatchString(*err.Message) {
 						return &restError{code: RestErrorResourceDNETarget, msg: *err.Message}
+					}
+				}
+				if shareNotFoundClassRegexp.MatchString(*err.Class) {
+					if shareNotExistsMsgRegexp.MatchString(*err.Message) {
+						return &restError{code: RestErrorResourceDNEShare, msg: *err.Message}
 					}
 				}
 			}
@@ -253,12 +273,11 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 		}
 	}
 	l.Warnln("Unable to identify error: ", err.String())
-	//l.Warnf("Errno:%d, Class:%s, Message:%s, Url:%s", *err.Errno, *err.Class, *err.Message, *err.Url )
+	// l.Warnf("Errno:%d, Class:%s, Message:%s, Url:%s", *err.Errno, *err.Class, *err.Message, *err.Url )
 	return &restError{code: RestErrorFailureUnknown}
 }
 
 func (err *restError) Error() (out string) {
-
 	switch (*err).code {
 
 	case RestErrorResourceBusy:
@@ -284,5 +303,4 @@ func (err *restError) Error() (out string) {
 
 func (err *restError) GetCode() int {
 	return err.code
-
 }

@@ -21,6 +21,7 @@ import (
 	//"fmt"
 	//"strings"
 	"context"
+
 	log "github.com/sirupsen/logrus"
 
 	// "encoding/base64"
@@ -34,137 +35,243 @@ import (
 	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
-func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshotShort) (err error) {
-
+func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSnapshotsResponse, gsnaps interface{}) (err error) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
 		"func":    "completeListResponseFromSnapshotShort",
 		"section": "controller",
 	})
+	i := 0
 
-	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
-	var i = 0
+	switch snaps := gsnaps.(type) {
+	case []jrest.ResourceSnapshotShort:
+		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
 
-	lsr.Entries = entries
-	for _, s := range snaps {
-		ts := timestamppb.New(s.Properties.Creation)
+		lsr.Entries = entries
+		for _, s := range snaps {
+			ts := timestamppb.New(s.Properties.Creation)
 
-		vd, err := jdrvr.NewVolumeDescFromVDS(s.Volume)
-		if err != nil {
-			l.Warnf("Volume name has incompatible format %s", s.Volume)
-			continue
+			vd, err := jdrvr.NewVolumeDescFromVDS(s.Volume)
+			if err != nil {
+				l.Warnf("Volume name has incompatible format %s", s.Volume)
+				continue
+			}
+			sd, err := jdrvr.NewSnapshotDescFromSDS(vd, s.Name)
+			if err != nil {
+				l.Warnf("Snapshot name has incompatible format %s", s.Name)
+				continue
+			}
+
+			entries[i] = &csi.ListSnapshotsResponse_Entry{
+				Snapshot: &csi.Snapshot{
+					SnapshotId:     sd.CSIID(),
+					SourceVolumeId: vd.CSIID(),
+					CreationTime:   ts,
+					ReadyToUse:     true,
+				},
+			}
+			i += 1
 		}
-		sd, err := jdrvr.NewSnapshotDescFromSDS(vd, s.Name)
-		if err != nil {
-			l.Warnf("Snapshot name has incompatible format %s", s.Name)
-			continue
-		}
+		lsr.Entries = entries[:i]
+	case []jrest.ResourceNASSnapshotShort:
+		l.Debug("Processing NAS snapshot response")
+		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
 
-		entries[i] = &csi.ListSnapshotsResponse_Entry{
-			Snapshot: &csi.Snapshot{
-				SnapshotId:     sd.CSIID(),
-				SourceVolumeId: vd.CSIID(),
-				CreationTime:   ts,
-				ReadyToUse:     true,
-			},
+		lsr.Entries = entries
+		for _, s := range snaps {
+			ts := timestamppb.New(s.Properties.Creation)
+
+			vd, err := jdrvr.NewVolumeDescFromVDS(s.Parent.Name)
+			if err != nil {
+				l.Warnf("Volume name has incompatible format %s", s.Parent.Name)
+				continue
+			}
+			sd, err := jdrvr.NewSnapshotDescFromSDS(vd, s.Name)
+			if err != nil {
+				l.Warnf("Snapshot name has incompatible format %s", s.Name)
+				continue
+			}
+
+			entries[i] = &csi.ListSnapshotsResponse_Entry{
+				Snapshot: &csi.Snapshot{
+					SnapshotId:     sd.CSIID(),
+					SourceVolumeId: vd.CSIID(),
+					CreationTime:   ts,
+					ReadyToUse:     true,
+				},
+			}
+			i += 1
 		}
-		i += 1
+		lsr.Entries = entries[:i]
 	}
-	lsr.Entries = entries[:i]
 
 	return nil
 }
 
-func completeListResponseFromVolumeSnapshot(ctx context.Context, lsr *csi.ListSnapshotsResponse, snaps []jrest.ResourceSnapshot, ld jdrvr.LunDesc) (err error) {
-
+func completeListResponseFromVolumeSnapshots(ctx context.Context, lsr *csi.ListSnapshotsResponse, gsnaps interface{}, ld jdrvr.LunDesc) (err error) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
-		"func":    "completeListResponseFromSnapshotShort",
+		"func":    "completeListResponseFromNASVolumeSnapshotShort",
 		"section": "controller",
 	})
-	var i = 0
+	i := 0
 
-	entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
-	lsr.Entries = entries
-	for i, s := range snaps {
-		ts := timestamppb.New(s.Creation)
+	switch snaps := gsnaps.(type) {
+	case []jrest.ResourceSnapshot:
+		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
+		lsr.Entries = entries
+		for _, s := range snaps {
+			ts := timestamppb.New(s.Creation)
 
-		sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
-		if err != nil {
-			l.Warnf("Snapshot name has incompatible format %s", s.Name)
-			continue
+			sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
+			if err != nil {
+				l.Warnf("Snapshot name has incompatible format %s", s.Name)
+				continue
+			}
+
+			entries[i] = &csi.ListSnapshotsResponse_Entry{
+				Snapshot: &csi.Snapshot{
+					SnapshotId:     sd.CSIID(),
+					SourceVolumeId: ld.CSIID(),
+					CreationTime:   ts,
+					ReadyToUse:     true,
+				},
+			}
+			i += 1
 		}
+		lsr.Entries = entries[:i]
+	case []jrest.ResourceNASVolumeSnapshot:
+		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
+		lsr.Entries = entries
 
-		entries[i] = &csi.ListSnapshotsResponse_Entry{
-			Snapshot: &csi.Snapshot{
-				SnapshotId:     sd.CSIID(),
-				SourceVolumeId: ld.CSIID(),
-				CreationTime:   ts,
-				ReadyToUse:     true,
-			},
+		for _, s := range snaps {
+			ts := timestamppb.New(s.Creation)
+
+			sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
+			if err != nil {
+				l.Warnf("Snapshot name has incompatible format %s", s.Name)
+				continue
+			}
+
+			entries[i] = &csi.ListSnapshotsResponse_Entry{
+				Snapshot: &csi.Snapshot{
+					SnapshotId:     sd.CSIID(),
+					SourceVolumeId: ld.CSIID(),
+					CreationTime:   ts,
+					ReadyToUse:     true,
+				},
+			}
+			i += 1
 		}
-		i += 1
+		lsr.Entries = entries[:i]
 	}
-	lsr.Entries = entries[:i]
 
 	return nil
 }
 
-func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesResponse, vols []jrest.ResourceVolume) (err error) {
-
+func completeListResponseFromVolume(ctx context.Context, lsr *csi.ListVolumesResponse, gvols interface{}) (err error) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
 		"func":    "completeListResponseFromVolume",
 		"section": "controller",
 	})
 
-	entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
-	var i = 0
-	for _, v := range vols {
+	i := 0
 
-		vd, err := jdrvr.NewVolumeDescFromVDS(v.Name)
-		if err != nil {
-			l.Warnf("Volume name has incompatible format %s", v.Name)
-			continue
-		}
-		var contentSource *csi.VolumeContentSource
+	switch vols := gvols.(type) {
+	case []jrest.ResourceVolume:
+		entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
+		for _, v := range vols {
 
-		osds := v.OriginSnapshot()
-		if len(osds) > 0 {
-			if jdrvr.IsSDS(osds) {
-				if sd, err := jdrvr.NewSnapshotDescFromSDS(vd, osds); err != nil {
-					contentSource = &csi.VolumeContentSource{
-						Type: &csi.VolumeContentSource_Snapshot{
-							Snapshot: &csi.VolumeContentSource_SnapshotSource{
-								SnapshotId: sd.CSIID(),
-							},
-						},
-					}
-				}
-			} else if jdrvr.IsVDS(osds) {
-				if vd, err := jdrvr.NewVolumeDescFromVDS(osds); err == nil {
-					contentSource = &csi.VolumeContentSource{
-						Type: &csi.VolumeContentSource_Volume{
-							Volume: &csi.VolumeContentSource_VolumeSource{
-								VolumeId: vd.CSIID(),
-							},
-						},
-					}
-				}
-
+			vd, err := jdrvr.NewVolumeDescFromVDS(v.Name)
+			if err != nil {
+				l.Warnf("Volume name has incompatible format %s", v.Name)
+				continue
 			}
-		}
+			var contentSource *csi.VolumeContentSource
 
-		entries[i] = &csi.ListVolumesResponse_Entry{
-			Volume: &csi.Volume{
-				CapacityBytes: v.GetSize(),
-				VolumeId:      vd.CSIID(),
-				ContentSource: contentSource,
-			},
+			osds := v.OriginSnapshot()
+			if len(osds) > 0 {
+				if jdrvr.IsSDS(osds) {
+					if sd, err := jdrvr.NewSnapshotDescFromSDS(vd, osds); err != nil {
+						contentSource = &csi.VolumeContentSource{
+							Type: &csi.VolumeContentSource_Snapshot{
+								Snapshot: &csi.VolumeContentSource_SnapshotSource{
+									SnapshotId: sd.CSIID(),
+								},
+							},
+						}
+					}
+				} else if jdrvr.IsVDS(osds) {
+					if vd, err := jdrvr.NewVolumeDescFromVDS(osds); err == nil {
+						contentSource = &csi.VolumeContentSource{
+							Type: &csi.VolumeContentSource_Volume{
+								Volume: &csi.VolumeContentSource_VolumeSource{
+									VolumeId: vd.CSIID(),
+								},
+							},
+						}
+					}
+				}
+			}
+
+			entries[i] = &csi.ListVolumesResponse_Entry{
+				Volume: &csi.Volume{
+					CapacityBytes: v.GetSize(),
+					VolumeId:      vd.CSIID(),
+					ContentSource: contentSource,
+				},
+			}
+			i += 1
 		}
-		i += 1
+		lsr.Entries = entries[:i]
+	case []jrest.ResourceNASVolume:
+		entries := make([]*csi.ListVolumesResponse_Entry, len(vols))
+		for _, v := range vols {
+
+			vd, err := jdrvr.NewVolumeDescFromVDS(v.Name)
+			if err != nil {
+				l.Warnf("Volume name has incompatible format %s", v.Name)
+				continue
+			}
+			var contentSource *csi.VolumeContentSource
+
+			osds := v.OriginSnapshot()
+			if len(osds) > 0 {
+				if jdrvr.IsSDS(osds) {
+					if sd, err := jdrvr.NewSnapshotDescFromSDS(vd, osds); err != nil {
+						contentSource = &csi.VolumeContentSource{
+							Type: &csi.VolumeContentSource_Snapshot{
+								Snapshot: &csi.VolumeContentSource_SnapshotSource{
+									SnapshotId: sd.CSIID(),
+								},
+							},
+						}
+					}
+				} else if jdrvr.IsVDS(osds) {
+					if vd, err := jdrvr.NewVolumeDescFromVDS(osds); err == nil {
+						contentSource = &csi.VolumeContentSource{
+							Type: &csi.VolumeContentSource_Volume{
+								Volume: &csi.VolumeContentSource_VolumeSource{
+									VolumeId: vd.CSIID(),
+								},
+							},
+						}
+					}
+				}
+			}
+
+			entries[i] = &csi.ListVolumesResponse_Entry{
+				Volume: &csi.Volume{
+					CapacityBytes: v.GetSize(),
+					VolumeId:      vd.CSIID(),
+					ContentSource: contentSource,
+				},
+			}
+			i += 1
+		}
+		lsr.Entries = entries[:i]
 	}
-	lsr.Entries = entries[:i]
 
 	return nil
 }

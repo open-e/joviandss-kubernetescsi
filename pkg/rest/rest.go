@@ -19,23 +19,21 @@ package rest
 
 import (
 	"fmt"
+
 	"github.com/sirupsen/logrus"
 
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
-var (
-	vendorVersion = "dev"
-)
+var vendorVersion = "dev"
 
 type StorageInterface interface {
-
 	// General information
 	GetAddress() (string, int)
 
 	// Pools
 	GetPool() (*ResourcePool, RestError)
-	//GetPools() ([]PoolShort, error)
+	// GetPools() ([]PoolShort, error)
 
 	// Volumes
 	CreateVolume(poolName string, vol ResourceVolume) RestError
@@ -59,7 +57,7 @@ type StorageInterface interface {
 	AddUserToTarget(tname string, name string, pass string) RestError
 
 	CreateClone(vname string, sname string, cname string) RestError
-	//DeleteClone(vname string, sname string, cname string, rChildren bool, rDependent bool) RestError
+	// DeleteClone(vname string, sname string, cname string, rChildren bool, rDependent bool) RestError
 	PromoteClone(vname string, sname string, cname string) RestError
 }
 
@@ -96,35 +94,7 @@ func (re *RestEndpoint) String() string {
 	return re.rec.Addrs[0]
 }
 
-// func GetEndpoint(cfg *RestEndpointCfg, l *logrus.Entry) (s *RestEndpoint, err error) {
-
-//	return nil, nil
-// restProxy, err := NewRestProxy(cfg, l)
-// if err != nil {
-// 	l.Errorf("cannot create REST client for: %s", cfg.Addrs[0])
-// }
-
-// s = &Storage{
-// 	addr: cfg.Addrs[0],
-// 	port: cfg.Port,
-// 	user: cfg.User,
-// 	pass: cfg.Pass,
-// 	rp:   restProxy,
-// 	l:    l,
-// }
-
-// l = l.WithFields(logrus.Fields{
-// 	"obj":     "RestEndpoint",
-// 	"storage": cfg.Addrs[0] + ":" + string(cfg.Port),
-// })
-
-// l.Debugf("Created for %s", cfg.Addrs[0])
-
-// return s, nil
-// }
-
 func SetupEndpoint(rn *RestEndpoint, cfg *jcom.RestEndpointCfg, logger *logrus.Entry) (err error) {
-
 	rn.rec = *cfg
 
 	rn.l = logger.WithFields(logrus.Fields{"section": "rest"})
@@ -134,10 +104,5 @@ func SetupEndpoint(rn *RestEndpoint, cfg *jcom.RestEndpointCfg, logger *logrus.E
 	if ser := SetupRestProxy(&rn.rp, cfg, rn.l); ser != nil {
 		logrus.Errorf("cannot create REST client for: %v", cfg.Addrs)
 	}
-
-	// rn.l.Debugf("RP log value %+s", rn.rp)
-
-	// var v []Volume
-	// rn.ListVolumes("Pool-0", &v)
 	return nil
 }

@@ -1,3 +1,20 @@
+/*
+Copyright (c) 2024 Open-E, Inc.
+All Rights Reserved.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may
+not use this file except in compliance with the License. You may obtain
+a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+License for the specific language governing permissions and limitations
+under the License.
+*/
+
 package node
 
 import (
@@ -9,26 +26,28 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/utils/mount"
+
+	//"k8s.io/utils/mount"
+	mount "k8s.io/mount-utils"
 
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 var supportedNodeServiceCapabilities = []csi.NodeServiceCapability_RPC_Type{
-
 	csi.NodeServiceCapability_RPC_UNKNOWN,
 	csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 }
 
 // NodePlugin responsible for attaching and detaching volumes to host
 type NodePlugin struct {
-	//cfg *NodeCfg
-	l *log.Entry
+	// cfg *NodeCfg
+	l       *log.Entry
+	mounter mount.Interface
 }
 
 // GetNodePlugin inits NodePlugin
 func GetNodePlugin(l *log.Entry) (*NodePlugin, error) {
-	//TODO: rework getting node ID
+	// TODO: rework getting node ID
 	nid, err := GetNodeId(l)
 	if err != nil {
 		return nil, err
@@ -40,6 +59,8 @@ func GetNodePlugin(l *log.Entry) (*NodePlugin, error) {
 		"section": "node",
 	})
 
+	mounter := mount.New("")
+	np.mounter = mounter
 	l.Debug("Init node plugin")
 	return &np, nil
 }
@@ -48,18 +69,20 @@ func GetNodePlugin(l *log.Entry) (*NodePlugin, error) {
 func (np *NodePlugin) NodeExpandVolume(ctx context.Context, in *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	np.l.Trace("Expanding Volume")
 	out := new(csi.NodeExpandVolumeResponse)
+	// TODO: implement volume expansion
 	return out, nil
 }
 
 // NodeGetInfo returns node info
 func (np *NodePlugin) NodeGetInfo(
 	ctx context.Context,
-	req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-
+	req *csi.NodeGetInfoRequest,
+) (*csi.NodeGetInfoResponse, error) {
 	l := np.l.WithFields(log.Fields{
 		"request": "NoneGetInfo",
 		"func":    "NodeGetInfo",
 		"section": "node",
+		"version": jcom.Version,
 	})
 
 	if nid, err := GetNodeId(l); err != nil {
@@ -77,7 +100,6 @@ func (np *NodePlugin) NodeStageVolume(
 	ctx context.Context,
 	req *csi.NodeStageVolumeRequest,
 ) (*csi.NodeStageVolumeResponse, error) {
-
 	l := np.l.WithFields(log.Fields{
 		"request": "NoneStageVolume",
 		"func":    "NodeStageVolume",
@@ -85,44 +107,31 @@ func (np *NodePlugin) NodeStageVolume(
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debug("Node Stage Volume")
-	l.Debugf("Stage Volume request %+v", *req)
+	l.Debugf("Node Stage Volume %s", req.VolumeId)
+	l.Debugf("PublishContext %+v", req.GetPublishContext())
+	l.Debugf("StagingTargetPath %s", req.GetStagingTargetPath())
+	l.Debugf("VolumeCapability %+v", req.GetVolumeCapability())
 	var msg string
-
-	t, err := GetTargetFromReq(ctx, *req)
-	l.Debugf("Target %+v", t)
-
-	if err != nil {
-		return nil, err
-	}
+	var err error
 	var exists bool
-	if exists, err = mount.PathExists(t.STPath); err != nil {
-		msg = fmt.Sprintf("Unable to check file %s for volume %s. Err: %s", t.STPath, t.Tname, err.Error())
-		t.l.Warn(msg)
+
+	if exists, err = mount.PathExists(req.GetStagingTargetPath()); err != nil {
+		msg = fmt.Sprintf("Staging target path %s error: %s", req.GetStagingTargetPath(), err.Error())
+		l.Warn(msg)
 		return nil, status.Error(codes.Internal, msg)
 	}
 
 	// Some activity are taking place with target staging path
 	if exists == false {
-		if err = os.MkdirAll(t.STPath, 0640); err != nil {
-			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", t.TPath, err.Error())
+		l.Debugf("STP dne, creating")
+		if err = os.MkdirAll(req.GetStagingTargetPath(), 0o640); err != nil {
+			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", req.GetStagingTargetPath(), err.Error())
 			return nil, status.Error(codes.Internal, msg)
 		}
 	}
 
-	// Volume do not exist
-	err = t.SerializeTarget()
-	if err != nil {
+	if err := np.StageVolume(ctx, req); err != nil {
 		return nil, err
-	}
-
-	err = t.StageVolume(ctx)
-
-	if err != nil {
-		t.DeleteSerialization()
-		msg = fmt.Sprintf("Unable to stage volume: %s ", err.Error())
-		np.l.Warn(msg)
-		return nil, status.Error(codes.Internal, msg)
 	}
 	return &csi.NodeStageVolumeResponse{}, nil
 }
@@ -133,7 +142,6 @@ func (np *NodePlugin) NodeUnstageVolume(
 	req *csi.NodeUnstageVolumeRequest,
 ) (*csi.NodeUnstageVolumeResponse, error) {
 	// Log out from specified target
-	var msg string
 	l := np.l.WithFields(log.Fields{
 		"request": "NoneUnstageVolume",
 		"func":    "NodeUnstageVolume",
@@ -142,36 +150,16 @@ func (np *NodePlugin) NodeUnstageVolume(
 	ctx = jcom.WithLogger(ctx, l)
 
 	l.Debugf("Node Unstage Volume %s", req.GetVolumeId())
-
-	vname := req.GetVolumeId()
-	if len(vname) == 0 {
-		msg = fmt.Sprintf("Request do not contain volume id")
-		l.Warn(msg)
-		return nil, status.Error(codes.InvalidArgument, msg)
+	var ok bool
+	var umounter mount.MounterForceUnmounter
+	if umounter, ok = np.mounter.(mount.MounterForceUnmounter); ok {
+		if err := UmountVolume(ctx, umounter, req.GetStagingTargetPath()); err != nil {
+			return nil, err
+		}
+	} else {
+		return nil, status.Error(codes.Internal, "Unable to identify umounter")
 	}
 
-	stp := req.GetStagingTargetPath()
-	if len(stp) == 0 {
-		msg = fmt.Sprintf("Request do not contain staging target path")
-		l.Warn(msg)
-		return nil, status.Error(codes.InvalidArgument, msg)
-	}
-
-	if GetStageStatus(stp) == false {
-		return &csi.NodeUnstageVolumeResponse{}, nil
-	}
-	t, err := GetTargetFromPath(np.l, stp)
-	// TODO: implement recovery using target path
-	if err != nil {
-		msg = fmt.Sprintf("Unable to get info about target: %s", err.Error())
-		l.Warn(msg)
-		return nil, err
-	}
-	err = t.UnStageVolume(ctx)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	t.DeleteSerialization()
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
@@ -180,7 +168,6 @@ func (np *NodePlugin) NodePublishVolume(
 	ctx context.Context,
 	req *csi.NodePublishVolumeRequest,
 ) (*csi.NodePublishVolumeResponse, error) {
-
 	// TODO: ValidateCapability()
 
 	l := np.l.WithFields(log.Fields{
@@ -193,26 +180,27 @@ func (np *NodePlugin) NodePublishVolume(
 
 	l.Debugf("Node Publish Volume %s", req.GetVolumeId())
 
-	l.Debugf("Publish Volume request %+v", *req)
-
-	block := false
 	var msg string
+	var err error
+	var exists bool
 
-	t, err := GetTargetFromReq(ctx, *req)
-	if err != nil {
-		return nil, err
-	}
-
-	if !block {
-		err = t.FormatMountVolume(req)
-	} else {
-		return nil, status.Error(codes.Unimplemented, "Block attaching is not supported")
-	}
-
-	if err != nil {
-		msg = fmt.Sprintf("Unable to mount volume: %s", err.Error())
-		np.l.Warn(msg)
+	if exists, err = mount.PathExists(req.GetTargetPath()); err != nil {
+		msg = fmt.Sprintf("Target path %s error: %s", req.GetTargetPath(), err.Error())
+		l.Warn(msg)
 		return nil, status.Error(codes.Internal, msg)
+	}
+
+	// Some activity are taking place with target staging path
+	if exists == false {
+		l.Debugf("Target path do not exists, creating")
+		if err = os.MkdirAll(req.GetTargetPath(), 0o640); err != nil {
+			msg = fmt.Sprintf("Unable to create directory %s, Error:%s", req.GetTargetPath(), err.Error())
+			return nil, status.Error(codes.Internal, msg)
+		}
+	}
+
+	if err := np.PublishVolume(ctx, req); err != nil {
+		return nil, err
 	}
 
 	return &csi.NodePublishVolumeResponse{}, nil
@@ -223,7 +211,6 @@ func (np *NodePlugin) NodeUnpublishVolume(
 	ctx context.Context,
 	req *csi.NodeUnpublishVolumeRequest,
 ) (*csi.NodeUnpublishVolumeResponse, error) {
-
 	l := np.l.WithFields(log.Fields{
 		"request": "NodeUnpublishVolume",
 		"func":    "NodeUnpublishVolume",
@@ -234,33 +221,11 @@ func (np *NodePlugin) NodeUnpublishVolume(
 
 	l.Debugf("Node Unpublish Volume %s", req.GetVolumeId())
 
-	block := false
-	//eq := false
-	var msg string
-
-	tp := req.GetTargetPath()
-	if len(tp) == 0 {
-		msg = fmt.Sprintf("Request do not contain target path")
-		l.Warn(msg)
-		return nil, status.Error(codes.InvalidArgument, msg)
-	}
-
-	t, err := GetTarget(l, tp)
-	if err != nil {
+	if err := np.UnpublishVolume(ctx, req); err != nil {
 		return nil, err
 	}
 
-	if !block {
-		err = t.UnMountVolume(ctx)
-		if err != nil {
-			msg = fmt.Sprintf("Unable to clean up on volume unmounting: %s", err.Error())
-			return nil, status.Error(codes.Aborted, msg)
-		}
-	} else {
-		return nil, status.Error(codes.Unimplemented, "Block detaching is not supported")
-	}
-
-	l.Tracef("Node Unpublish Volume %s Done.", req.GetVolumeId())
+	l.Debugf("Node Unpublish Volume %s from path %s Done.", req.GetVolumeId(), req.GetTargetPath())
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
@@ -291,7 +256,6 @@ func (ns *NodePlugin) NodeGetCapabilities(
 	return &csi.NodeGetCapabilitiesResponse{
 		Capabilities: capabilities,
 	}, nil
-
 }
 
 // NodeGetVolumeStats volume total and available space

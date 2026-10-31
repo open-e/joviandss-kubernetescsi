@@ -23,7 +23,6 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	//jcom "joviandss-kubernetescsi/pkg/common"
 	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
 
@@ -39,5 +38,20 @@ func RestSnapshotEntryBasedID(entry jrest.ResourceSnapshot) string {
 
 func RestSnapshotShortEntryBasedID(entry jrest.ResourceSnapshotShort) string {
 	basedid := fmt.Sprintf("%s_%s", base64.StdEncoding.EncodeToString([]byte(entry.Volume)), base64.StdEncoding.EncodeToString([]byte(entry.Volume)))
+	return basedid
+}
+
+func RestNASVolumeEntryBasedID(entry jrest.ResourceNASVolume) string {
+	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
+	return basedid
+}
+
+func RestNASVolumeSnapshotEntryBasedID(entry jrest.ResourceNASVolumeSnapshot) string {
+	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
+	return basedid
+}
+
+func RestNASSnapshotShortEntryBasedID(entry jrest.ResourceNASSnapshotShort) string {
+	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
 	return basedid
 }

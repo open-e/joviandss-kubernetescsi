@@ -24,10 +24,9 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	log "github.com/sirupsen/logrus"
-	//humanize "github.com/dustin/go-humanize"
 
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
-	csi_node "github.com/open-e/joviandss-kubernetescsi/pkg/node"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/node"
 
 	"github.com/spf13/cobra"
 )
@@ -52,7 +51,7 @@ func getInfo(cmd *cobra.Command, args []string) {
 	l := log.NewEntry(logger)
 	l.Debug("publish volume")
 
-	np, err := csi_node.GetNodePlugin(l)
+	np, err := node.GetNodePlugin(l)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Unable to init node plugin:", err.Error())
 		os.Exit(1)
@@ -78,9 +77,6 @@ var NodeGetInfoCmd = &cobra.Command{
 
 	That makes volume available for attachment`,
 	Run: getInfo,
-	//func(cmd *cobra.Command, args []string) {
-	//	fmt.Println("createvolume called")
-	//},
 }
 
 func init() {

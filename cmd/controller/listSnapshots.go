@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
-	csi_controller "github.com/open-e/joviandss-kubernetescsi/pkg/controller"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/controller"
 
 	// csi_rest "joviandss-kubernetescsi/pkg/rest"
 
@@ -36,13 +36,13 @@ func listSnapshots(cmd *cobra.Command, args []string) {
 	// controller.ControllerCfg
 	// var cp csi_controller.ControllerPlugin
 
-	var cp csi_controller.ControllerPlugin
+	var cp controller.ControllerPlugin
 
 	if err := jcom.SetupConfig(jcom.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
-	csi_controller.SetupControllerPlugin(&cp, &cfg)
+	controller.SetupControllerPlugin(&cp, &cfg)
 
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 

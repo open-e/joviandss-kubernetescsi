@@ -9,10 +9,9 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/sirupsen/logrus"
-	//humanize "github.com/dustin/go-humanize"
 
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
-	csi_controller "github.com/open-e/joviandss-kubernetescsi/pkg/controller"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/controller"
 
 	"github.com/spf13/cobra"
 )
@@ -20,10 +19,6 @@ import (
 var (
 	volumeId string
 	nodeId   string
-	//volumeSize string
-
-	//volumeSizeRequired string
-	//volumeSizeLimit string
 )
 
 func unpublishVolume(cmd *cobra.Command, args []string) {
@@ -31,13 +26,13 @@ func unpublishVolume(cmd *cobra.Command, args []string) {
 
 	var cfg jcom.JovianDSSCfg
 
-	var cp csi_controller.ControllerPlugin
+	var cp controller.ControllerPlugin
 
 	if err := jcom.SetupConfig(jcom.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
-	csi_controller.SetupControllerPlugin(&cp, &cfg)
+	controller.SetupControllerPlugin(&cp, &cfg)
 
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
 
@@ -53,36 +48,6 @@ func unpublishVolume(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("%+v\n", resp)
-	//for i:=0 ; i < len(resp.Entries) ; i++ {
-	//	fmt.Printf("volume %s\n",:23
-	//resp.Entries[i].Volume.VolumeId)
-	//}
-
-	// var cfg csi_common.JovianDSSCfg
-	// // controller.ControllerCfg
-	// // var cp csi_controller.ControllerPlugin
-
-	// if err := csi_common.SetupConfig(ControllerConfigPath, &cfg) ; err != nil {
-	// 	// GetConfig(ControllerConfigPath, &controllerCfg)
-	// 	panic(err)
-	// }
-
-	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
-	// var rEndpoint csi_rest.RestEndpoint
-	// csi_rest.SetupEndpoint(&rEndpoint, &cfg.RestEndpointCfg)
-
-	// if err := rEndpoint.CreateVolume("Pool-0", vol) ; err != nil {
-	// 	panic(err)
-	// }
-	//csi_rest.CreateVolume(
-	//if err := csi_controller.GetConfig(ControllerConfigPath, &controllerCfg); err != nil {
-	//	panic(err)
-	//}
-	//l := csi_common.GetLogger(cfg.LLevel, cfg.LPath)
-
-	//if err := csi_controller.GetControllerPlugin(&cp, &cfg, l); err != nil {
-	//		log.Fatalf("Unable to init controller: %v", err)
-	//}
 }
 
 // createVolumeCmd represents the createvolume command

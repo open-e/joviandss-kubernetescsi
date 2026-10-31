@@ -27,7 +27,7 @@ import (
 	//humanize "github.com/dustin/go-humanize"
 
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
-	csi_node "github.com/open-e/joviandss-kubernetescsi/pkg/node"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/node"
 
 	"github.com/spf13/cobra"
 )
@@ -57,7 +57,7 @@ func stageVolume(cmd *cobra.Command, args []string) {
 	l := log.NewEntry(logger)
 	l.Debug("stage volume command")
 
-	np, err := csi_node.GetNodePlugin(l)
+	np, err := node.GetNodePlugin(l)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Unable to init node plugin:", err.Error())
 		os.Exit(1)

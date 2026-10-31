@@ -9,20 +9,15 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/sirupsen/logrus"
-	//humanize "github.com/dustin/go-humanize"
 
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
-	csi_controller "github.com/open-e/joviandss-kubernetescsi/pkg/controller"
+	"github.com/open-e/joviandss-kubernetescsi/pkg/controller"
 
 	"github.com/spf13/cobra"
 )
 
 var (
 	readOnly bool
-	//volumeSize string
-
-	//volumeSizeRequired string
-	//volumeSizeLimit string
 )
 
 func publishVolume(cmd *cobra.Command, args []string) {
@@ -30,15 +25,13 @@ func publishVolume(cmd *cobra.Command, args []string) {
 
 	var cfg jcom.JovianDSSCfg
 
-	var cp csi_controller.ControllerPlugin
+	var cp controller.ControllerPlugin
 
 	if err := jcom.SetupConfig(jcom.ControllerConfigPath, &cfg); err != nil {
 		// GetConfig(ControllerConfigPath, &controllerCfg)
 		panic(err)
 	}
-	csi_controller.SetupControllerPlugin(&cp, &cfg)
-
-	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
+	controller.SetupControllerPlugin(&cp, &cfg)
 
 	var req csi.ControllerPublishVolumeRequest
 	var ctx context.Context = jcom.GetContext("publish_volume")

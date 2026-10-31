@@ -17,6 +17,13 @@ under the License.
 
 package rest
 
+type JovianDSSStorageProtocolType int
+
+const (
+	ProtocolNFS   JovianDSSStorageProtocolType = 1
+	ProtocolISCSI JovianDSSStorageProtocolType = 4
+)
+
 type Primarycache string
 
 const (
@@ -46,32 +53,44 @@ const (
 	LZ4     Compression = "lz4"
 )
 
-// Define Logbias as a type with specific allowed values
-type Logbias string
+type SyncSetting string
 
 const (
-	Latency    Logbias = "latency"
-	Throughput Logbias = "throughput"
+	Always   SyncSetting = "always"
+	Standard SyncSetting = "standard"
+	Disabled SyncSetting = "disabled"
 )
 
-// Define Sync as a type with specific allowed values
-type Sync string
+type CacheSetting string
 
 const (
-	Always   Sync = "always"
-	Standard Sync = "standard"
-	Disabled Sync = "disabled"
+	CacheAll      CacheSetting = "all"
+	CacheNone     CacheSetting = "none"
+	CacheMetadata CacheSetting = "metadata"
 )
 
-// Define Dedup as a type with specific allowed values
-type Dedup string
+type LogBias string
 
 const (
-	DedupOff     Dedup = "off"
-	DedupOn      Dedup = "on"
-	Verify       Dedup = "verify"
-	SHA256       Dedup = "sha256"
-	SHA256Verify Dedup = "sha256,verify"
+	LogBiasLatency    LogBias = "latency"
+	LogBiasThroughput LogBias = "throughput"
+)
+
+type AtimeSetting string
+
+const (
+	AtimeOn  AtimeSetting = "on"
+	AtimeOff AtimeSetting = "off"
+)
+
+type DedupSetting string
+
+const (
+	DedupOn           DedupSetting = "on"
+	DedupOff          DedupSetting = "off"
+	DedupVerify       DedupSetting = "verify"
+	DedupSha256       DedupSetting = "sha256"
+	DedupSha256Verify DedupSetting = "sha256,verify"
 )
 
 // Define Copies as a type
@@ -82,9 +101,9 @@ type CreateVolumeProperties struct {
 	Primarycache   *Primarycache `json:"primarycache,omitempty"`
 	Secondarycache *Primarycache `json:"secondarycache,omitempty"`
 	Compression    *Compression  `json:"compression,omitempty"`
-	Logbias        *Logbias      `json:"logbias,omitempty"`
-	Sync           *Sync         `json:"sync,omitempty"`
-	Dedup          *Dedup        `json:"dedup,omitempty"`
+	Logbias        *LogBias      `json:"logbias,omitempty"`
+	Sync           *SyncSetting  `json:"sync,omitempty"`
+	Dedup          *DedupSetting `json:"dedup,omitempty"`
 	Copies         *Copies       `json:"copies,omitempty"`
 }
 
@@ -118,12 +137,12 @@ type CreateSnapshotProperties struct {
 type CreateSnapshotDescriptor struct {
 	SnapshotName string                    `json:"snapshot_name"`        // string with name of the new snapshot.
 	Recursive    *bool                     `json:"recursive,omitempty"`  // boolean indicating if recursively create snapshots of all descendant datasets
-	Properties   *CreateSnapshotProperties `json:"properties,omitempty"` //object containing properties of new snapshot.
+	Properties   *CreateSnapshotProperties `json:"properties,omitempty"` // object containing properties of new snapshot.
 }
 
 type DeleteSnapshotDescriptor struct {
 	RecursivelyChildren *bool `json:"recursively_children,omitempty"`
-	ForceUnmount        *bool `json:"force_umount,omitempty"`
+	ForceUmount         *bool `json:"force_umount,omitempty"`
 }
 
 type CreateTargetDescriptor struct {
@@ -147,4 +166,89 @@ type TargetLunDescriptor struct {
 	Mode      *string `json:"mode,omitempty"`
 	BlockSize *int    `json:"block_size,omitempty"`
 	EUI       *string `json:"eui,omitempty"`
+}
+
+type CreateShareDescriptor struct {
+	Name    string              `json:"name"`
+	Path    string              `json:"path"`
+	Comment *string             `json:"comment,omitempty"`
+	Active  *bool               `json:"active,omitempty"`
+	NFS     *ShareNFSDescriptor `json:"nfs,omitempty"`
+	SMB     *ShareSMBDescriptor `json:"smb,omitempty"`
+}
+
+type ShareNFSDescriptor struct {
+	Enabled               *bool    `json:"enabled,omitempty"`
+	AllowAccessIP         []string `json:"allow_access_ip,omitempty"`
+	AllowWriteIP          []string `json:"allow_write_ip,omitempty"`
+	InsecureConnections   *bool    `json:"insecure_connections,omitempty"`
+	SynchronousDataRecord *bool    `json:"synchronous_data_record,omitempty"`
+	InsecureLockRequests  *bool    `json:"insecure_lock_requests,omitempty"`
+	AllSquash             *bool    `json:"all_squash,omitempty"`
+	NoRootSquash          *bool    `json:"no_root_squash,omitempty"`
+}
+
+type ShareSMBDescriptor struct {
+	Enabled           *bool   `json:"enabled,omitempty"`
+	ReadOnly          *bool   `json:"read_only,omitempty"`
+	Visible           *bool   `json:"visible,omitempty"`
+	HandlingLargeDirs *bool   `json:"handling_large_dirs,omitempty"`
+	DefaultCase       *string `json:"default_case,omitempty"`
+	InheritOwner      *bool   `json:"inherit_owner,omitempty"`
+	InheritPerms      *bool   `json:"inherit_perms,omitempty"`
+	AccessMode        *string `json:"access_mode,omitempty"`
+	Spotlight         *bool   `json:"spotlight,omitempty"`
+	TimeMachine       *bool   `json:"timemachine,omitempty"`
+}
+
+type DeleteShareDescriptor struct {
+	RecursivelyChildren *bool  `json:"recursively_children,omitempty"`
+	ForceUmount         *bool  `json:"force_umount,omitempty"`
+	Key                 string `json:"key,omitempty"`
+}
+
+type CreateNASVolumeDescriptor struct {
+	Compression             *Compression  `json:"compression,omitempty"`
+	PrimaryCache            *CacheSetting `json:"primarycache,omitempty"`
+	LogBias                 *LogBias      `json:"logbias,omitempty"`
+	Dedup                   *DedupSetting `json:"dedup,omitempty"`
+	Copies                  *Copies       `json:"copies,omitempty"`
+	Sync                    *SyncSetting  `json:"sync,omitempty"`
+	Quota                   *string       `json:"quota,omitempty"`
+	RefReservation          *string       `json:"refreservation,omitempty"`
+	Reservation             *string       `json:"reservation,omitempty"`
+	ResWithDescendents      *bool         `json:"resWithDescendents,omitempty"`
+	RefquotaWithDescendents *bool         `json:"refquotaWithDescendents,omitempty"`
+	Atime                   *AtimeSetting `json:"atime,omitempty"`
+	SecondaryCache          *CacheSetting `json:"secondarycache,omitempty"`
+	Name                    string        `json:"name"`
+}
+
+type DeleteNASVolumeDescriptor struct {
+	RecursivelyChildren *bool `json:"recursively_children,omitempty"`
+	ForceUmount         *bool `json:"force_umount,omitempty"`
+}
+
+// TODO: Expand create NAS snapshot properties
+// type CreateNASSnapshotProperties struct {
+// 	Primarycache   *Primarycache `json:"primarycache,omitempty"`
+// 	Secondarycache *Primarycache `json:"secondarycache,omitempty"`
+// }
+
+type CreateNASSnapshotDescriptor struct {
+	Name string `json:"name"` // string with name of the new snapshot.
+	// TODO: expand deffinition according to newes version of rest specification
+	// Recursive    *bool                     `json:"recursive,omitempty"`  // boolean indicating if recursively create snapshots of all descendant datasets
+	// Properties   *CreateSnapshotProperties `json:"properties,omitempty"` // object containing properties of new snapshot.
+}
+
+type CloneNASVolumeDescriptor struct {
+	Name           string        `json:"name"`
+	Primarycache   *Primarycache `json:"primarycache,omitempty"`
+	Secondarycache *Primarycache `json:"secondarycache,omitempty"`
+	Compression    *Compression  `json:"compression,omitempty"`
+	Logbias        *LogBias      `json:"logbias,omitempty"`
+	Sync           *SyncSetting  `json:"sync,omitempty"`
+	Dedup          *DedupSetting `json:"dedup,omitempty"`
+	Copies         *Copies       `json:"copies,omitempty"`
 }

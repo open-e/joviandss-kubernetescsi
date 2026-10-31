@@ -19,6 +19,7 @@ package rest
 
 import (
 	"encoding/json"
+	"net"
 	"regexp"
 	"strconv"
 	"time"
@@ -28,8 +29,10 @@ const resourceNamePattern = `/([\w\-\/]+)`
 
 const originNamePattern = `(?P<pool>[\w\-\.]+)/(?P<volume>[\w\-\.]+)@(?P<snapshot>[\w\-\.]+)`
 
-var resourceNameRegexp = regexp.MustCompile(resourceNamePattern)
-var originNameRegexp = regexp.MustCompile(originNamePattern)
+var (
+	resourceNameRegexp = regexp.MustCompile(resourceNamePattern)
+	originNameRegexp   = regexp.MustCompile(originNamePattern)
+)
 
 type GeneralResponse struct {
 	Data  interface{} `json:"data,omitempty"`
@@ -43,7 +46,7 @@ type ResultEntries struct {
 
 type ResourceVolume struct {
 	Name                 string `json:"name,omitempty"`
-	Size                 string `json:"size,omitempty"`
+	Size                 int64  `json:"size,omitempty"`
 	Origin               string `json:"origin,omitempty"`
 	Relatime             string `json:"relatime,omitempty"`
 	Acltype              string `json:"acltype,omitempty"`
@@ -58,7 +61,7 @@ type ResourceVolume struct {
 	Dedup                string `json:"dedup,omitempty"`
 	ShareNFS             string `json:"sharenfs,omitempty"`
 	ReceiveResumeToken   string `json:"receive_resume_token,omitempty"`
-	VolSize              string `json:"volsize,omitempty"`
+	VolSize              int64  `json:"volsize,omitempty"`
 	Referenced           string `json:"referenced,omitempty"`
 	ShareSMB             string `json:"sharesmb,omitempty"`
 	CreateTxg            string `json:"createtxg,omitempty"`
@@ -130,12 +133,36 @@ type ResourceVolume struct {
 	NBMAND               string `json:"nbmand,omitempty"`
 }
 
-func (v *ResourceVolume) GetSize() int64 {
-	if i, err := strconv.ParseInt(v.VolSize, 10, 64); err != nil {
-		return 0
-	} else {
-		return i
+func (m *ResourceVolume) UnmarshalJSON(data []byte) error {
+	type Alias ResourceVolume
+	aux := &struct {
+		VolSize string `json:"volsize,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
 	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	if aux.VolSize != "" { // Only parse if non-empty
+		parsedVolSize, err := strconv.ParseInt(aux.VolSize, 10, 64)
+		if err != nil {
+			return err
+		}
+		m.VolSize = parsedVolSize
+	}
+
+	return nil
+}
+
+func (v *ResourceVolume) GetSize() int64 {
+	return v.VolSize
+	// if i, err := strconv.ParseInt(v.VolSize, 10, 64); err != nil {
+	// 	return 0
+	// } else {
+	// 	return i
+	// }
 }
 
 func (v *ResourceVolume) OriginVolume() string {
@@ -189,7 +216,6 @@ type ResourceSnapshot struct {
 }
 
 func (m *ResourceSnapshot) UnmarshalJSON(data []byte) error {
-
 	type Alias ResourceSnapshot
 	aux := &struct {
 		Creation string `json:"creation,omitempty"`
@@ -242,7 +268,6 @@ type ResourceSnapshotShortProperties struct {
 }
 
 func (m *ResourceSnapshotShortProperties) UnmarshalJSON(data []byte) error {
-
 	type Alias ResourceSnapshotShortProperties
 	aux := &struct {
 		Creation string `json:"creation,omitempty"`
@@ -297,7 +322,6 @@ type ResourcePool struct {
 }
 
 func (m *ResourcePool) UnmarshalJSON(data []byte) error {
-
 	type Alias ResourcePool
 	aux := &struct {
 		Available string `json:"available,omitempty"`
@@ -382,4 +406,270 @@ type ResourceTarget struct {
 	OutgoingUser        *CreateTargetOutgoingUser `json:"outgoing_user,omitempty"`
 	AllowIP             []string                  `json:"allow_ip,omitempty"`
 	DenyIP              []string                  `json:"deny_ip,omitempty"`
+}
+
+type ShareNFS struct {
+	NoRootSquash          bool     `json:"no_root_squash"`
+	AllowWriteIP          []net.IP `json:"allow_write_ip"`
+	AllSquash             bool     `json:"all_squash"`
+	Enabled               bool     `json:"enabled"`
+	InsecureConnections   bool     `json:"insecure_connections"`
+	SynchronousDataRecord bool     `json:"synchronous_data_record"`
+	InsecureLockRequests  bool     `json:"insecure_lock_requests"`
+	AllowAccessIP         []net.IP `json:"allow_access_ip"`
+}
+
+type ShareSMB struct {
+	Enabled           bool   `json:"enabled"`
+	ReadOnly          bool   `json:"read_only"`
+	Visible           bool   `json:"visible"`
+	HandlingLargeDirs bool   `json:"handling_large_dirs"`
+	DefaultCase       string `json:"default_case"`
+	InheritOwner      bool   `json:"inherit_owner"`
+	InheritPerms      bool   `json:"inherit_perms"`
+	AccessMode        string `json:"access_mode"`
+	Timemachine       bool   `json:"timemachine"`
+	Recycle           bool   `json:"recycle"`
+	RecycleName       string `json:"recycle_name"`
+}
+
+type ResourceShare struct {
+	Comment    string   `json:"comment"`
+	Name       string   `json:"name"`
+	RealPath   string   `json:"real_path"`
+	NFS        ShareNFS `json:"nfs"`
+	SMB        ShareSMB `json:"smb"`
+	Active     bool     `json:"active"`
+	Path       string   `json:"path"`
+	Conflicted bool     `json:"conflicted"`
+}
+
+type ResourceNASVolume struct {
+	ID                        string       `json:"id,omitempty"`
+	Name                      string       `json:"name"`
+	FullName                  string       `json:"fullName,omitempty"`
+	ScreenName                string       `json:"screenName,omitempty"`
+	Deduplication             DedupSetting `json:"deduplication,omitempty"`
+	Compression               Compression  `json:"compression,omitempty"`
+	RecordSize                int64        `json:"recordsize,omitempty"`
+	Sync                      SyncSetting  `json:"sync,omitempty"`
+	LogBias                   LogBias      `json:"logBias,omitempty"`
+	PrimaryCache              CacheSetting `json:"primaryCache,omitempty"`
+	SecondaryCache            CacheSetting `json:"secondaryCache,omitempty"`
+	AccessTime                AtimeSetting `json:"accessTime,omitempty"`
+	Copies                    Copies       `json:"copies,omitempty"`
+	Quota                     int64        `json:"quota,omitempty"`
+	Reservation               string       `json:"reservation,omitempty"`
+	ResWithDescendents        bool         `json:"resWithDescendents,omitempty"`
+	RefquotaWithDescendents   bool         `json:"refquotaWithDescendents,omitempty"`
+	Pool                      string       `json:"pool,omitempty"`
+	Type                      string       `json:"type,omitempty"`
+	SharesCount               int          `json:"sharesCount,omitempty"`
+	OdpLocalRetention         bool         `json:"odpLocalRetention,omitempty"`
+	OdpLocalEnabled           bool         `json:"odpLocalEnabled,omitempty"`
+	OdpRemoteRetention        bool         `json:"odpRemoteRetention,omitempty"`
+	OdpRemoteSrcPath          string       `json:"odpRemoteSrcPath,omitempty"`
+	OdpRemoteSrcHostname      string       `json:"odpRemoteSrcHostname,omitempty"`
+	OdpIsReceivingDataStopped bool         `json:"odpIsReceivingDataStopped,omitempty"`
+	UsedByTracker             bool         `json:"usedByTracker,omitempty"`
+	Origin                    string       `json:"origin,omitempty"`
+}
+
+func (v *ResourceNASVolume) GetSize() int64 {
+	return v.Quota
+}
+
+func (v *ResourceNASVolume) OriginVolume() string {
+	if len(v.Origin) > 0 {
+		if originNameRegexp.MatchString(v.Origin) {
+			match := originNameRegexp.FindStringSubmatch(v.Origin)
+			volume := originNameRegexp.SubexpIndex("volume")
+			return match[volume]
+		}
+	}
+	return ""
+}
+
+func (v *ResourceNASVolume) OriginSnapshot() string {
+	if len(v.Origin) > 0 {
+		if originNameRegexp.MatchString(v.Origin) {
+			match := originNameRegexp.FindStringSubmatch(v.Origin)
+			snapshot := originNameRegexp.SubexpIndex("snapshot")
+			return match[snapshot]
+		}
+	}
+	return ""
+}
+
+func (m *ResourceNASVolume) UnmarshalJSON(data []byte) error {
+	type Alias ResourceNASVolume
+	aux := &struct {
+		Copies     string `json:"copies,omitempty"`
+		RecordSize string `json:"recordsize,omitempty"`
+		Quota      string `json:"quota,omitempty"`
+
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	if aux.Copies != "" {
+		num, err := strconv.Atoi(aux.Copies)
+		if err != nil {
+			return err
+		}
+		m.Copies = Copies(num)
+	}
+
+	if aux.RecordSize != "" {
+
+		num, err := strconv.ParseInt(aux.RecordSize, 10, 64)
+		if err != nil {
+			return err
+		}
+		m.RecordSize = num
+	}
+
+	if aux.Quota != "" {
+
+		num, err := strconv.ParseInt(aux.Quota, 10, 64)
+		if err != nil {
+			return err
+		}
+		m.Quota = num
+	}
+	return nil
+}
+
+type ResourceNASVolumeSnapshot struct {
+	SetUID            string    `json:"setuid,omitempty"`
+	AclType           string    `json:"acltype,omitempty"`
+	UserRefs          string    `json:"userrefs,omitempty"`
+	PrimaryCache      string    `json:"primarycache,omitempty"`
+	Creation          time.Time `json:"creation,omitempty"`
+	Referenced        string    `json:"referenced,omitempty"`
+	CreateTXG         string    `json:"createtxg,omitempty"`
+	CaseSensitivity   string    `json:"casesensitivity,omitempty"`
+	GUID              string    `json:"guid,omitempty"`
+	XAttr             string    `json:"xattr,omitempty"`
+	CompressRatio     string    `json:"compressratio,omitempty"`
+	RootContext       string    `json:"rootcontext,omitempty"`
+	UTF8Only          string    `json:"utf8only,omitempty"`
+	Encryption        string    `json:"encryption,omitempty"`
+	DefContext        string    `json:"defcontext,omitempty"`
+	Written           string    `json:"written,omitempty"`
+	Version           string    `json:"version,omitempty"`
+	MlsLabel          string    `json:"mlslabel,omitempty"`
+	SecondaryCache    string    `json:"secondarycache,omitempty"`
+	Used              string    `json:"used,omitempty"`
+	Exec              string    `json:"exec,omitempty"`
+	RefCompressRatio  string    `json:"refcompressratio,omitempty"`
+	FsContext         string    `json:"fscontext,omitempty"`
+	Normalization     string    `json:"normalization,omitempty"`
+	ObjSetID          string    `json:"objsetid,omitempty"`
+	Name              string    `json:"name"`
+	DeferDestroy      string    `json:"defer_destroy,omitempty"`
+	Type              string    `json:"type,omitempty"`
+	Devices           string    `json:"devices,omitempty"`
+	LogicalReferenced string    `json:"logicalreferenced,omitempty"`
+	Context           string    `json:"context,omitempty"`
+	NbMand            string    `json:"nbmand,omitempty"`
+	Clones            string    `json:"clones,omitempty"`
+}
+
+func (m *ResourceNASVolumeSnapshot) UnmarshalJSON(data []byte) error {
+	type Alias ResourceNASVolumeSnapshot
+	aux := &struct {
+		Creation string `json:"creation,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	const layout = "2006-01-02 15:04:05"
+	if aux.Creation != "" { // Only parse if non-empty
+		parsedTime, err := time.Parse(layout, aux.Creation)
+		if err != nil {
+			return err
+		}
+		m.Creation = parsedTime
+	}
+
+	return nil
+}
+
+func (s *ResourceNASVolumeSnapshot) ClonesNames() (clones []string) {
+	if len(s.Clones) > 0 {
+		matches := resourceNameRegexp.FindAllStringSubmatch(s.Clones, -1)
+
+		for _, v := range matches {
+			clones = append(clones, v[1])
+		}
+	}
+	return clones
+}
+
+func (s *ResourceNASVolumeSnapshot) GetSize() int64 {
+	return 0
+}
+
+type ResourceNASSnapshotShortProperties struct {
+	Creation     time.Time `json:"creation,omitempty"`
+	ResourceType string    `json:"resource_type,omitempty"`
+	Guid         string    `json:"guid,omitempty"`
+}
+
+func (m *ResourceNASSnapshotShortProperties) UnmarshalJSON(data []byte) error {
+	type Alias ResourceNASSnapshotShortProperties
+	aux := &struct {
+		Creation int64 `json:"creation,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(m), // Point Alias to ResourceSnapshot to reuse JSON tags
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+
+	if aux.Creation > 0 { // Only parse if non-empty
+		//creationTime, err := strconv.ParseInt(aux.Creation, 10, 64)
+		//if err != nil {
+		//	return nil
+		//}
+		m.Creation = time.Unix(aux.Creation, 0)
+	}
+
+	return nil
+}
+
+type ResourceNASSnapshotParent struct {
+	Name       string                             `json:"name"`
+	Type       JovianDSSStorageProtocolType       `json:"type"`
+	Properties ResourceNASSnapshotShortProperties `json:"properties"`
+}
+
+func (m *ResourceNASSnapshotParent) UnmarshalJSON(data []byte) error {
+	type Alias ResourceNASSnapshotParent
+	aux := &struct {
+		Type int `json:"copies,omitempty"`
+		*Alias
+	}{
+		Alias: (*Alias)(m),
+	}
+	if err := json.Unmarshal(data, aux); err != nil {
+		return err
+	}
+	m.Type = JovianDSSStorageProtocolType(aux.Type)
+
+	return nil
+}
+
+type ResourceNASSnapshotShort struct {
+	Parent     ResourceNASSnapshotParent          `json:"parent"`
+	Name       string                             `json:"name"`
+	Properties ResourceNASSnapshotShortProperties `json:"properties"`
 }
