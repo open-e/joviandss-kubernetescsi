@@ -11,7 +11,8 @@
 > Makes `master` the single line of development again by bringing in the
 > unmerged `nfs-support` branch (all plugin work since April 2024), without
 > adding new behavior. Comes before the controller fixes
-> ([0002](0002-controller-crash-fixes-design.md)), user decision
+> (now [0003](0003-controller-crash-fixes-design.md); REST compliance
+> [0002](0002-rest-api-compliance-design.md) comes first since 2026-11-02), user decision
 > 2026-10-28: "this will be longer but it will save time later, because
 > diff will be smaller".
 >
@@ -353,8 +354,9 @@ before `master` is pushed. Expected change: CreateSnapshot error handling
 ## Relationship to Other Work
 [Relationship_to_Other_Work](#relationship-to-other-work)
 
-- Next: [0002 controller crash fixes](0002-controller-crash-fixes-design.md),
-  on the merged code; then F6 (NodeStageVolume idempotency).
+- Next: [0002 REST API compliance](0002-rest-api-compliance-design.md), then
+  [0003 controller crash fixes](0003-controller-crash-fixes-design.md) (split
+  2026-11-02), on the merged code; then F6 (NodeStageVolume idempotency).
 - Backlog: `review/backlog.md` item 35.
 - Baselines and results: `kub-testing/project-status.md`.
 - Needs the development registry for T1 (Open question 8;

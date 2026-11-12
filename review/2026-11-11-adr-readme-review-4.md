@@ -1,0 +1,30 @@
+# ADR README: fourth consistency review, after the parts went on their own lines
+
+Date: 2026-11-11, late night, after the third review's eleven items were applied and every rule's parts became labelled sub-bullets. Reviewed: `docs/adr/README.md` (610 lines) against itself, against the user's rules of today, against the record where the README claims a practice, against `kub-testing/issues/` and its README for the naming and registry claims, and against the two tools for the checks list. Tonight's edits were read as claims. Report only; nothing edited.
+
+## Verdict
+
+Consistent. No rule contradicts another, every claim about the record, the registry and the tools holds, and the layout does what the user asked: each part of a rule is on its own line under a bold label. What is left is four Low points, three of them about the shape's own bookkeeping.
+
+## Low
+
+1. **The intro names three labels and the text uses seven** (L20–23 against L140, L261, L296, L360): Why, Example and Not are announced; Parts, The areas, The checks and Exception are used for a rule's own data. One clause in the intro: "and a labelled part for data of the rule's own, such as Parts or The checks".
+2. **Two pieces of prose inside rules carry no label.** The paragraph after the kinds table (L251–256) mixes definitions, what a finding's field table says, what a rule says, what an item says, with a rule of its own: an implementation item names the findings and rules it closes, so the two directions link each other. The sentence "The scripts are …" under the checks rule (L355–357) is the rule's data. Label the first **Definitions** and make its last sentence a rule bullet, or label the whole paragraph; label the second **Scripts**.
+3. **The names example uses four real names** (L231–233), from the record and the registry, while the intro promises examples that depend on no record (L22–23). A name never changes once chosen, so the dependence is on the registry, not on any record's state, and the file-name example was changed tonight for the stronger reason that it made a claim about a record's content. Either keep the names and let the intro say that what never changes may be real, or replace them with names of the pattern's shape. Keeping them is the better reading.
+4. **Stages are never renumbered and never checked.** They are in the never-renumbered list (L298–299) and absent from the checks (L364–365), and the script checks nothing about them. Either a check, stages numbered without gaps, or nothing, since a record has few stages; but the asymmetry should be deliberate.
+
+## Verified and found consistent
+
+- The user's rules: the intro states the file's purpose and that it lists no records; the shape holds on all 41 rules, each with its parts as labelled sub-bullets (Why on every rule, Example on 18, Not on 20); the examples depend on no record's state, item 3 aside; the Options scope, the four Problem statement questions, Decision as its own section, the Testing rules and the bullet form for lists with gaps are as decided.
+- The intro's order of what a record holds, the Sections table and the skeleton agree; the Appendix row's seven parts all have skeleton blocks and Table of Contents lines, the Compliance matrix included.
+- Rule and definition pairs say the same thing: status (L75 and L105), self-anchor lines (L97 and L320), unit tests (L111, L115 and L130), "what must hold once it is done" (L111 and L131), "cheapest to the live one" (L115 and L165), the bullet form (L116, L308 and L366–368), numbering (L298–303, L326–330, L346–350, L364–365), the mechanism (L109, L111 and L193–194), lab details (L174–177 and L218–223).
+- Claims about the record: the Metadata row's dating, the Options naming, the Decision paragraph, Consequences referring to stages and items, the Appendix subsections the kinds table and the skeleton name, the folded step.
+- Claims about the registry: `kub-testing/issues/` is one file per old prefix (its README says so, and the files are `compliance-rules.md`, `crashes.md`, `data-loss.md`, `design-items.md`, `gaps.md`, `node.md`, `rest-client.md`, `security.md`, `test-findings.md`); it is where a name is registered; `ISSUES.md` keeps the old IDs; the twelve areas, the slug rule, the sentence on adding an area and the never-renamed rule are the same in both READMEs; all 90 names of the record are registered.
+- Claims about the tools: `tools/check_record.py` makes every scripted check in the list, flags "design NNNN" and "ADR NNNN" with the record's own number only, and passes on the record; `tools/check_names.py` reads the registry from the checkout beside the repository and the area list by its new wording.
+- Links and structure: every README anchor resolves; `../design/README.md` exists; the skeleton's Table of Contents matches its headings, every skeleton heading has its self-anchor line, and the only differences are the intended `<name>` against `<slug>` placeholders; the rendering example (24 for the third item of a list that starts at 22) is right.
+
+## Still open, for the user
+
+Unchanged: the residuals of backlog items 48 and 49 (the title of "Names, not IDs", the `dataloss` row, the `work` to `impl` sentence, the skeleton's letters), and the reasons supplied tonight where the old text had none.
+
+**Outcome (same night, on the user's request):** all four applied. The intro names the labelled data parts (Parts, The checks) and says that what never changes, such as a name, may be real in an example; the paragraph after the kinds table is labelled **Definitions** and its linking sentence is a rule of its own ("An implementation item names the findings and rules it closes, and a finding names the item or stage that fixes it"); the scripts sit under **Scripts** in the checks rule; stages are in the checks list and `tools/check_record.py` checks that the `### Stage n` headings are numbered 1..n in order (the record passes: stages 1 to 4). Verified after the change: 42 rules, each with Why first; every anchor resolves; both checkers pass.
