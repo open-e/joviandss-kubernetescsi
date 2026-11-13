@@ -211,12 +211,13 @@ What the recordings do not show: how JovianDSS 1 releases older than
 `1.0up33.65410` behave on v4, since no such appliance was available; the user
 states that they do not serve the same v4, so none is supported
 ([question 29](#decisions), [risk 2](#risks));
-some requests on jdss1 v4, because the run meant to close the remaining gaps
-there was lost to an appliance outage ([results of the gap
-runs](#how-the-gap-runs-went));
+what a full pool and simultaneous requests do on jdss1 v4, because those
+tests ran there on v3 only, and what lists of hundreds of objects do, because
+that test ran on no appliance
+([results of the gap runs](#how-the-gap-runs-went));
 and the type of any field that was `null` in every recording.
 
-The [evidence gaps](#evidence-gaps) in the Appendix hold all twelve, with what the two runs made to close them found.
+The [evidence gaps](#evidence-gaps) in the Appendix hold all twelve, with what the three runs made to close them found.
 
 ### Key observations
 [Key_observations](#key-observations)
@@ -385,11 +386,15 @@ run it and record what else it reports, if anything.
 ### Before stage 1: send `per_page` on every list
 [Before_stage_1_send_per_page_on_every_list](#before-stage-1-send-per_page-on-every-list)
 
-**Its own commit, before the v4 move.** Without it, the v4 move could make CSI
-ListVolumes run forever ([bug_plugin_rest_list_calls_send_page_without_per_page](#bug_plugin_rest_list_calls_send_page_without_per_page)): on jdss2 v4 a
-list request without `per_page` ignores the page number and returns the first
-page again and again. On jdss1 v4 this was never recorded (gap [gap_jdss_rest_list_paging_without_per_page](#gap_jdss_rest_list_paging_without_per_page)), so it may
-behave the same way. Paging with `per_page` works on both jdss1 v3 and jdss2 v4.
+**Its own commit, before the v4 move.** On JovianDSS 1 the list loop ends
+today, on v3 and on v4: a list request without `per_page` returns everything
+on page 0 and nothing after it. On jdss2 v4 it ignores the page number and
+returns the first page again and again, so CSI ListVolumes would run forever
+([bug_plugin_rest_list_calls_send_page_without_per_page](#bug_plugin_rest_list_calls_send_page_without_per_page)). The commit is therefore not a
+condition of the v4 move on JovianDSS 1; it makes the loop safe against a
+server that repeats a page, and it comes first so that the v4 commit changes
+paths only. Paging with `per_page` works on jdss1, v3 and v4, and on jdss2 v4
+(gap [gap_jdss_rest_list_paging_without_per_page](#gap_jdss_rest_list_paging_without_per_page)).
 The stop rule would change too. Today the plugin asks for page after page until
 a page comes back empty; it would also stop once it has received as many entries
 as the reply's `results` count announces, so a server that repeats a page could
@@ -428,8 +433,7 @@ be no setting and no fallback to v3. **Nothing else would change in this commit*
 so if the live test failed, `git bisect` could tell an effect of v4 from an effect
 of a fix. No change in behaviour is expected on JovianDSS 1 (hurl Findings 14, 15).
 Of the evidence gaps, [gap_jdss_rest_empty_body_on_get_delete](#gap_jdss_rest_empty_body_on_get_delete) (the empty `{}` body the plugin sends with every GET) made
-no difference on jdss1 v3 and jdss2 v4, and the live test would be its first check
-on jdss1 v4; [gap_jdss_rest_list_paging_without_per_page](#gap_jdss_rest_list_paging_without_per_page) and [gap_jdss_rest_volume_create_without_sparse](#gap_jdss_rest_volume_create_without_sparse) became findings of their own,
+no difference on jdss1, v3 and v4, or on jdss2 v4; [gap_jdss_rest_list_paging_without_per_page](#gap_jdss_rest_list_paging_without_per_page) and [gap_jdss_rest_volume_create_without_sparse](#gap_jdss_rest_volume_create_without_sparse) became findings of their own,
 [bug_plugin_rest_list_calls_send_page_without_per_page](#bug_plugin_rest_list_calls_send_page_without_per_page) (paging) and
 [bug_plugin_rest_create_volume_never_sets_sparse](#bug_plugin_rest_create_volume_never_sets_sparse) (thick volumes), handled elsewhere.
 
@@ -1099,12 +1103,14 @@ the types ([risk 1](#risks)).
     concluding that it is absent, and take no destructive step on the strength
     of a single list read straight after a change.
 
-15. **Some requests have never been seen on jdss1 v4.** The gap run on jdss1
-   v4 was lost to an outage, so the `{}` body the plugin sends with every GET,
-   among others, is recorded on jdss1 v3 and jdss2 v4 only. Guard: the live
-   tests ([Testing](#testing)
-   steps 4 and 5) run every call on v4, and the path move being its own
-   commit, `git bisect` can tell its effect from a fix's.
+15. **Some situations have never been seen on jdss1 v4.** The tests of a
+   full pool and of simultaneous requests ran on jdss1 on v3 only, and the
+   test of lists of hundreds of objects on no appliance
+   ([how the gap runs went](#how-the-gap-runs-went)).
+   Guard: v3 and v4 answered the same wherever both were recorded; the live
+   tests ([Testing](#testing) steps 4 and 5) run every call on v4, and the
+   path move being its own commit, `git bisect` can tell its effect from a
+   fix's.
 16. **A read field was never seen set, so the recordings give it no type.**
    Guard: the mapping may state the type by hand, with the reason, and the
    generator refuses a read field it cannot type otherwise; the live test
@@ -1261,8 +1267,8 @@ agent's: the items say what they must show, and this section only runs them.
    `summary.txt`; with `cafile` or `insecure` set for the lab appliance in the
    config Secret `jdss-controller-cfg`, because its certificate is self-signed
    ([risk 11](#risks)). Proves that the plugin works on v4 against the lab
-   appliance as well as it did on v3, and answers [question 30](#open-questions)
-   and [risk 15](#risks), the calls never recorded on jdss1 v4. Three
+   appliance as well as it did on v3, and confirms on the lab appliance what
+   the recordings show for the `{}` body ([question 30](#decisions)). Three
    prerequisites. The baseline build carried the user's
    GetCapacity fix (`crash_plugin_ctrl_get_capacity_no_logger`, 0003's D3), which is not on `master` yet, so **`crash_plugin_ctrl_get_capacity_no_logger` has to
    be committed before the series** (`ISSUES.md`, next action 3); without it the
@@ -1284,7 +1290,7 @@ agent's: the items say what they must show, and this section only runs them.
      the same page twice;
    - every GET and every DELETE in the request log is answered as the
      [compliance matrix](#compliance-matrix) records, none with 400 or 415, so the
-     `{}` body made no difference on jdss1 v4 either ([question 30](#open-questions));
+     `{}` body makes no difference on the lab appliance either ([question 30](#decisions));
    - a well-formed ID of a missing volume still gets `NotFound` and a malformed one
      `InvalidArgument`, as the baseline cycle shows for csi-sanity's own IDs
      ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids));
@@ -1364,7 +1370,7 @@ test appliance.
 ## Open questions
 [Open_questions](#open-questions)
 
-Open: 22, 25 and 30 to 34. The numbers are kept, gaps included, so that "question 27" means the same thing everywhere; the decided questions follow as a table, each with the section that argues it.
+Open: 22, 25 and 31 to 34. The numbers are kept, gaps included, so that "question 27" means the same thing everywhere; the decided questions follow as a table, each with the section that argues it.
 
 - **22. Who prepares the NFS live cycle?** [Testing](#testing) step 5 lists the
   five things it needs that do not exist, from the tooling that refuses an
@@ -1387,9 +1393,6 @@ Open: 22, 25 and 30 to 34. The numbers are kept, gaps included, so that "questio
   has no such check today, while `NewVolumeDescFromName` has one
   (`lunid.go:61-63`). Recommendation: add that one check to [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) and record `crash_plugin_ctrl_create_snapshot_empty_name`
   as closed by it; record `crash_plugin_driver_snapshot_name_empty`, `crash_plugin_driver_id_index_without_length_check` and `crash_plugin_driver_volume_desc_empty_value` as 0003's in `ISSUES.md`.
-- **30. Does the `{}` body the plugin sends with every GET matter on jdss1 v4?**
-  It made no difference on jdss1 v3 and jdss2 v4; jdss1 v4 was never
-  recorded. The live test answers it.
 - **31. Which spec output does the generator read?** The compiled YAML has the
   tab defect; the TypeSpec emitter can write JSON, or the generator can read
   the `.tsp` files, which are regular but need a parser. Recommendation: the
@@ -1443,6 +1446,7 @@ Open: 22, 25 and 30 to 34. The numbers are kept, gaps included, so that "questio
 | 27 | Keep or remove the unread fields that fail? | remove; superseded by 28. | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
 | 28 | Generate the reply types instead of fixing them by hand? | yes, from the recorded jdss1 v4 API, same names, only read fields can fail. Weighed against: the rule per field (27), a transcription that drifts again with the next release and only the audit tells; every field modelled by hand, which fails on a field nobody reads and drifts the same way; the whole client generated, which replaces about 2,100 lines and every caller and redoes the stage 3 and 4 work on generated code; tolerant decoding, which lets a real change in a read field pass silently. Price: about 650 lines of generator and mapping to keep, and [risks 19 and 20](#risks). | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
 | 29 | Do older JovianDSS 1 releases serve the same v4? | no: they do not serve the same API v4, and there is no backward compatibility with them; nothing older than `1.0up33.65410` is supported. | [Risk 2](#risks) |
+| 30 | Does the `{}` body the plugin sends with every GET matter on jdss1 v4? | no: the replies with and without it are the same on jdss1 v4, as on jdss1 v3 and jdss2 v4. | [gap_jdss_rest_empty_body_on_get_delete](#gap_jdss_rest_empty_body_on_get_delete) |
 
 ## Relationship to other designs
 [Relationship_to_other_designs](#relationship-to-other-designs)
@@ -1588,6 +1592,10 @@ required-or-optional list rests on evidence rather than on reading the code.
 
 - hurl suite, Finding 9 (2026-11-04): JovianDSS 2 serves v4 only and accepts
   only tokens.
+- hurl suite, jdss1 run `20261107-010938` (2026-11-07, read 2026-11-13):
+  the gap tests on jdss1 v4; the `{}` body, paging without `per_page`, the
+  default provisioning, the name limit and the missing-object replies as on
+  v3, the snapshot list of a missing volume answering 404.
 - hurl suite, Findings 14 and 15 (2026-11-04): v3 and v4 identical on
   JovianDSS 1 in 363 and 281 cases.
 - kub-testing `ISSUES.md` [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch) (confirmed 2026-10-27 and 2026-11-01) and [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch)
@@ -1678,7 +1686,7 @@ did not always send a request the exact way the plugin does (an extra body, no
 two kinds of gap: a request the plugin sends differently from the hurl tests, and
 a situation that was never recorded. Each gap
 below says which kind it is, what the evidence showed before the gap runs, and
-what those two extra hurl runs found; [how the gap runs went](#how-the-gap-runs-went)
+what the three hurl runs made for the gaps found; [how the gap runs went](#how-the-gap-runs-went)
 says what the runs themselves managed to cover, and lists the statuses and error
 patterns the code expects that no recording has ever shown.
 
@@ -1690,7 +1698,7 @@ patterns the code expects that no recording has ever shown.
 | The plugin sends | a `{}` body on **every GET**, and on DELETE of target, LUN and share (`rproxy.go:108`) |
 | hurl sent | GET: never a body. DELETE of those three: never a body |
 | Why it matters | works on jdss1 v3 (the lab today); unknown on v4 and on jdss2 |
-| Result of the gap runs | No difference with and without the `{}` body, in 80 (jdss1 v3) and 82 (jdss2 v4) pairs of requests, including DELETE of target, LUN and share. Finding: closed, except on jdss1 v4 |
+| Result of the gap runs | No difference with and without the `{}` body, in 80 (jdss1 v3) and 82 (jdss2 v4) pairs of requests, including DELETE of target, LUN and share. On jdss1 v4, run later: no difference either, in 82 pairs of GET requests and 134 pairs of DELETE requests. Closed on all three |
 
 #### gap_jdss_rest_list_paging_without_per_page
 
@@ -1700,7 +1708,7 @@ patterns the code expects that no recording has ever shown.
 | The plugin sends | lists as `?page=N&_dc=<random>`, without `per_page` |
 | hurl sent | never `_dc`. `page` without `per_page` only on snapshot lists, with at most 10 items |
 | Why it matters | the default page size is unknown. The plugin keeps asking for the next page until it gets an empty one (`driver/common.go:52`). That stop rule was seen working, but never on a long list without `per_page`. |
-| Result of the gap runs | On jdss2 v4, the `volumes` and `nas-volumes` lists ignore `page` when `per_page` is missing; on jdss1 v3, without `per_page`, page 0 held all three test volumes and page 1 and page 99 were empty. With `per_page`, paging works on both. `_dc` changes nothing. The default page size is still unknown. Finding: [bug_plugin_rest_list_calls_send_page_without_per_page](#bug_plugin_rest_list_calls_send_page_without_per_page): **must be fixed before the v4 move** |
+| Result of the gap runs | On jdss2 v4, the `volumes` and `nas-volumes` lists ignore `page` when `per_page` is missing; on jdss1, v3 and v4, without `per_page`, page 0 held all the test objects and page 1 and page 99 were empty. With `per_page`, paging works on all three; `results` is the total, not the page's count. `_dc` changes nothing. The default page size is still unknown. Finding: [bug_plugin_rest_list_calls_send_page_without_per_page](#bug_plugin_rest_list_calls_send_page_without_per_page), which concerns jdss2; on JovianDSS 1 the plugin's loop ends |
 
 #### gap_jdss_rest_volume_create_without_sparse
 
@@ -1710,7 +1718,7 @@ patterns the code expects that no recording has ever shown.
 | The plugin sends | `POST volumes` with only `name` and `size` |
 | hurl sent | always with `sparse` |
 | Why it matters | every CSI volume gets the appliance's default provisioning, and defaults can change between releases: block size did (hurl Finding 9) |
-| Result of the gap runs | The default is **thick** (the full size is reserved) on both: the same `refreservation` as with `sparse: false`, about the volume size. Finding: [bug_plugin_rest_create_volume_never_sets_sparse](#bug_plugin_rest_create_volume_never_sets_sparse) |
+| Result of the gap runs | The default is **thick** (the full size is reserved) on both: the same `refreservation` as with `sparse: false`, about the volume size. Finding: [bug_plugin_rest_create_volume_never_sets_sparse](#bug_plugin_rest_create_volume_never_sets_sparse) The same on jdss1 v4 |
 
 #### gap_jdss_rest_name_length_limit
 
@@ -1720,7 +1728,7 @@ patterns the code expects that no recording has ever shown.
 | The plugin sends | names up to 243 characters (`vp_`/`vb_` + 240) |
 | hurl sent | longest name about 59 characters |
 | Why it matters | the length limit and its error are unknown |
-| Result of the gap runs | Zvol and clone names: 129 characters accepted, 150 refused; the appliance's own message gives the limit, 132. Snapshots: the limit is on the full name `pool/volume@snapshot`, at most 255; with the tested pool and volume names it was reached at 217 ([snapshot name limits](#future-work-snapshot-name-limits)). Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised); [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) would cap names at 131 and keep the plugin's generated names within it |
+| Result of the gap runs | Zvol and clone names: 129 characters accepted, 150 refused; the appliance's own message gives the limit, 132. Snapshots: the limit is on the full name `pool/volume@snapshot`, at most 255; with the tested pool and volume names it was reached at 217 ([snapshot name limits](#future-work-snapshot-name-limits)). Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised); [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) would cap names at 131 and keep the plugin's generated names within it Zvol and clone names give the same on jdss1 v4 |
 
 
 #### gap_jdss_rest_out_of_space_messages
@@ -1730,7 +1738,7 @@ patterns the code expects that no recording has ever shown.
 | Kind | a situation that was never recorded |
 | Situation | **Out of space:** a volume, thick volume, snapshot or NAS reservation larger than the pool. The error message was never seen |
 | Plugin code that depends on it | `errors.go:270`; `ResourceExhausted` at `controllerplugin.go:378`, `:656` |
-| Result of the gap runs | Three different out-of-space messages; only one is recognised. The zvol snapshot, clone and thick-volume cases were not run. Finding: [bug_rest_v4_create_calls_out_of_space_messages_unrecognised](#bug_rest_v4_create_calls_out_of_space_messages_unrecognised) |
+| Result of the gap runs | Three different out-of-space messages; only one is recognised. The zvol snapshot, clone and thick-volume cases were not run. Finding: [bug_rest_v4_create_calls_out_of_space_messages_unrecognised](#bug_rest_v4_create_calls_out_of_space_messages_unrecognised) Not run on jdss1 v4 |
 
 #### gap_jdss_rest_delete_missing_zvol_clone
 
@@ -1739,7 +1747,7 @@ patterns the code expects that no recording has ever shown.
 | Kind | a situation that was never recorded |
 | Situation | Zvol `DeleteClone` of a clone that does not exist (the NAS case is recorded) |
 | Plugin code that depends on it | `iscsi_driver.go:520` |
-| Result of the gap runs | `500`, errno 1, `Zfs resource: ... not found`: recognised. Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised) (the problem is in the caller); low |
+| Result of the gap runs | `500`, errno 1, `Zfs resource: ... not found`: recognised. Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised) (the problem is in the caller); low The same on jdss1 v4 |
 
 #### gap_jdss_rest_clones_of_missing_parent
 
@@ -1748,7 +1756,7 @@ patterns the code expects that no recording has ever shown.
 | Kind | a situation that was never recorded |
 | Situation | `GET .../clones` on a missing snapshot or volume, zvol and NAS: only 200 recorded |
 | Plugin code that depends on it | `iscsi_driver.go:498`, `nfs_driver.go:635` |
-| Result of the gap runs | Clones of a missing parent: `500`, errno 1, recognised. A snapshot with no clones: `200` with an empty list, never `204`. Snapshot list of a missing parent: `500` on jdss1 v3, `404` on jdss2 v4. Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised); NFS only |
+| Result of the gap runs | Clones of a missing parent: `500`, errno 1, recognised. A snapshot with no clones: `200` with an empty list, never `204`. Snapshot list of a missing parent: `500` on jdss1 v3, `404` on jdss1 v4 and jdss2 v4. Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised); NFS only |
 
 #### gap_jdss_rest_missing_pool_replies
 
@@ -1757,7 +1765,7 @@ patterns the code expects that no recording has ever shown.
 | Kind | a situation that was never recorded |
 | Situation | The pool is missing or unavailable, on any call except `GET pools/<pool>` |
 | Plugin code that depends on it | every call |
-| Result of the gap runs | `POST` and list of volumes on a missing pool: `500`, errno 1. Targets: `404`. Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised); low |
+| Result of the gap runs | `POST` and list of volumes on a missing pool: `500`, errno 1. Targets: `404`. Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised); low The same on jdss1 v4, where the snapshot lists of a missing pool answer `404`, `Pool <p> not found.` |
 
 #### gap_jdss_rest_detach_and_delete_with_connected_clients
 
@@ -1804,17 +1812,21 @@ work would have to allow for is in [risk 14](#risks).
 #### How the gap runs went
 [How_the_gap_runs_went](#how-the-gap-runs-went)
 
-Two runs were made to fill the gaps: jdss1 `20261105-221223` on v3, and jdss2
-`20261105-220744` on v4. **There are no jdss1 v4 results:** jdss1 stopped answering
-2 minutes after its v4 part started (the 8-hour outage in [gap_plugin_rest_appliance_unreachable](#gap_plugin_rest_appliance_unreachable)). One test, which
+Three runs were made to fill the gaps: jdss1 `20261105-221223` on v3, jdss2
+`20261105-220744` on v4, and jdss1 `20261107-010938` on v4. The third replaces
+the v4 part of the first, which was lost: jdss1 stopped answering 2 minutes
+after it started (the 8-hour outage in [gap_plugin_rest_appliance_unreachable](#gap_plugin_rest_appliance_unreachable)).
+In the first two runs one test, which
 puts a newline into a share comment, broke share handling and NAS deletes on both
 appliances for the rest of the run (hurl Finding 21 for jdss2, 22 for jdss1),
-and on jdss1 the pool also filled up. So the results below come only from the
+and on jdss1 the pool also filled up. So their results come only from the
 part of each run before that test, or from zvol tests, which the breakage did
-not touch. The `scale/` tests and `nospace/volume-no-space.hurl` ran on neither
-appliance.
+not touch. The third run had no such breakage: about 14,100 requests, one
+without an answer. It left out the `race/`, `scale/` and `nospace/` tests.
+The `scale/` tests and `nospace/volume-no-space.hurl` ran on no appliance.
 
-Never seen in either run (about 21,000 requests each): `202`, `204` on a GET, `200`
+Never seen in any of the three runs (about 21,000 requests in each of the
+first two): `202`, `204` on a GET, `200`
 on a DELETE. Also never seen, not even in the `race/` tests:
 `Resource ... already exists.` with errno 1 or 100, and "not found" without an
 errno. Creating the same object twice at the same time gives errno 100
@@ -2117,7 +2129,7 @@ the plugin never sets.
 | | |
 |---|---|
 | Where | `pagedcSuffix` ([`entrielisters.go:34`](../../pkg/rest/entrielisters.go#L34)), `getResourcesList` (`driver/common.go:52`) |
-| What happens | lists are requested with `page` and `_dc`, but without `per_page`. On jdss2 v4, the `volumes` and `nas-volumes` lists then ignore `page` and return the first page again (tried with `page=1` and `page=99`). The loop stops only on an empty page, so CSI ListVolumes never ends when `max_entries` is not set, and returns duplicates when it is |
+| What happens | lists are requested with `page` and `_dc`, but without `per_page`. On jdss2 v4, the `volumes` and `nas-volumes` lists then ignore `page` and return the first page again (tried with `page=1` and `page=99`). The loop stops only on an empty page, so CSI ListVolumes never ends when `max_entries` is not set, and returns duplicates when it is. On jdss1, v3 and v4, page 0 holds everything and the next page is empty, so there the loop ends |
 | Evidence | recorded replies (results [gap_jdss_rest_list_paging_without_per_page](#gap_jdss_rest_list_paging_without_per_page)); the loop from code reading |
 
 #### bug_plugin_rest_create_volume_never_sets_sparse
@@ -2472,7 +2484,7 @@ would remove it.
 | jdss1 v3 against jdss1 v4, lists and delete flags | jdss1 run `20261104-200231` | 363 per version | none: status, errno, class and message identical | hurl Finding 14 |
 | jdss1 v3 against jdss1 v4, rollback and clone id | jdss1, 2026-11-04 | 281 common | 7: one NAS `rapid` count (1 against 0) and six NAS `effect` cases lost to an appliance outage on the v3 side | hurl Finding 15 |
 | jdss2 v4 against jdss1 v4, lists and delete flags | jdss2, 2026-11-04 | 751 common | 12: eleven the known share 404 style, one a VIP address inside a message | hurl Finding 15 |
-| with and without the `{}` body on GET and on DELETE of target, LUN and share | jdss1 v3 and jdss2 v4 | 80 and 82 pairs | none | [how the gap runs went](#how-the-gap-runs-went), [gap_jdss_rest_empty_body_on_get_delete](#gap_jdss_rest_empty_body_on_get_delete) |
+| with and without the `{}` body on GET and on DELETE of target, LUN and share | jdss1 v3, jdss2 v4 and jdss1 v4 | 80, 82 and 82 pairs | none | [how the gap runs went](#how-the-gap-runs-went), [gap_jdss_rest_empty_body_on_get_delete](#gap_jdss_rest_empty_body_on_get_delete) |
 
 **Hard-coded API paths in the current code:** 34 `api/v3` strings in
 `pkg/rest`, 22 distinct path patterns; 30 strings after the dead-code commit.
