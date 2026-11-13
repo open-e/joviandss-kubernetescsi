@@ -174,8 +174,8 @@ are merged, so optional fields do not show which go together. For the
 plugin's calls, the observed types say exactly what the six mismatches say.
 Types differ per endpoint for the same thing: a snapshot's `creation` is
 `int64` in the all-snapshots list and a string in the reply by name;
-`volsize`, `available` and the pool's `size` are strings holding numbers,
-which the hand-written decoders parse today. jdss1 and jdss2 agree on types
+`volsize` and the pool's `available` are strings holding numbers, which the
+hand-written decoders parse today. jdss1 and jdss2 agree on types
 for the endpoints the plugin uses. The compiled YAML has a defect: line 15389
 of the jdss2 v4 file holds a literal tab inside a `pattern:` value, which
 Python's YAML parser refuses; the emitter can write JSON instead.
@@ -395,10 +395,15 @@ condition of the v4 move on JovianDSS 1; it makes the loop safe against a
 server that repeats a page, and it comes first so that the v4 commit changes
 paths only. Paging with `per_page` works on jdss1, v3 and v4, and on jdss2 v4
 (gap [gap_jdss_rest_list_paging_without_per_page](#gap_jdss_rest_list_paging_without_per_page)).
-The stop rule would change too. Today the plugin asks for page after page until
-a page comes back empty; it would also stop once it has received as many entries
-as the reply's `results` count announces, so a server that repeats a page could
-not keep it looping.
+Every list call would carry `per_page=100`, on v3 and on v4, so that lists
+are paged the same way on every version.
+The stop rule would gain one condition. Today the plugin asks for page after
+page until a page comes back empty; it would keep that rule and also stop when
+a page holds fewer entries than `per_page`. The loop then needs no total, so
+it also ends on a list that resumes from a token at a later page, and a list
+shorter than one page costs one request instead of two. A server that returned
+the same full page again and again would still keep the loop running; no
+recording shows one once `per_page` is sent.
 
 ### Before stage 1: remove dead REST code
 [Before_stage_1_remove_dead_REST_code](#before-stage-1-remove-dead-rest-code)
@@ -465,7 +470,11 @@ generator version. The 19 `Resource*` type names would stay, so the drivers and
 the controller keep compiling against them; the accessors and the conversions
 (`GetSize`, `OriginSnapshot`, `ClonesNames`, the parsing of numbers sent as
 strings that the custom decoders do today) would move to a hand-written
-`pkg/rest/types_methods.go`. The spec repo stays read only: the user runs its
+`pkg/rest/types_methods.go`. The rest of `types.go` would follow the same
+split: the reply sub-types `Disk`, `ShareNFS` and `ShareSMB` would be generated
+under their names, and the envelopes `GeneralResponse` and `ResultEntries` and
+the two regular expressions the accessors use would move to
+`types_methods.go`. The spec repo stays read only: the user runs its
 tools; the build never needs them, because the generated file is committed.
 `make gen-types` would run the generator; `make check-types` would regenerate
 and fail on a difference, the guard against the committed file drifting from
@@ -476,8 +485,8 @@ the spec.
 | What | Rule |
 |---|---|
 | a field the plugin reads | the type the recordings show for that endpoint, exact. The mapping names it and marks it **required** or **optional**; where the recordings never show it set, the mapping may state the type by hand, with the reason |
-| a required read field absent from a reply | the call fails with an error that names the field: a generated `checkRequired()` per type, called after decoding. First list: pool `available` and `size`, snapshot `creation`, volume `name`, and snapshot `name` in list entries and in the NAS snapshot reply by name; the zvol snapshot reply by name carries no `name` ([bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_get_no_name_key](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_get_no_name_key)) and nothing reads it there |
-| an optional read field absent from a reply | the accessor returns the documented absent value. First list: `origin` and `clones` on a volume without them, NAS `quota` without a quota ([bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec), review `bug_plugin_driver_nas_quota_null_size_zero`) |
+| a required read field absent from a reply | the call fails with an error that names the field: a generated `checkRequired()` per type, called after decoding. First list: pool `available`, snapshot `creation`, volume `name`, and snapshot `name` in list entries and in the NAS snapshot reply by name; the zvol snapshot reply by name carries no `name` ([bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_get_no_name_key](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_get_no_name_key)) and nothing reads it there |
+| an optional read field absent from a reply | the accessor returns the documented absent value. First list: `origin` on a volume that is not a clone, `clones` on a snapshot without clones, NAS `quota` without a quota ([bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec), review `bug_plugin_driver_nas_quota_null_size_zero`) |
 | a field the plugin does not read | kept as `json.RawMessage`: stored as sent, never able to fail. [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch), [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch), [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch) and the keys of [bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec) become this |
 | the key of a read field | the recorded key: [bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead) reads `parent.name`, and [bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key](#bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key)'s `type` comes under its own key (stage 3 filters by it) |
 | a field never seen set in any recording | `json.RawMessage`, unless the mapping types it by hand |
@@ -550,8 +559,8 @@ Would fix the rest of [response content](#response-content-and-defaults), the
   instead of only adding the two new messages.
 - [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised), REST side only: a missing pool would get its own code, so
   the controller can report a configuration error instead of Unknown; "name too
-  long" would map to `RestErrorArgumentIncorrect`, a code that exists but is unused
-  today; and on v4 the snapshot list of a missing parent would map to "not found".
+  long" would map to `RestErrorArgumentIncorrect`, a code the drivers return
+  today but the mapping in `errors.go` never produces; and on v4 the snapshot list of a missing parent would map to "not found".
   The caller that turns every zvol `DeleteClone` error into `Busy`
   (`iscsi_driver.go:520`) is the driver part of this finding, fixed by
   [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) below.
@@ -686,7 +695,9 @@ and [impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit) add 
 - [crash_plugin_rest_setup_endpoint_ignores_error](#crash_plugin_rest_setup_endpoint_ignores_error): `SetupEndpoint` would log the error from `SetupRestProxy`
   **and** return it, instead of logging it and returning `nil`; and `Send` would
   return a `RestError` ("REST client not configured", followed by the setup
-  error's text) when the proxy was never set up, instead of panicking. Its three
+  error's text) when the proxy was never set up, instead of panicking.
+  `SetupRestProxy` would return an error for an empty `addrs`, which it accepts
+  today. Its three
   callers (`controllerplugin.go:193`, `iscsi_driver.go:409`, `nfs_driver.go:546`)
   ignore the returned error today; with this fix a bad configuration would give
   an error on every REST call, naming the cause, instead of a panic. The log
@@ -826,7 +837,10 @@ is checked (`iscsi_driver.go:571`).
 
 **Reply size limit** (user decision): a new setting in the REST endpoint
 configuration, `maxreplysize`, would cap how much of a reply `Send` reads
-(`io.LimitReader` before `io.ReadAll`, `rproxy.go:164`). A reply over the limit
+(`io.LimitReader` before `io.ReadAll`, `rproxy.go:164`). The reader would
+allow one byte more than the limit, and a read that reaches that byte is a
+reply over the limit: `io.LimitReader` alone cuts the reply short without an
+error, and the caller would see broken JSON. A reply over the limit
 would fail with an error naming the limit, instead of being read into memory
 whatever its size. Proposed default: 16 MiB; the largest recorded reply is about
 66 KB.
@@ -1286,8 +1300,8 @@ agent's: the items say what they must show, and this section only runs them.
      the plugin's real logic: the request log shows their `GET` answered 200, and
      a spec that still fails does not fail with `Internal` and a decode message
      (those failures would become new findings);
-   - the request log shows `per_page` on every list call, and no list call asks for
-     the same page twice;
+   - the request log shows `per_page` on every list call, no list call asks for
+     the same page twice, and no list call follows a page shorter than `per_page`;
    - every GET and every DELETE in the request log is answered as the
      [compliance matrix](#compliance-matrix) records, none with 400 or 415, so the
      `{}` body makes no difference on the lab appliance either ([question 30](#decisions));
@@ -1622,6 +1636,11 @@ required-or-optional list rests on evidence rather than on reading the code.
   questions are kept here with their numbers.
 - User decision (2026-11-11): older JovianDSS 1 releases do not serve the
   same API v4; there is no backward compatibility with them (question 29).
+- User decision (2026-11-14): the list loop stops on an empty page and on a
+  page shorter than `per_page`, and `per_page` is sent on every version. The
+  check for a repeated page was set aside: it would have to compare whole
+  pages, because a volume removed or added between two requests shifts the
+  entries.
 - User decision (2026-11-13): the NFS snapshot deletes that destroy clones
   are driver bugs, fixed separately and not in this document; it carries
   them as risk 23.
@@ -2310,7 +2329,7 @@ Bugs in the REST code itself, whatever the appliance does.
 
 | | |
 |---|---|
-| Where | `getError` ([`storageapi.go:42-58`](../../pkg/rest/storageapi.go#L42)); every `Get*` decodes before looking at the status |
+| Where | `getError` ([`storageapi.go:42-58`](../../pkg/rest/storageapi.go#L42)); every `Get*` decodes before looking at the status, except the two snapshot reads by name (`GetVolumeSnapshot`, [`storageapi.go:211`](../../pkg/rest/storageapi.go#L211); `GetNASVolumeSnapshot`, `nas_volumes_snapshots.go:111`) |
 | What happens | only the JSON body is mapped; the HTTP status is never used. Error bodies that are not JSON (plain text `401 unauthorized` on jdss1, `404 not found`) give `RestErrorRPM` ("Failure during processing response from storage") on GETs, and `RequestMalfunction` ("Failure in sending data to storage", `errors.go:287`) on create and delete, which wrongly points at the network. A wrong password gives no hint about credentials, and a plain 404 is not seen as "not found" |
 | Evidence | recorded bodies, code reading |
 
@@ -2399,7 +2418,7 @@ all five inside `pkg/rest` ([impl_plugin_rest_fix_transport_auth_nil_body_setup_
 |---|---|
 | Where | `rest.go:104-107` |
 | Crash | `SetupEndpoint` ignores the error from `SetupRestProxy` |
-| Trigger | a missing or invalid `idletimeout`, or an empty `addrs`: the first REST call panics |
+| Trigger | a missing or invalid `idletimeout`: `SetupRestProxy` returns an error and the proxy stays unset. An empty `addrs`: `SetupRestProxy` returns no error, and `Send` indexes the empty list (`rproxy.go:91`). In both cases the first REST call panics |
 
 #### crash_plugin_rest_endpoint_string_empty_addrs
 
@@ -2520,13 +2539,15 @@ would remove it.
 | `ResourceNASSnapshotParent` | 3 | | `copies`; reads `type` under the wrong key ([bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key](#bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key)) |
 | `ResourceTarget`, `ResourceShare`, `ResourceVolumeSnapshotClones`, pool sub-types | 4 to 8 each | | none |
 
-**Observed types of the read fields, jdss1 v4:** volume by name: `name`,
-`volsize`, `available`, `used`, `reservation`, `refreservation` strings;
-`clones` and `quota` `null` in every recording; in the zvol alternative
-`is_clone` `false` and `origin` `null`, in the clone alternative `is_clone`
-`true` and `origin` a string.
+**Observed types, jdss1 v4.** Fields the plugin reads: volume by name:
+`name` and `volsize` strings; `origin` `null` in the zvol alternative and a
+string in the clone alternative.
 All-snapshots list: `name` string, `parent.name` string, `creation` `int64`.
-Pool: `available`, `size`, `name`, `health` strings; `status` `int64`.
+Pool: `available` string.
+Fields of the same replies that nothing reads: volume `available`, `used`,
+`reservation` and `refreservation` strings; `clones` and `quota` `null` in
+every recording; `is_clone` `false` in the zvol alternative and `true` in the
+clone alternative. Pool `size`, `name` and `health` strings; `status` `int64`.
 
 **What the company documentation says for each mismatched field**, against
 the recordings: [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch) `encryption`: v3 not listed, v4 an object whose example
