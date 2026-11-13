@@ -327,8 +327,9 @@ delivered and tested once, every check that needs no lab first (priority 7,
 [risk 7](#risks)). Every known appliance error means one thing and an
 unknown one stays unknown (priority 8). Without a guard in this delivery: a
 hung call past the CSI deadline ([risk 12](#risks)), the accepted edge of a
-name of exactly 132 characters ([risk 13](#risks)) and a reply behind the
-request ([risk 14](#risks)).
+name of exactly 132 characters ([risk 13](#risks)), a reply behind the
+request ([risk 14](#risks)) and the NFS cleanup that destroys a clone
+([risk 23](#risks)).
 
 The decisions below the options were taken as questions and are kept in the
 [Decisions](#decisions) table: the reply types are generated from the
@@ -341,8 +342,8 @@ each driver lists only its own snapshot kind (question 7); every ID and name
 is validated at the CSI boundary, generated names are at most 131 characters
 and target names lower case (questions 20 and 21); the plugin speaks HTTPS
 only, TLS 1.3 fixed, with certificate checks on by default (questions 23,
-26); no secret reaches any log at any level and no request is logged
-(question 19, [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging), [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs)); release notes live in
+26); no secret reaches any log at any level and no request body or header
+is logged (question 19 for tokens; [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging), [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs)); release notes live in
 `CHANGELOG.md` (question 24).
 
 ## What changes
@@ -897,7 +898,7 @@ the package and `make gen-types` whenever new recordings are added, with the aud
 - The whole of this document is implemented as one series; stages 3 and 4
   need no further record: their files, risks and tests are in
   [Affected systems and files](#affected-systems-and-files),
-  [risks 4 to 8, 10, 11, 13 and 14](#risks) and [Testing](#testing).
+  [risks 4 to 8, 10, 11, 13, 14 and 23](#risks) and [Testing](#testing).
 
 Confidence: high for JovianDSS 1 at the recorded release, where v3 and v4 are
 recorded identical and every reply of every call is validated against the
@@ -1103,6 +1104,28 @@ the types ([risk 1](#risks)).
    both endpoints.
 22. **A later JovianDSS release changes v4.** Guard: regeneration and the
    audit on the new recordings show the change as a diff or a failed check.
+23. **Stage 3 makes an NFS data-loss path reachable
+   (`dataloss_plugin_driver_nfs_intermediate_snapshot_delete_destroys_clone_volume`).**
+   The appliance does not refuse the delete of a NAS snapshot that has a
+   clone: it answers 204 and destroys the clone with it (hurl Finding 7); a
+   zvol snapshot with a clone is refused. The NFS `cleanIntermediateSnapshots`
+   deletes an intermediate snapshot when the snapshot list shows it without
+   clones (`nfs_driver.go:315-322`), and the entries of that list carry no
+   `clones` key, so it would delete every one, and the clone it destroys is
+   the volume that was made from the deleted one. Four bugs keep that
+   cleanup from deleting anything today, and this document fixes all four:
+   [bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised),
+   [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots),
+   [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error) and
+   [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete). The NFS
+   DeleteSnapshot has the same fault and is reachable today, with or without
+   this delivery
+   (`dataloss_plugin_driver_nfs_delete_snapshot_destroys_volumes_cloned_from_it`).
+   Guard: none in this delivery. Both are driver bugs, fixed separately (user
+   decision) and described in kub-testing,
+   `issues/notes/dataloss-nfs-snapshot-delete-destroys-clones.md`. Until that
+   fix is in the build, an NFS build with stage 3 would destroy the clones of
+   a volume it deletes; [Testing](#testing) step 5 deletes such a volume.
 
 ## Affected systems and files
 [Affected_systems_and_files](#affected-systems-and-files)
@@ -1358,7 +1381,7 @@ Open: 22, 25 and 30 to 33. The numbers are kept, gaps included, so that "questio
 | # | Question | Decision | Where it is argued |
 |---|---|---|---|
 | 1 | Which API? | v4 only; v3 deprecated; no other option was considered. | [Option A](#option-a-v4-only-the-only-option-considered) |
-| 2 | Minimum JovianDSS 1 release? | `1.0up33.65410`, the release of the lab and the recordings. | [Decision](#decision) |
+| 2 | Minimum JovianDSS 1 release? | `1.0up33.65410`, the release of the lab and the recordings. | [Option A](#option-a-v4-only-the-only-option-considered), [risk 2](#risks) |
 | 3 | When does token login come? | with JovianDSS 2 support, a later design. | [Future work: JovianDSS 2](#future-work-joviandss-2-support) |
 | 4 | Fixtures: real replies or hand-written? | real replies from the recordings, trimmed, passwords and the `Authorization` header removed. | [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) |
 | 5 | Unused fields with the wrong type? | removed at first; the same question as 27, both superseded by 28: kept as raw JSON that cannot fail. | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
@@ -1382,7 +1405,7 @@ Open: 22, 25 and 30 to 33. The numbers are kept, gaps included, so that "questio
 | 24 | Where do release notes live? | `CHANGELOG.md` at the repository root. | [Stage 1](#stage-1-move-to-api-v4) |
 | 26 | TLS minimum as a setting? | no; 1.3 fixed, a parameter of `pkg/rest` at most, no `tlsmin` key. | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile) |
 | 27 | Keep or remove the unread fields that fail? | remove; superseded by 28. | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
-| 28 | Generate the reply types instead of fixing them by hand? | yes, from the recorded jdss1 v4 API, same names, only read fields can fail. Weighed against: the rule per field (27), a transcription that drifts again with the next release and only the audit tells; every field modelled by hand, which fails on a field nobody reads and drifts the same way; the whole client generated, which replaces about 2,100 lines and every caller and redoes the stage 3 and 4 work on generated code; tolerant decoding, which lets a real change in a read field pass silently. Price: about 650 lines of generator and mapping to keep, a procedure that depends on the user running the spec repository's tools, a spec output format still moving. | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
+| 28 | Generate the reply types instead of fixing them by hand? | yes, from the recorded jdss1 v4 API, same names, only read fields can fail. Weighed against: the rule per field (27), a transcription that drifts again with the next release and only the audit tells; every field modelled by hand, which fails on a field nobody reads and drifts the same way; the whole client generated, which replaces about 2,100 lines and every caller and redoes the stage 3 and 4 work on generated code; tolerant decoding, which lets a real change in a read field pass silently. Price: about 650 lines of generator and mapping to keep, and [risks 19 and 20](#risks). | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
 | 29 | Do older JovianDSS 1 releases serve the same v4? | no: they do not serve the same API v4, and there is no backward compatibility with them; nothing older than `1.0up33.65410` is supported. | [Risk 2](#risks) |
 
 ## Relationship to other designs
@@ -1549,6 +1572,9 @@ required-or-optional list rests on evidence rather than on reading the code.
   questions are kept here with their numbers.
 - User decision (2026-11-11): older JovianDSS 1 releases do not serve the
   same API v4; there is no backward compatibility with them (question 29).
+- User decision (2026-11-13): the NFS snapshot deletes that destroy clones
+  are driver bugs, fixed separately and not in this document; it carries
+  them as risk 23.
 - User decisions (2026-11-12): the Problem statement is four sentences,
   success is compliance with the JovianDSS 1 REST API v4 and JovianDSS 2 is
   not supported within this iteration; security is the second priority;
