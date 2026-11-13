@@ -246,3 +246,15 @@ Line numbers refer to the record and the README as of the working tree on
     Medium, risk 19 and the duplicated clause. Still open: whether the
     Decision names the crash fixes (question 12) and the reply size limit;
     whether the price of questions 20, 21 and 23 is stated in the Decision.
+57. Coherence of the whole record, end of 2026-11-12
+    (`review/2026-11-12-adr-0002-consistency-review.md`): no High, no new
+    Medium. Low: the Decision's "no request is logged" says more than the
+    item (method, path and status stay logged at Debug); question 19 cited
+    for the no-secrets decisions it does not hold; question 28's price
+    restates risks 19 and 20; row 2's "where it is argued" should be Option
+    A and risk 2. Carried over: 55 (the "assumptions" sentence; the
+    exclusion restated in nine places in five wordings, "iteration"
+    undefined) and 56. Item 46's first point may close: question 29 says
+    what the hedge "or with a different v4" describes. The four Low items
+    were applied on 2026-11-12 (the review's Outcome); the carried-over
+    items stay with 55 and 56.

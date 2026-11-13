@@ -523,6 +523,8 @@ Would fix the rest of [response content](#response-content-and-defaults), the
 - Lists and checks that come back empty or wrong. [bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub) (the iSCSI
   "snapshots of this volume" request is an empty stub): implement the request.
   [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots) (the NFS version asks the wrong path): fix the path.
+  What the two lists then return, their callers would have to read as it
+  is sent: [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow).
   [bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name](#bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name) (the "target not found" pattern is a test string that never
   matches): use the real message. [bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key](#bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key) (the
   snapshot kind is read from the wrong key): read `type`, and filter by it: the
@@ -561,6 +563,30 @@ Would fix the rest of [response content](#response-content-and-defaults), the
   like any other unexpected status ([risk 6](#risks)). What must hold: a GET
   answered 204 is the empty result, not a parse error ([bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check)),
   and a 202 on `CreateTarget` is an error naming the status.
+
+#### impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow
+
+**The per-volume snapshot lists decode into the short entry types, and their
+callers follow.** It closes [bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name](#bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name). Once the two listers above send their
+requests, their replies would decode into `ResourceSnapshotShort` and
+`ResourceNASSnapshotShort`, and these callers would change in the same
+commits:
+
+- `ListVolumeSnapshots` in both drivers: the entry type of the list and of
+  its token function (`RestSnapshotEntryBasedID`,
+  `RestNASVolumeSnapshotEntryBasedID`, `driver/restwrappers.go`);
+- `completeListResponseFromVolumeSnapshots` (`controller/listers.go:111-170`):
+  the creation time comes from `Properties.Creation`, as in
+  `completeListResponseFromSnapshotShort`; lines `:124` and `:148`, which
+  stage 2 moves to an accessor, change again here;
+- `cleanIntermediateSnapshots` in both drivers: it calls `ClonesNames()` on
+  each entry (`iscsi_driver.go:212`, `:282`; `nfs_driver.go:316`, `:421`),
+  and a short entry has no clones to give. Where the cleanup takes them from
+  is [question 34](#open-questions).
+
+What must hold: a fixture of each per-volume list decodes into its short
+type with `name`, `parent.name` and `properties.creation` set, and no code
+reads a field of the full object from a list entry.
 
 #### impl_plugin_rest_error_catalogue
 
@@ -1109,23 +1135,20 @@ the types ([risk 1](#risks)).
    The appliance does not refuse the delete of a NAS snapshot that has a
    clone: it answers 204 and destroys the clone with it (hurl Finding 7); a
    zvol snapshot with a clone is refused. The NFS `cleanIntermediateSnapshots`
-   deletes an intermediate snapshot when the snapshot list shows it without
-   clones (`nfs_driver.go:315-322`), and the entries of that list carry no
-   `clones` key, so it would delete every one, and the clone it destroys is
-   the volume that was made from the deleted one. Four bugs keep that
-   cleanup from deleting anything today, and this document fixes all four:
-   [bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised),
+   deletes an intermediate snapshot that its list shows without clones
+   (`nfs_driver.go:315-322`), and that list never shows clones
+   ([bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name](#bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name)).
+   An NFS volume delete would therefore destroy every volume cloned from
+   the deleted one. The cleanup deletes nothing today, because four bugs
+   stand in its way, and stage 3 and the dead-code commit would remove all
+   four: [bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised),
    [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots),
    [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error) and
-   [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete). The NFS
-   DeleteSnapshot has the same fault and is reachable today, with or without
-   this delivery
-   (`dataloss_plugin_driver_nfs_delete_snapshot_destroys_volumes_cloned_from_it`).
-   Guard: none in this delivery. Both are driver bugs, fixed separately (user
-   decision) and described in kub-testing,
-   `issues/notes/dataloss-nfs-snapshot-delete-destroys-clones.md`. Until that
-   fix is in the build, an NFS build with stage 3 would destroy the clones of
-   a volume it deletes; [Testing](#testing) step 5 deletes such a volume.
+   [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete).
+   Guard: none in this delivery; [question 34](#open-questions) decides the
+   order in which the fix and these commits land, and
+   [Relationship](#relationship-to-other-designs) names where the fix is
+   handled. [Testing](#testing) step 5 deletes such a volume.
 
 ## Affected systems and files
 [Affected_systems_and_files](#affected-systems-and-files)
@@ -1136,7 +1159,7 @@ the types ([risk 1](#risks)).
 | Plugin REST client, reply types | `types.go` replaced by the generated types and the methods file; the mapping added | `pkg/rest/types_gen.go` (generated), `pkg/rest/types_methods.go`, `pkg/rest/types_gen.yaml` |
 | Generator and build | the generator script; `gen-types` and `check-types` targets | `tools/rest-types-gen.py`, `Makefile` |
 | Fixtures, tests and audit | fixtures of every recorded jdss1 v4 reply, which the implementing agent's tests decode with the generated types and check field by required field; the audit compares the plugin's calls with the v4 index and keeps no type check | `pkg/rest/*_test.go`, `pkg/rest/testdata/`; `kub-testing/tools/rest-type-audit.py` ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures), [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)) |
-| Drivers and controller | the twelve lines: `Creation` via accessor, `Parent.Name` for list entries, `GetAvailable()` for the pool | `pkg/controller/listers.go:52`, `:54`, `:56`, `:82`, `:124`, `:148`; `pkg/controller/controllerplugin.go:679`, `:802`, `:1017`; `pkg/driver/restwrappers.go:40`; `pkg/driver/iscsi_driver.go:456`; `pkg/driver/nfs_driver.go:591` |
+| Drivers and controller | the twelve lines: `Creation` via accessor, `Parent.Name` for list entries, `GetAvailable()` for the pool; the callers of the per-volume snapshot lists ([impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow)) | `pkg/controller/listers.go:52`, `:54`, `:56`, `:82`, `:124`, `:148`; `pkg/controller/controllerplugin.go:679`, `:802`, `:1017`; `pkg/driver/restwrappers.go:40`; `pkg/driver/iscsi_driver.go:456`; `pkg/driver/nfs_driver.go:591` |
 | Plugin documentation and release notes | the required JovianDSS release is stated: one that serves API v4, for JovianDSS 1 at least `1.0up33.65410`; the regeneration procedure ([question 33](#open-questions)) | `docs/`, `CHANGELOG.md`, `pkg/rest/doc.go` |
 | JovianDSS appliances | must serve API v4: JovianDSS 1 at `1.0up33.65410` or later | the lab appliance and the recorded appliances already do |
 | Test lab | the live cycles become the plugin's first runs on v4; the suite itself does not change | kub-testing `dev_cycle.py` cycles ([Testing](#testing) steps 4 and 5); `ISSUES.md` T9 |
@@ -1164,6 +1187,7 @@ step 5) and, where it is `pkg/rest` code, by unit tests.
 | `kub-testing/tools/rest-type-audit.py` (new) | [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool): compliance matrix, request keys, error coverage; no type check | 2 |
 | `pkg/rest/doc.go` (new) | [impl_plugin_rest_package_documentation](#impl_plugin_rest_package_documentation), package documentation | 2 |
 | `pkg/rest/entrielisters.go` | [bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub) (a new call, `GET pools/<x>/volumes/<x>/snapshots`, in the [compliance matrix](#compliance-matrix)), [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots) *NFS* | 3 |
+| `pkg/driver/iscsi_driver.go`, `nfs_driver.go` (`ListVolumeSnapshots`, `cleanIntermediateSnapshots`), `pkg/driver/restwrappers.go`, `pkg/controller/listers.go` (`completeListResponseFromVolumeSnapshots`) | [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow): the short entry type, `Properties.Creation`; the cleanup's clones by [question 34](#open-questions) | 3 |
 | `pkg/rest/errors.go`, `targets.go` | [bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name](#bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name), [bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised), [bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone](#bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone), [bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised), [bug_rest_v4_shares_post_409_already_exists_unrecognised](#bug_rest_v4_shares_post_409_already_exists_unrecognised) and [bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised) *NFS*, [bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay](#bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay), [bug_rest_v4_create_calls_out_of_space_messages_unrecognised](#bug_rest_v4_create_calls_out_of_space_messages_unrecognised), [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised) | 3 |
 | `pkg/rest/errors.go`, `storageapi.go` (`getError`); `pkg/driver/iscsi_driver.go`, `nfs_driver.go`, `pkg/controller/*.go` (callers) | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue): error catalogue, one handler and log line, codes per kind; callers decide on the code only (`iscsi_driver.go:520` included) | 3 |
 | `pkg/driver/iscsi_driver.go`, `nfs_driver.go` (`DeleteVolume`, `cleanIntermediateSnapshots`) | review [bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children](#bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children) (cleanup also on `volume has children`, with [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)), [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error) (listing error first; NFS takes NAS snapshots, *NFS*) | 3 |
@@ -1211,6 +1235,8 @@ agent's: the items say what they must show, and this section only runs them.
    NFS cleanup reaching [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete)'s call. kub-testing holds them as the
    seven checks of T11 (`testcases/plugin-checks-design-0002.md`) for later; the
    live cycles (steps 4 and 5) exercise them as far as csi-sanity reaches them.
+   The callers changed by [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow) are not among the seven and have no automated
+   check either.
 2. **Audit and compliance (analysis machine, the agent).** Proves that every call
    the plugin makes meets the rules on jdss1 v4 and that the committed types match
    the spec. Needs the spec repository refreshed by the user with
@@ -1327,7 +1353,7 @@ test appliance.
 
 **Limits**
 
-9. csi-sanity reaches [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch), [bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead), [bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub) and [bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised) only after 0003
+9. csi-sanity reaches [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch), [bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead), [bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub), [bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name](#bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name) and [bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised) only after 0003
    stops the controller crashes; until then they have no live cover in this delivery.
 10. **Not testable here:** [gap_jdss_rest_detach_and_delete_with_connected_clients](#gap_jdss_rest_detach_and_delete_with_connected_clients) beyond steps 6 and 7 (several nodes, a pool moving
     between nodes), [gap_plugin_rest_failover_during_call](#gap_plugin_rest_failover_during_call), JovianDSS 2 live, which needs
@@ -1338,7 +1364,7 @@ test appliance.
 ## Open questions
 [Open_questions](#open-questions)
 
-Open: 22, 25 and 30 to 33. The numbers are kept, gaps included, so that "question 27" means the same thing everywhere; the decided questions follow as a table, each with the section that argues it.
+Open: 22, 25 and 30 to 34. The numbers are kept, gaps included, so that "question 27" means the same thing everywhere; the decided questions follow as a table, each with the section that argues it.
 
 - **22. Who prepares the NFS live cycle?** [Testing](#testing) step 5 lists the
   five things it needs that do not exist, from the tooling that refuses an
@@ -1374,6 +1400,16 @@ Open: 22, 25 and 30 to 33. The numbers are kept, gaps included, so that "questio
 - **33. Where does the regeneration procedure live?** In the plugin's
   documentation, since the generated file is the plugin's, with the
   kub-testing notes pointing at it.
+- **34. Where does `cleanIntermediateSnapshots` take a snapshot's clones
+  from, and when?** Its call on the list entries cannot stay once
+  [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow) is in. Alternatives: read each intermediate snapshot by name, the
+  reply that has `clones`, at one more request per snapshot; or ask
+  `GET .../snapshots/<s>/clones`, which both drivers already call when a
+  snapshot delete is refused. On NFS the answer decides whether a cloned
+  volume survives ([risk 23](#risks)). Recommendation: the driver fix for
+  that risk settles the source of the clones for both drivers, and the
+  commits of [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow) wait for it. The owner and the order are still to be
+  decided.
 
 ### Decisions
 [Decisions](#decisions)
@@ -1451,6 +1487,12 @@ Open: 22, 25 and 30 to 33. The numbers are kept, gaps included, so that "questio
 - `sparse` provisioning ([bug_plugin_rest_create_volume_never_sets_sparse](#bug_plugin_rest_create_volume_never_sets_sparse)): sparse by default,
   configurable in the plugin configuration and per StorageClass; its own design
   ([question 9](#decisions)).
+- NFS snapshot deletes that destroy clones
+  (`dataloss_plugin_driver_nfs_delete_snapshot_destroys_volumes_cloned_from_it`,
+  `dataloss_plugin_driver_nfs_intermediate_snapshot_delete_destroys_clone_volume`):
+  driver bugs, handled outside this document; described in kub-testing,
+  `issues/notes/dataloss-nfs-snapshot-delete-destroys-clones.md`
+  ([risk 23](#risks), [question 34](#open-questions)).
 - REST client behaviour: not a compliance matter. Of its catalogue
   ([REST client behaviour](#rest-client-behaviour)) this delivery leaves
   [bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover) and
@@ -2094,6 +2136,15 @@ the plugin never sets.
 | What happens | a zvol snapshot GET has **no `name` key** (NAS snapshot GETs do), so `ResourceSnapshot.Name` and the iSCSI `GeneralSnapshot.Name` (`iscsi_driver.go:455`) are always empty. No caller reads it; callers take the name from the snapshot descriptor. Low |
 | Evidence | recorded replies |
 
+#### bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name
+
+| | |
+|---|---|
+| Where | the per-volume snapshot lists: `ListVolumeSnapshots` (`iscsi_driver.go:385-393`, `nfs_driver.go:523-530`), `GetNASVolumeSnapshotsEntries` (`entrielisters.go:217`), and what reads their entries: `cleanIntermediateSnapshots` (`iscsi_driver.go:212`, `nfs_driver.go:316`), `completeListResponseFromVolumeSnapshots` (`controller/listers.go:124`, `:148`) |
+| What happens | the appliance describes a snapshot in two shapes. Read by name it is the full object: `creation` as a date string, `volsize`, and `clones` when it has any. In a list it is a short entry: `name`, `parent` with `name` and `type`, `properties` with `creation` as a number. The lists of one volume's snapshots, zvol and NAS, send the short entry, as the two all-snapshots lists do. The code decodes them as the full object, which gives no error, a `creation` of year 1 and no `clones`. Hidden today, because both lists return nothing ([bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub), [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots)) |
+| Evidence | recorded replies of both per-volume lists on jdss1 v4 (`list/volume-kinds.hurl`); code reading |
+| Fixed by | [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow), stage 3 |
+
 ### Error messages
 [Error_messages](#error-messages)
 
@@ -2184,7 +2235,7 @@ Bugs in the REST code itself, whatever the appliance does.
 | | |
 |---|---|
 | Where | `GetVolumeSnapshotsEntries` ([`entrielisters.go:53`](../../pkg/rest/entrielisters.go#L53)) |
-| What happens | an empty stub that sends no request. ListSnapshots by source volume on iSCSI always returns nothing |
+| What happens | an empty stub that sends no request. ListSnapshots by source volume on iSCSI always returns nothing. What the request would return, once sent, is misread too: [bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name](#bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name) |
 | Evidence | code reading |
 
 #### bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots
@@ -2192,7 +2243,7 @@ Bugs in the REST code itself, whatever the appliance does.
 | | |
 |---|---|
 | Where | `GetNASVolumeSnapshotsEntries` ([`entrielisters.go:198`](../../pkg/rest/entrielisters.go#L198)) |
-| What happens | the path lacks `/snapshots`, so it reads the NAS volume itself; the reply has no `entries` key, so the list is empty, without an error |
+| What happens | the path lacks `/snapshots`, so it reads the NAS volume itself; the reply has no `entries` key, so the list is empty, without an error. What the right path returns is misread too: [bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name](#bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name) |
 | Evidence | code reading |
 
 #### bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete
@@ -2521,6 +2572,7 @@ enum; the tab defect at line 15389.
 | mapping | `pkg/rest/types_gen.yaml`: for each generated type, the endpoint it comes from and the fields the plugin reads, each required or optional |
 | stage 1-4 | the four stages of [What changes](#what-changes); the three commits before stage 1 and the supporting work are outside them; not the CSI NodeStage call |
 | `vp_`, `vb_`, `vs_`; `sp_`, `sb_`, `ss_` | the prefixes of the names the plugin gives volumes (`v`) and snapshots (`s`) on the appliance: `p` for the CSI name as it is, `b` for its base32 form, `s` for a SHA-256 hash of it ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids)) |
+| short entry, full snapshot | the two shapes in which the appliance describes a snapshot: the short entry of a list (`name`, `parent`, `properties`), and the full object of a read by name, with `clones` and `volsize` |
 | intermediate snapshot | a snapshot the plugin creates on its own when it makes a volume from another volume; the new volume is a clone of that snapshot, and `cleanIntermediateSnapshots` removes such snapshots when the volume is deleted |
 | transport error | a request that gets no HTTP reply at all: the address does not resolve, the connection is refused, or the request times out ([crash_plugin_rest_nil_response_on_transport_error](#crash_plugin_rest_nil_response_on_transport_error)) |
 | Basic auth, Bearer token | two ways to log in to the REST API: Basic sends the user name and password with every request; a Bearer token is obtained once by logging in and sent instead of the password until it expires |
