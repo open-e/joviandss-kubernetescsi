@@ -137,7 +137,7 @@ of its own.
 | Open questions | the open ones, as bullets with the number in bold, each with how it gets answered; then the subsection **Decisions**, a table of the decided questions with their numbers kept, one line of decision each and a link to the section that argues it |
 | Relationship to other designs | the designs, records and repositories this record touches, one line each with the link; then **Future work** subsections for what is deliberately left to a later record |
 | Advice | the inputs the decision was formed from, each with its date: findings, reviews, tracker entries, user decisions |
-| Appendix | what is looked up rather than read: the evidence sources, the evidence gaps, the compliance rules and matrix, the finding catalogues by kind, the measurements, where the names and IDs come from, and the terms |
+| Appendix | what is looked up rather than read: the evidence sources, the evidence gaps, the compliance rules and matrix, the finding catalogues by kind, the measurements, where the names and IDs come from, and the terms; its parts and their formats are in [The Appendix](#the-appendix) |
 
 ## The Testing section
 
@@ -274,11 +274,12 @@ of its own.
 
   - **Definitions:** the first five are findings: they describe what is, and
     their field table says where, what happens, the evidence, and which
-    implementation item or stage fixes them. A rule says what must hold. An
+    implementation item or stage they are assigned to
+    ([The Appendix](#the-appendix)). A rule says what must hold. An
     implementation item says what is done, whatever its form: a repair, a new
     file, a tool, a setting.
 - **An implementation item names the findings and rules it closes, and a
-  finding names the item or stage that fixes it.**
+  finding names the item or stage it is assigned to.**
   - **Why:** the two directions link each other, so a reader goes from a
     finding to its fix and back.
 - **Then the area; lower-case letters, digits and underscores only.**
@@ -359,6 +360,77 @@ of its own.
     Decisions table.
   - **Not:** `30.` as an ordered-list item, which renders with the number of
     its position: 24 for the third item of a list that starts at 22.
+
+## The Appendix
+
+- **The Appendix holds what is looked up rather than read, and each thing in
+  it is described there once; the rest of the record refers to it by name or
+  by link.**
+  - **Why:** a reader follows the argument without the catalogues in the
+    way, and one who doubts a claim finds its entry in one known place.
+  - **Not:** a finding described in Context and again in the Appendix; an
+    argument for the decision that exists only in the Appendix.
+- **Its parts come in this order, and a part the record does not need is
+  left out.**
+  - **Why:** the order goes from what the record rests on, through what was
+    found, to what helps to read it, and is the same in every record.
+
+  | Part | Holds | Form |
+  |---|---|---|
+  | Evidence | the sources the facts come from, how they were checked, and what the check cannot show | a numbered table, one row per source: Source, What it is, Use; then one sentence on which source wins when two disagree |
+  | Evidence gaps | what no source shows | one `gap_` heading per gap with a field table; then what the attempts to close them covered, and how the rest would be closed |
+  | Reference repositories | a repository the record measures against: what it holds, and the rules for using it | prose and numbered tables; only where the record depends on one |
+  | What "compliant" means | the rules the code is checked against | one `rule_` heading per rule with a field table |
+  | Compliance matrix | where the code stands on each rule | a numbered table with one row per checked unit, such as a call, and a second with one row per rule |
+  | Finding catalogues | the findings, grouped by subject: one catalogue per kind of fault | one `###` section per catalogue, one finding heading per entry with a field table |
+  | Dead code | what nothing uses and a commit would remove | a bullet list by kind: functions, types, keys |
+  | Measurements | the counts and sizes the record quotes | tables without numbers, each under a bold line saying what was measured and on which commit |
+  | ID sources | where the names and every foreign numbering in the record come from | a numbered table: Names and IDs, Meaning, Source |
+  | Terms | the jargon | a numbered table: Term, Meaning |
+
+- **A catalogue opens with one or two sentences: what its entries have in
+  common, and anything that holds for all of them.**
+  - **Why:** what is true of the whole group is said once, not in every
+    entry.
+  - **Example:** "Error replies the code does not recognise. Each becomes an
+    unknown error today."
+  - **Not:** a statement in the opening that some entry contradicts.
+- **Every named entry has a field table: two columns without a header, the
+  field in the first and its value in the second, the fields in the order
+  below.**
+  - **Why:** a reader who has seen one entry knows where to look in the
+    next, and a script can read the fields.
+  - **Parts:**
+
+  | Entry | Fields, in order |
+  |---|---|
+  | finding (`bug`, `crash`, `dataloss`, `security`) | **Where**: the file, line and function, or the call. **What happens**: the fault, in the present tense. **Effect**: what a user or a caller sees, where that is not plain from the fault. **Evidence**: a recording, a live run, a code reading, another document's finding. **Assigned to**: see below |
+  | gap | **Kind**: a request sent differently from the evidence, or a situation never recorded. **What differs** or **Situation**. **Why it matters** or the code that depends on it. **Result**: what the attempts to close it showed, and the finding it became, if any |
+  | rule | **Requirement**: what must hold. **Checked against**: the source or the tool that shows it |
+
+  - **Example:** a catalogue may name the fault's parts in its own words,
+    the same in every entry of that catalogue: "Struct says" and "Appliance
+    sends" for a type mismatch, "Recorded reply" and "Plugin expects" for an
+    unrecognised error, "Crash" and "Trigger" for a crash.
+  - **Not:** a field left empty; a field present in some entries of a
+    catalogue and absent in others without a reason.
+- **Every finding has an "Assigned to" row: the implementation item or stage
+  of this record that takes it, as a link; or, when the record leaves it,
+  the record, design or tracker entry that takes it; or "not assigned" with
+  the reason.**
+  - **Why:** a reader who lands on a finding sees who has it without
+    searching, and the implementation item names the finding in return, so
+    the two link each other. The row says who has the finding, not that it
+    is fixed: a Proposed record has fixed nothing, and the row stays true
+    when the work is done.
+  - **Example:** "`impl_plugin_rest_error_catalogue`, stage 3"; "design
+    0003"; "not assigned: no caller reads the field".
+  - **Not:** "Fixed by", which claims work that has not happened; a finding
+    whose only pointer to its item is in the catalogue's opening sentence.
+- **A table in the Appendix carries a number only when the text refers to
+  it; a field table never does.**
+  - **Why:** a number is for finding a table from elsewhere, and a field
+    table is found by its heading.
 
 ## Navigation
 
@@ -626,10 +698,22 @@ Re-evaluate when ...
 
 #### gap_<area>_<slug>
 
+| | |
+|---|---|
+| Kind | <a request sent differently, or a situation never recorded> |
+| Situation | ... |
+| Why it matters | ... |
+| Result | ... |
+
 ### What "compliant" means
 [What_compliant_means](#what-compliant-means)
 
 #### rule_<area>_<slug>
+
+| | |
+|---|---|
+| Requirement | ... |
+| Checked against | ... |
 
 ### Compliance matrix
 [Compliance_matrix](#compliance-matrix)
@@ -639,9 +723,15 @@ Re-evaluate when ...
 
 #### <kind>_<area>_<slug>
 
+<what the entries have in common>
+
 | | |
 |---|---|
-| <field> | <value> |
+| Where | <file:line, function or call> |
+| What happens | ... |
+| Effect | ... |
+| Evidence | ... |
+| Assigned to | <impl item or stage; another record or tracker entry; "not assigned: <reason>"> |
 
 ### Measurements
 [Measurements](#measurements)
