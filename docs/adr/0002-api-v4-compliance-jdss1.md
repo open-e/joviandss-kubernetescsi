@@ -403,12 +403,19 @@ reporting them after this delivery.
 **Two commits, right after the `go vet` commit and before everything else**
 (user decision): the REST password, a CHAP password and the CSI `Secrets`
 must never reach a log, at Debug, at Info or at any other level. The
-current code breaks that rule at every level, and so would every build of
-the series made before these two commits. With them at the front, every
+current code breaks that rule: the REST password reaches the log at Debug,
+and the CSI `Secrets` at any level, through the Warn lines of a failed
+create, delete or publish. So would every build of the series made before
+these two commits. With them at the front, every
 later build keeps secrets out of the log whatever its level, so a live run
 of any of those builds, the cycle of [Testing](#testing) step 4 or a
 `git bisect` round of step 8, may be made at Debug. The log level is set in
-the plugin configuration for a run; its default is Info.
+the plugin configuration for a run. Info is to be the default (user
+decision), and it is not one yet: the shipped controller configuration sets
+Info, the `--loglevel` argument defaults to Warning, a configuration without
+the key stops the controller, and the node manifests pass Debug. Making Info
+the default is startup and manifest work outside `pkg/rest`, handled
+separately (kub-testing `ISSUES.md`, MF15).
 
 #### impl_plugin_rest_no_request_logging
 
@@ -699,6 +706,8 @@ handling errors.
   catalogue, and anything that does not match becomes `RestErrorUnknown` with the
   status, `class`, `errno`, message and endpoint kept in the error. Nothing is
   guessed: an unknown error is never turned into "busy", "exists" or "not found".
+  A call that gets no reply at all, a transport error, goes through the same
+  handler and gets its log line there ([impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes)).
 - **One log line per failed call, in one format**, written by that handler:
   method, path, status, `class`, `errno`, message and the code it was mapped to.
   The handler cannot know whether a failure was expected (only the caller knows
@@ -1310,7 +1319,7 @@ agent's: the items say what they must show, and this section only runs them.
    and `go test ./pkg/rest/...` (`make test`) on the last one; all would have to
    pass. The driver and controller code this document changes has no automated
    check in this delivery (user decision): [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids)'s name and ID rules
-   and its `iscsi.iqn` prefix check, [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs)'s request logs, the delete cleanup of
+   and its `iscsi.iqn` prefix check, [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs)'s lines that print CSI requests, the delete cleanup of
    [bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children](#bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children) and [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error), the filter by kind ([question 7](#decisions)) and the
    NFS cleanup reaching [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete)'s call. kub-testing holds these seven as checks of T11 (`testcases/plugin-checks-design-0002.md`) for later; the
    live cycles (steps 4 and 5) exercise them as far as csi-sanity reaches them.
@@ -1348,7 +1357,7 @@ agent's: the items say what they must show, and this section only runs them.
    ctrl-cap preset would crash again and the comparison would be void. The
    plugin runs at **Debug** level for the cycle, which the `per_page` check below
    needs; the level is set in the plugin
-   configuration for the run, and its default is Info. That is safe because [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging) and [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs) are commits [before stage 1](#before-stage-1-keep-secrets-out-of-the-logs), so the build keeps
+   configuration for the run. That is safe because [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging) and [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs) are commits [before stage 1](#before-stage-1-keep-secrets-out-of-the-logs), so the build keeps
    secrets out of the log at every level (the current code does not, which is
    why kub-testing forbids Debug today). And the TLS
    handshake check of [risk 10](#risks), `openssl s_client -tls1_3` against the
@@ -1506,7 +1515,7 @@ Open: 31. The numbers are kept, gaps included, so that "question 27" means the s
 | 33 | Where does the regeneration procedure live? | in the plugin's documentation, since the generated file is the plugin's; the page is written separately, not in this delivery. | [Relationship](#relationship-to-other-designs) |
 | 34 | Where does `cleanIntermediateSnapshots` take a snapshot's clones from, and when? | from `GET .../snapshots/<s>/clones`, asked for each intermediate snapshot before it is deleted, in both drivers and in the same commits as the list change; no waiting for the separate driver fix. | [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow), [risk 23](#risks) |
 | 35 | How does [Testing](#testing) step 5 observe that the clone survived? | by a read made by hand: after the source volume is deleted through the plugin, `GET pools/<pool>/nas-volumes/<clone>` on the appliance answers 200. csi-sanity deletes the source and never looks at the clone, so the cycle alone cannot show it; the check is kept in the tracker with the other driver checks (kub-testing `ISSUES.md`, T11). | [Testing](#testing) step 5, [risk 23](#risks) |
-| 36 | Where in the series do the two logging items go? | at the front, right after the `go vet` commit: no password or CSI secret may reach a log at any level, so no build that is run live may predate them; the log level is set in the configuration, Info by default. Weighed against: leaving them in stage 4 and tracing a failure on builds at Info, which still print CSI `Secrets` at Warn. | [Before stage 1](#before-stage-1-keep-secrets-out-of-the-logs), [Testing](#testing) step 8 |
+| 36 | Where in the series do the two logging items go? | at the front, right after the `go vet` commit: no password or CSI secret may reach a log at any level, so no build that is run live may predate them; the log level is set in the configuration. Weighed against: leaving them in stage 4 and tracing a failure on builds at Info, which still print CSI `Secrets` at Warn. | [Before stage 1](#before-stage-1-keep-secrets-out-of-the-logs), [Testing](#testing) step 8 |
 | 37 | What does "logged once" cover? | the REST module: the handler writes the one line of `pkg/rest` for a failed call, with the appliance's fields in full. The driver and the controller make their own log records for a failed operation, and this document does not prescribe or change them. | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) |
 
 ## Relationship to other designs
@@ -1558,7 +1567,7 @@ Open: 31. The numbers are kept, gaps included, so that "question 27" means the s
   0003). The item's ID check also misses two CSI entry points, the volume ID
   of DeleteVolume and the source volume ID of CreateVolume, which reach
   `NewVolumeDescFromVDS` without passing the CSI parser
-  (`controllerplugin.go:550`, `:345`): `security_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser`
+  (`controllerplugin.go:550`, `:345`): `bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser`
   (kub-testing `issues/security.md`), handled with the same work.
 - `sparse` provisioning ([bug_plugin_rest_create_volume_never_sets_sparse](#bug_plugin_rest_create_volume_never_sets_sparse)): sparse by default,
   configurable in the plugin configuration and per StorageClass; its own design
@@ -1712,12 +1721,15 @@ required-or-optional list rests on evidence rather than on reading the code.
   `pkg/rest` (8), `pkg/controller` (23) and `pkg/node` (3).
 - User decision (2026-11-15, question 34): the cleanup takes a snapshot's
   clones from `GET .../snapshots/<s>/clones`, the safest source.
+- User decision (2026-11-16): the default log level should be Info. Today
+  it is not a default but a value in the shipped controller configuration;
+  the change is recorded in the tracker, not made here.
 - User decision (2026-11-15, question 37): this document is about the REST
   module, so "logged once" means once in that module; the driver and the
   controller make their own log records, which are left alone at this stage.
 - User decision (2026-11-15, question 36): the REST password and a CHAP
   password never reach a log, at Debug, at Info or at any other level; the
-  log level is set in the configuration for a run and is Info by default; the
+  log level is set in the configuration for a run; the
   two logging items move to the front of the series.
 - Review of this document (2026-11-15, question 35): csi-sanity does not
   check that a clone survives the delete of its source; the check is a read
@@ -1894,6 +1906,7 @@ patterns the code expects that no recording has ever shown.
 | Kind | a situation that was never recorded |
 | Situation | **Clients connected:** in the hurl tests no initiator logs in and nothing is mounted (hurl README). Detach, target delete and deletes with `force_umount: true` were recorded only on idle resources ([risk 8](#risks)) |
 | Plugin code that depends on it | unpublish and every delete |
+| Result of the gap runs | not run: the hurl tests log no initiator in. [Testing](#testing) steps 6 and 7 would give the first evidence |
 
 #### gap_plugin_rest_appliance_unreachable
 
@@ -1902,6 +1915,7 @@ patterns the code expects that no recording has ever shown.
 | Kind | a situation that was never recorded |
 | Situation | **The appliance cannot be reached:** connection refused, DNS, timeout, TLS, reply cut off. Not recorded on purpose, but it happens: jdss1 stopped answering for 15-18 minutes three times (hurl C24), and once for over 8 hours. On this path the plugin crashes ([crash_plugin_rest_nil_response_on_transport_error](#crash_plugin_rest_nil_response_on_transport_error)) |
 | Plugin code that depends on it | `Send` |
+| Result of the gap runs | not run: it cannot be recorded reliably; covered by unit tests with a fake HTTP server ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)) |
 
 #### gap_plugin_rest_unexpected_reply_bodies
 
@@ -1919,6 +1933,7 @@ patterns the code expects that no recording has ever shown.
 | Kind | a situation that was never recorded |
 | Situation | Failover: the pool moves to the other node during a call; several addresses in `addrs` ([bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover)) |
 | Plugin code that depends on it | `Send` |
+| Result of the gap runs | not run: it needs a second node and a pool that moves; not testable in this delivery ([Testing](#testing) limit 10) |
 
 #### What the evidence covers but the plugin ignores
 [What_the_evidence_covers_but_the_plugin_ignores](#what-the-evidence-covers-but-the-plugin-ignores)
@@ -2277,6 +2292,7 @@ the plugin never sets.
 | Where | `GetVolumeSnapshot` ([`storageapi.go:191`](../../pkg/rest/storageapi.go#L191)) |
 | What happens | a zvol snapshot GET has **no `name` key** (NAS snapshot GETs do), so `ResourceSnapshot.Name` and the iSCSI `GeneralSnapshot.Name` (`iscsi_driver.go:455`) are always empty. No caller reads it; callers take the name from the snapshot descriptor. Low |
 | Evidence | recorded replies |
+| Assigned to | not assigned: no caller reads the name, and the generated types do not require it ([Table 2](#impl_plugin_rest_generated_reply_types)) |
 
 #### bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name
 
@@ -2473,6 +2489,7 @@ because they misread REST errors ([priority 8](#priorities)).
 |---|---|
 | Where | `DeleteVolume` (`iscsi_driver.go:245`, `:257`; `nfs_driver.go:383`, `:396`) |
 | What happens | the intermediate-snapshot cleanup runs only for `Busy`. A leftover snapshot without clones gives `volume has children` (errno 1000), mapped to `BusyVolumeHasSnapshots`, so the cleanup never runs, `DeleteVolume` returns `Internal` on every retry, and **the volume can never be deleted** |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
 | Assigned to | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), stage 3 |
 
 #### bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error
@@ -2481,6 +2498,7 @@ because they misread REST errors ([priority 8](#priorities)).
 |---|---|
 | Where | `cleanIntermediateSnapshots` (`iscsi_driver.go:197-208`, `nfs_driver.go:302-312`) |
 | What happens | the listing error is checked after the type check, so a real error such as "not found" becomes `FailureUnknown`; and the NFS version expects the zvol snapshot type although its lister returns NAS snapshots, so it always fails with "Unable to typecast snapshot data" and never reaches the [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete) call at `nfs_driver.go:322` |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
 | Assigned to | [Stage 3](#stage-3-behaviour-and-error-mapping), its own fix after the error catalogue |
 
 ### Security findings
@@ -2496,6 +2514,7 @@ the [first commit](#first-commit-make-go-vet-pass-in-pkgrest).
 |---|---|
 | Where | `rproxy.go:251` |
 | Finding | TLS certificate checks are always off (`InsecureSkipVerify: true`, no setting), while the admin's Basic credentials go with every request |
+| Evidence | code reading (the security review, [ID sources](#id-sources)) |
 | Assigned to | this delivery: verification on by default, `insecure` and `cafile` settings ([impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile), stage 4) |
 
 #### security_plugin_rest_unescaped_path_segments
@@ -2504,6 +2523,7 @@ the [first commit](#first-commit-make-go-vet-pass-in-pkgrest).
 |---|---|
 | Where | every path builder in `pkg/rest` |
 | Finding | paths are built with `fmt.Sprintf` and no `url.PathEscape`; a `?` or `#` in a name cuts the path short, and a crafted volume handle can reach other resources |
+| Evidence | code reading (the security review, [ID sources](#id-sources)) |
 | Assigned to | this delivery: `url.PathEscape` on every path segment ([impl_plugin_rest_escape_path_segments](#impl_plugin_rest_escape_path_segments), stage 4) |
 
 
@@ -2523,6 +2543,7 @@ all five inside `pkg/rest` ([impl_plugin_rest_fix_transport_auth_nil_body_setup_
 | Where | `rproxy.go:138-157` |
 | Crash | every branch that handles a transport error reads `res.StatusCode` while `res` is `nil` |
 | Trigger | a refused connection (`:141`), or the client's own timeout, which is not a `*net.OpError` (`:153`). During jdss1's 8-hour outage a controller would have crashed again and again (inferred). Gap [gap_plugin_rest_appliance_unreachable](#gap_plugin_rest_appliance_unreachable) |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)); no recording, since the hurl suite records replies and this path has none |
 | Assigned to | [impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes), stage 4 |
 
 #### crash_plugin_rest_basic_auth_before_request_check
@@ -2532,6 +2553,7 @@ all five inside `pkg/rest` ([impl_plugin_rest_fix_transport_auth_nil_body_setup_
 | Where | `rproxy.go:122-123` |
 | Crash | `SetBasicAuth` runs before the error from `http.NewRequest` is checked |
 | Trigger | a config without `prot` (there is no default) gives the URL `://host`, and `NewRequest` fails |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
 | Assigned to | [impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes), stage 4 |
 
 #### crash_plugin_rest_error_from_nil_body
@@ -2541,6 +2563,7 @@ all five inside `pkg/rest` ([impl_plugin_rest_fix_transport_auth_nil_body_setup_
 | Where | `errors.go:140-149` |
 | Crash | `ErrorFromErrorT(nil)` logs the `nil` case, then uses it anyway |
 | Trigger | a list with `"data": null`, or an error body without `"error"`. Gap [gap_plugin_rest_unexpected_reply_bodies](#gap_plugin_rest_unexpected_reply_bodies) |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)); no recorded reply reaches it ([gap_plugin_rest_unexpected_reply_bodies](#gap_plugin_rest_unexpected_reply_bodies)) |
 | Assigned to | [impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes), stage 4 |
 
 #### crash_plugin_rest_setup_endpoint_ignores_error
@@ -2550,6 +2573,7 @@ all five inside `pkg/rest` ([impl_plugin_rest_fix_transport_auth_nil_body_setup_
 | Where | `rest.go:104-107` |
 | Crash | `SetupEndpoint` ignores the error from `SetupRestProxy` |
 | Trigger | a missing or invalid `idletimeout`: `SetupRestProxy` returns an error and the proxy stays unset. An empty `addrs`: `SetupRestProxy` returns no error, and `Send` indexes the empty list (`rproxy.go:91`). In both cases the first REST call panics |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
 | Assigned to | [impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes), stage 4 |
 
 #### crash_plugin_rest_endpoint_string_empty_addrs
@@ -2559,6 +2583,7 @@ all five inside `pkg/rest` ([impl_plugin_rest_fix_transport_auth_nil_body_setup_
 | Where | `rest.go:83-95` |
 | Crash | `RestEndpoint.String()` throws away the string it builds and returns `Addrs[0]`, so it panics on an empty list |
 | Trigger | an endpoint with no addresses formatted with `%v` or `%s`: a log line alone can panic |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
 | Assigned to | [impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes), stage 4 |
 
 ### REST client behaviour
@@ -2574,6 +2599,7 @@ stage 3 by [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)
 |---|---|
 | Where | `rproxy.go:91`, `:274`, `:281` |
 | Behaviour | `tries` and every address after the first are never used: no retry and no failover (gap [gap_plugin_rest_failover_during_call](#gap_plugin_rest_failover_during_call)) |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
 | Assigned to | not this document: a later REST client design ([Relationship](#relationship-to-other-designs)) |
 
 #### bug_plugin_rest_reply_text_as_format_string
@@ -2582,6 +2608,7 @@ stage 3 by [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)
 |---|---|
 | Where | `storageapi.go:51`, `:53`, `errors.go:173`, `:265`, `targets.go:150`, `:184` |
 | Behaviour | the reply body is used as a format string; transport errors are reported as `RequestMalfunction`, which hides what kind of error it was. |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)); the eight `go vet` reports in `pkg/rest` ([Advice](#advice)) |
 | Assigned to | the format-string part: [impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply), the first commit; the transport-error part: [impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes), stage 4 |
 
 #### bug_plugin_rest_request_built_without_context_csi_deadline_not_applied
@@ -2590,6 +2617,7 @@ stage 3 by [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)
 |---|---|
 | Where | `rproxy.go:122`, `:257` |
 | Behaviour | the request is built without the context, so the CSI deadline never reaches it; `idletimeout` is used as the timeout for the whole request ([risk 12](#risks), [future work](#future-work-request-deadlines)) |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
 | Assigned to | not this document: a later REST client design ([request deadlines](#future-work-request-deadlines)) |
 
 #### bug_plugin_rest_unknown_error_empty_message
@@ -2598,6 +2626,7 @@ stage 3 by [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)
 |---|---|
 | Where | `errors.go:275-277`, `:297` |
 | Behaviour | errors that match no pattern get an empty message; the appliance's text appears only in a Warn log. |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
 | Assigned to | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), stage 3 |
 
 #### bug_plugin_rest_every_error_logged_at_warn
@@ -2606,6 +2635,7 @@ stage 3 by [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)
 |---|---|
 | Where | `errors.go:150`, `:173`, `:265`, `:291` |
 | Behaviour | every appliance error is logged at Warn, including the expected "not found" on repeated deletes; the not-found message repeats a word ("Resource Resource ... do not exists"). |
+| Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
 | Assigned to | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), stage 3 |
 
 ### Dead code
@@ -2712,7 +2742,7 @@ enum; the tab defect at line 15389 (in the jdss1 v4 file from line 14954).
 | F + number | the test findings' IDs, kept in the tracker | `kub-testing/ISSUES.md`; mapped to names in `kub-testing/issues/test-findings.md` |
 | D1-D7 in 0003 | design 0003's own items, not review IDs | [0003](../design/0003-controller-crash-fixes-design.md) |
 | hurl Finding n, C24 | the hurl suite's findings and caveats | the spec repo's own notes |
-| DEC11, DOC27, INF8, MF7, MK11, T9 to T12, TOOL10 | kub-testing items: decisions for the user, plugin documentation, lab infrastructure, manifests, Makefile, testing, tooling | `kub-testing/ISSUES.md` |
+| DEC11, DOC27, INF8, MF7, MF15, MK11, T9 to T12, TOOL10 | kub-testing items: decisions for the user, plugin documentation, lab infrastructure, manifests, Makefile, testing, tooling | `kub-testing/ISSUES.md` |
 
 ### Terms
 [Terms](#terms)
@@ -2747,7 +2777,7 @@ enum; the tab defect at line 15389 (in the jdss1 v4 file from line 14954).
 | `vp_`, `vb_`, `vs_`; `sp_`, `sb_`, `ss_` | the prefixes of the names the plugin gives volumes (`v`) and snapshots (`s`) on the appliance: `p` for the CSI name as it is, `b` for its base32 form, `s` for a SHA-256 hash of it ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids)) |
 | short entry, full snapshot | the two shapes in which the appliance describes a snapshot: the short entry of a list (`name`, `parent`, `properties`), and the full object of a read by name, with `clones` and `volsize` |
 | intermediate snapshot | a snapshot the plugin creates on its own when it makes a volume from another volume; the new volume is a clone of that snapshot, and `cleanIntermediateSnapshots` removes such snapshots when the volume is deleted |
-| handler | the one function in `pkg/rest` that every failed reply would pass through: it matches the reply against the error catalogue, returns the `RestError` code, or an unknown error with all the reply's fields kept, and writes the one log line of the REST module for that failure ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)). Today the work is spread over `getError`, `ErrorFromErrorT` and several call functions |
+| handler | the one function in `pkg/rest` that every failed call would pass through, whether the appliance answered with an error or no reply arrived (a transport error): it matches the reply against the error catalogue, returns the `RestError` code, or an unknown error with all the reply's fields kept, and writes the one log line of the REST module for that failure ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)). Today the work is spread over `getError`, `ErrorFromErrorT` and several call functions |
 | transport error | a request that gets no HTTP reply at all: the address does not resolve, the connection is refused, or the request times out ([crash_plugin_rest_nil_response_on_transport_error](#crash_plugin_rest_nil_response_on_transport_error)) |
 | Basic auth, Bearer token | two ways to log in to the REST API: Basic sends the user name and password with every request; a Bearer token is obtained once by logging in and sent instead of the password until it expires |
 | CHAP | the password login of iSCSI between a node and a target; the plugin does not use it today |
