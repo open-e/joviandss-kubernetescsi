@@ -328,9 +328,8 @@ delivered and tested once, every check that needs no lab first (priority 7,
 [risk 7](#risks)). Every known appliance error means one thing and an
 unknown one stays unknown (priority 8). Without a guard in this delivery: a
 hung call past the CSI deadline ([risk 12](#risks)), the accepted edge of a
-name of exactly 132 characters ([risk 13](#risks)), a reply behind the
-request ([risk 14](#risks)) and the NFS cleanup that destroys a clone
-([risk 23](#risks)).
+name of exactly 132 characters ([risk 13](#risks)) and a reply behind the
+request ([risk 14](#risks)).
 
 The decisions below the options were taken as questions and are kept in the
 [Decisions](#decisions) table: the reply types are generated from the
@@ -611,12 +610,19 @@ commits:
   stage 2 moves to an accessor, change again here;
 - `cleanIntermediateSnapshots` in both drivers: it calls `ClonesNames()` on
   each entry (`iscsi_driver.go:212`, `:282`; `nfs_driver.go:316`, `:421`),
-  and a short entry has no clones to give. Where the cleanup takes them from
-  is [question 34](#open-questions).
+  and a short entry has no clones to give. The cleanup would ask the
+  appliance instead, with `GET .../snapshots/<s>/clones` for each
+  intermediate snapshot (`GetVolumeSnapshotClones`,
+  `GetNASVolumeSnapshotClones`: the calls both drivers already make when a
+  snapshot delete is refused), and delete the snapshot only when that reply
+  lists no clone. When the call fails, nothing is deleted and the cleanup
+  returns the error ([question 34](#decisions)). It costs one more request
+  per intermediate snapshot.
 
 What must hold: a fixture of each per-volume list decodes into its short
-type with `name`, `parent.name` and `properties.creation` set, and no code
-reads a field of the full object from a list entry.
+type with `name`, `parent.name` and `properties.creation` set, no code
+reads a field of the full object from a list entry, and the cleanup deletes
+no snapshot before the appliance has answered that it has no clones.
 
 #### impl_plugin_rest_error_catalogue
 
@@ -778,11 +784,10 @@ checked at setup (below):
 |---|---|---|---|
 | zvol (volume, clone), NAS volume, NAS clone | `a-z A-Z 0-9 _ -` | **131** (user decision) | the appliance refuses anything else, saying so: "Allowed characters in zvol name: a-z, A-Z, 0-9, _, -", "cannot exceed 132 characters"; 131 keeps one character of margin |
 | iSCSI target | **lower case only** (user decision): `^[a-z0-9]([a-z0-9.:-]*[a-z0-9])?$` | 220, the longest seen accepted | the documented pattern without upper case; the appliance also accepts upper case, but the plugin would not use it |
-| snapshot | no empty name, no `.` or `..` (for the ID parsed from a CSI request; the name built at CreateSnapshot is [question 25](#open-questions)) | see [future work](#future-work-snapshot-name-limits) | ZFS's own rules, including a limit on the full name, are future work |
+| snapshot | no empty name, no `.` or `..` (for the ID parsed from a CSI request; the name built at CreateSnapshot is [question 25](#decisions)) | see [future work](#future-work-snapshot-name-limits) | ZFS's own rules, including a limit on the full name, are future work |
 
-A bad ID would fail with `InvalidArgument` before any REST call ([Open question
-25](#open-questions) says which of the review's panics next to these parsers
-this closes). As a second line,
+A bad ID would fail with `InvalidArgument` before any REST call; it closes
+none of the review's panics next to these parsers ([question 25](#decisions)). As a second line,
 the `pkg/rest` path builders would refuse an empty, `.` or `..` segment, which
 [impl_plugin_rest_escape_path_segments](#impl_plugin_rest_escape_path_segments)'s escaping does not catch. Why IDs need checking: the plugin does not control
 them. A volume ID comes back from Kubernetes in every later request, and anyone
@@ -1187,10 +1192,12 @@ the types ([risk 1](#risks)).
    [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots),
    [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error) and
    [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete).
-   Guard: none in this delivery; [question 34](#open-questions) decides the
-   order in which the fix and these commits land, and
-   [Relationship](#relationship-to-other-designs) names where the fix is
-   handled. [Testing](#testing) step 5 deletes such a volume.
+   Guard: the cleanup asks the appliance for each snapshot's clones before
+   it deletes the snapshot ([impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow),
+   [question 34](#decisions)), and [Testing](#testing) step 5 deletes such a
+   volume and checks that its clone is still there. The same loss through
+   DeleteSnapshot does not depend on this delivery and is handled outside it
+   ([Relationship](#relationship-to-other-designs)).
 
 ## Affected systems and files
 [Affected_systems_and_files](#affected-systems-and-files)
@@ -1229,7 +1236,7 @@ step 5) and, where it is `pkg/rest` code, by unit tests.
 | `kub-testing/tools/rest-type-audit.py` (new) | [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool): compliance matrix, request keys, error coverage; no type check | 2 |
 | `pkg/rest/doc.go` (new) | [impl_plugin_rest_package_documentation](#impl_plugin_rest_package_documentation), package documentation | 2 |
 | `pkg/rest/entrielisters.go` | [bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub) (a new call, `GET pools/<x>/volumes/<x>/snapshots`, in the [compliance matrix](#compliance-matrix)), [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots) *NFS* | 3 |
-| `pkg/driver/iscsi_driver.go`, `nfs_driver.go` (`ListVolumeSnapshots`, `cleanIntermediateSnapshots`), `pkg/driver/restwrappers.go`, `pkg/controller/listers.go` (`completeListResponseFromVolumeSnapshots`) | [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow): the short entry type, `Properties.Creation`; the cleanup's clones by [question 34](#open-questions) | 3 |
+| `pkg/driver/iscsi_driver.go`, `nfs_driver.go` (`ListVolumeSnapshots`, `cleanIntermediateSnapshots`), `pkg/driver/restwrappers.go`, `pkg/controller/listers.go` (`completeListResponseFromVolumeSnapshots`) | [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow): the short entry type, `Properties.Creation`; the cleanup's clones by [question 34](#decisions) | 3 |
 | `pkg/rest/errors.go`, `targets.go` | [bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name](#bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name), [bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised), [bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone](#bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone), [bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised), [bug_rest_v4_shares_post_409_already_exists_unrecognised](#bug_rest_v4_shares_post_409_already_exists_unrecognised) and [bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised) *NFS*, [bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay](#bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay), [bug_rest_v4_create_calls_out_of_space_messages_unrecognised](#bug_rest_v4_create_calls_out_of_space_messages_unrecognised), [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised) | 3 |
 | `pkg/rest/errors.go`, `storageapi.go` (`getError`); `pkg/driver/iscsi_driver.go`, `nfs_driver.go`, `pkg/controller/*.go` (callers) | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue): error catalogue, one handler and log line, codes per kind; callers decide on the code only (`iscsi_driver.go:520` included) | 3 |
 | `pkg/driver/iscsi_driver.go`, `nfs_driver.go` (`DeleteVolume`, `cleanIntermediateSnapshots`) | review [bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children](#bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children) (cleanup also on `volume has children`, with [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)), [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error) (listing error first; NFS takes NAS snapshots, *NFS*) | 3 |
@@ -1342,7 +1349,7 @@ agent's: the items say what they must show, and this section only runs them.
    anywhere, and the result comparison takes the latest cycle whatever its
    protocol, so it would compare the NFS cycle with an iSCSI one. Those are
    prerequisites of this
-   step, outside this document's commits ([Open question 22](#open-questions);
+   step, outside this document's commits ([question 22](#decisions);
    recorded in kub-testing as TOOL10 and MK11).
    There is no NFS baseline: no NFS build has ever been run live, so this cycle
    becomes the first one. It would pass when:
@@ -1354,6 +1361,8 @@ agent's: the items say what they must show, and this section only runs them.
      ([bug_rest_v4_shares_post_409_already_exists_unrecognised](#bug_rest_v4_shares_post_409_already_exists_unrecognised)), deleting a clone that is already gone
      ([bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised)), and deleting a volume after a clone from it
      ([bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error), [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete));
+   - after a volume with a clone has been deleted, the clone still exists on
+     the appliance and can be read ([risk 23](#risks));
    - every other failure is recorded as a new finding in kub-testing's
      `ISSUES.md`, with a name registered in `issues/test-findings.md`.
 
@@ -1411,43 +1420,12 @@ test appliance.
 ## Open questions
 [Open_questions](#open-questions)
 
-Open: 22, 25, 31 and 34. The numbers are kept, gaps included, so that "question 27" means the same thing everywhere; the decided questions follow as a table, each with the section that argues it.
+Open: 31. The numbers are kept, gaps included, so that "question 27" means the same thing everywhere; the decided questions follow as a table, each with the section that argues it.
 
-- **22. Who prepares the NFS live cycle?** [Testing](#testing) step 5 lists the
-  five things it needs that do not exist, from the tooling that refuses an
-  `-nfs` image to the image name nothing builds; kub-testing records them as
-  TOOL10 and MK11 in its `ISSUES.md`. Recommendation: a small `Makefile` and
-  manifest commit on `master` before this series for the image name; none of
-  it in this document's commits. The owner is still to be named.
-- **25. Which of `crash_plugin_driver_snapshot_name_empty`, `crash_plugin_driver_id_index_without_length_check`, `crash_plugin_driver_volume_desc_empty_value` and `crash_plugin_ctrl_create_snapshot_empty_name` does [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) close?** [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) changes the ID parsers
-  in `lunid.go` and `snapid.go`, next to four review findings that no design
-  claims: `crash_plugin_driver_snapshot_name_empty` and `crash_plugin_driver_volume_desc_empty_value` (`SnapshotDesc.Name()`, `SDS()`, `CSIID()` and
-  `VolumeDesc.VDS()`, `CSIID()` panic on an empty value, `snapid.go:147-166`,
-  `lunid.go:159-173`), `crash_plugin_driver_id_index_without_length_check` (`IsVDS`/`IsSDS` index `[0]` without a length check,
-  `lunid.go:104`, `snapid.go:27`) and `crash_plugin_ctrl_create_snapshot_empty_name` (CreateSnapshot with an empty name
-  creates `sb_` on the appliance, then `Name()` panics). Reading the code: `crash_plugin_driver_id_index_without_length_check`
-  is not about IDs: all sixteen callers pass names that came back from the
-  appliance (`controller/listers.go:195-251`, the snapshot and clone cleanups in
-  both drivers), so [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) does not touch it. `crash_plugin_driver_snapshot_name_empty` and `crash_plugin_driver_volume_desc_empty_value` are panics inside
-  accessors that [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) does not change. `crash_plugin_ctrl_create_snapshot_empty_name` would be closed only if [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) also
-  rejected an empty name in `NewSnapshotDescFromName` (`snapid.go:30`), which
-  has no such check today, while `NewVolumeDescFromName` has one
-  (`lunid.go:61-63`). Recommendation: add that one check to [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) and record `crash_plugin_ctrl_create_snapshot_empty_name`
-  as closed by it; record `crash_plugin_driver_snapshot_name_empty`, `crash_plugin_driver_id_index_without_length_check` and `crash_plugin_driver_volume_desc_empty_value` as 0003's in `ISSUES.md`.
 - **31. Which spec output does the generator read?** The compiled YAML has the
   tab defect; the TypeSpec emitter can write JSON, or the generator can read
   the `.tsp` files, which are regular but need a parser. Recommendation: the
   JSON emit, agreed with the spec project.
-- **34. Where does `cleanIntermediateSnapshots` take a snapshot's clones
-  from, and when?** Its call on the list entries cannot stay once
-  [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow) is in. Alternatives: read each intermediate snapshot by name, the
-  reply that has `clones`, at one more request per snapshot; or ask
-  `GET .../snapshots/<s>/clones`, which both drivers already call when a
-  snapshot delete is refused. On NFS the answer decides whether a cloned
-  volume survives ([risk 23](#risks)). Recommendation: the driver fix for
-  that risk settles the source of the clones for both drivers, and the
-  commits of [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow) wait for it. The owner and the order are still to be
-  decided.
 
 ### Decisions
 [Decisions](#decisions)
@@ -1475,8 +1453,10 @@ Open: 22, 25, 31 and 34. The numbers are kept, gaps included, so that "question 
 | 19 | jdss2 tokens in fixtures? | tokens are secrets: never logged, never in a fixture; no jdss2 reply is a fixture now. | [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) |
 | 20 | Exact rules for the name check? | the appliance's rules from the strings tests: `a-z A-Z 0-9 _ -`, 131 characters, lower-case targets. | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) |
 | 21 | Cap generated names at 131 or 132? | 131; a volume of exactly 132 characters is the accepted edge (risk 13). | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) |
+| 22 | Who prepares the NFS live cycle? | not this document: the test suite and the image name are prepared separately, before [Testing](#testing) step 5 can run; the owner is named in the tracker. | [Relationship](#relationship-to-other-designs) |
 | 23 | Is `prot: http` still allowed? | no; HTTPS only, `prot` other than `https` is a configuration error. | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile) |
 | 24 | Where do release notes live? | `CHANGELOG.md` at the repository root. | [Stage 1](#stage-1-move-to-api-v4) |
+| 25 | Which of the four crashes in the ID and name code does [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) close? | none: the item stays as it is, and the four are handled separately. | [Relationship](#relationship-to-other-designs) |
 | 26 | TLS minimum as a setting? | no; 1.3 fixed, a parameter of `pkg/rest` at most, no `tlsmin` key. | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile) |
 | 27 | Keep or remove the unread fields that fail? | remove; superseded by 28. | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
 | 28 | Generate the reply types instead of fixing them by hand? | yes, from the recorded jdss1 v4 API, same names, only read fields can fail. Weighed against: the rule per field (27), a transcription that drifts again with the next release and only the audit tells; every field modelled by hand, which fails on a field nobody reads and drifts the same way; the whole client generated, which replaces about 2,100 lines and every caller and redoes the stage 3 and 4 work on generated code; tolerant decoding, which lets a real change in a read field pass silently. Price: about 650 lines of generator and mapping to keep, and [risks 19 and 20](#risks). | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
@@ -1484,6 +1464,7 @@ Open: 22, 25, 31 and 34. The numbers are kept, gaps included, so that "question 
 | 30 | Does the `{}` body the plugin sends with every GET matter on jdss1 v4? | no: the replies with and without it are the same on jdss1 v4, as on jdss1 v3 and jdss2 v4. | [gap_jdss_rest_empty_body_on_get_delete](#gap_jdss_rest_empty_body_on_get_delete) |
 | 32 | Which read fields are optional? | `origin`, `clones` and NAS `quota`; the list stays open, and a field that testing finds absent is added as optional. | [Table 2](#impl_plugin_rest_generated_reply_types) |
 | 33 | Where does the regeneration procedure live? | in the plugin's documentation, since the generated file is the plugin's; the page is written separately, not in this delivery. | [Relationship](#relationship-to-other-designs) |
+| 34 | Where does `cleanIntermediateSnapshots` take a snapshot's clones from, and when? | from `GET .../snapshots/<s>/clones`, asked for each intermediate snapshot before it is deleted, in both drivers and in the same commits as the list change; no waiting for the separate driver fix. | [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow), [risk 23](#risks) |
 
 ## Relationship to other designs
 [Relationship_to_other_designs](#relationship-to-other-designs)
@@ -1525,9 +1506,20 @@ Open: 22, 25, 31 and 34. The numbers are kept, gaps included, so that "question 
   0003's D3 (the GetCapacity logger fix, `crash_plugin_ctrl_get_capacity_no_logger`) exists on kub-gate uncommitted and
   has to be committed on `master` before this series, because the baseline cycle
   was built with it ([Testing](#testing) step 4).
+- Four crashes in the ID and name code next to the parsers that
+  [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) changes: `crash_plugin_ctrl_create_snapshot_empty_name`,
+  `crash_plugin_driver_snapshot_name_empty`,
+  `crash_plugin_driver_volume_desc_empty_value` and
+  `crash_plugin_driver_id_index_without_length_check`. None is fixed here;
+  the item does not close any of them (kub-testing `ISSUES.md`, C23, C16, C19
+  and C18, for 0003).
 - `sparse` provisioning ([bug_plugin_rest_create_volume_never_sets_sparse](#bug_plugin_rest_create_volume_never_sets_sparse)): sparse by default,
   configurable in the plugin configuration and per StorageClass; its own design
   ([question 9](#decisions)).
+- The NFS live cycle ([Testing](#testing) step 5): making the test suite and
+  the build able to run one is handled separately (kub-testing `ISSUES.md`,
+  TOOL10 and MK11; DEC11 names the owner). Step 5 stays a requirement of this
+  delivery.
 - The regeneration procedure of the reply types
   ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)): a page in the plugin's documentation, written
   separately and not in this delivery (kub-testing `ISSUES.md`, DOC27).
@@ -1539,8 +1531,10 @@ Open: 22, 25, 31 and 34. The numbers are kept, gaps included, so that "question 
   (`dataloss_plugin_driver_nfs_delete_snapshot_destroys_volumes_cloned_from_it`,
   `dataloss_plugin_driver_nfs_intermediate_snapshot_delete_destroys_clone_volume`):
   driver bugs, handled outside this document; described in kub-testing,
-  `issues/notes/dataloss-nfs-snapshot-delete-destroys-clones.md`
-  ([risk 23](#risks), [question 34](#open-questions)).
+  `issues/notes/dataloss-nfs-snapshot-delete-destroys-clones.md`. This
+  document only keeps its own commits from opening the second one
+  ([risk 23](#risks), [question 34](#decisions)); the first exists today
+  and stays.
 - REST client behaviour: not a compliance matter. Of its catalogue
   ([REST client behaviour](#rest-client-behaviour)) this delivery leaves
   [bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover) and
@@ -1669,6 +1663,12 @@ required-or-optional list rests on evidence rather than on reading the code.
 - `go vet ./...`, run by the user on commit `ef4ea8b` (2026-11-14; `pkg` and
   `app` as in `11ffbfd`): 34 reports, all "non-constant format string", in
   `pkg/rest` (8), `pkg/controller` (23) and `pkg/node` (3).
+- User decision (2026-11-15, question 34): the cleanup takes a snapshot's
+  clones from `GET .../snapshots/<s>/clones`, the safest source.
+- User decision (2026-11-15, question 25): the four crashes in the ID and
+  name code go to the issue tracker; the validation item is not extended.
+- User decision (2026-11-15, question 22): the preparation of the NFS live
+  cycle goes to the issue tracker.
 - User decision (2026-11-14, question 33): the regeneration procedure is
   handled separately, as an issue of its own.
 - User decision (2026-11-14, question 32): `origin`, `clones` and NAS `quota`
