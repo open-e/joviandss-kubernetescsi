@@ -63,7 +63,7 @@
 [List_of_Tables](#list-of-tables)
 
 1. `tbl_api_versions` — **API versions and auth**
-2. `tbl_type_generation` — **Generated reply types**
+2. `tbl_type_generation` — **Reply type rules**
 3. `tbl_files_changed` — **Files that would change**
 4. `tbl_evidence_sources` — **Evidence sources**
 5. `tbl_spec_forms` — **What the spec repo holds**
@@ -161,8 +161,10 @@ work; the user runs its tools.
 
 | What | Where | Size and state |
 |---|---|---|
-| Empirical TypeSpec, one file per method, types as observed | `empirical/jdss1/v4/typespec/` | 104 files; 108 for jdss2 v4 |
-| Compiled OpenAPI 3.1 | `empirical/pilot/tools/tsp/b_jdss1_v4/out/openapi/openapi.yaml` | 24,163 lines; 24,788 for jdss2 v4; present for all four trees |
+| Empirical TypeSpec, one file per method, types as observed | `empirical/jdss1/v4/typespec/<path>/<METHOD>.tsp`, tracked in git | 101 files; 105 for jdss2 v4 |
+| Error models, one file per kind of error | `typespec/models/errors/<Kind>.tsp` | 122 kinds; 135 for jdss2 v4 |
+| Scenarios, one file per method: which test case gave which error, with its status, `class`, `errno`, a pattern for the message and the kind of error | `typespec/<path>/<METHOD>-scenarios.json` | 101 files of plain JSON; no case carries a scenario key yet |
+| Compiled OpenAPI 3.1 | `empirical/pilot/tools/tsp/b_<appliance>_<api>/` | a build folder that the check rewrites on every run and git ignores: not an input of this work. The spec project plans a tracked `openapi.json` |
 | Validation | `hurl/build_typespec.py --check` | compiles each tree and validates every recorded response against it; fails on an invalid response or on a key the spec does not have |
 | Manifest | `b_<appliance>_<api>.manifest.json` | every recorded response behind each route and status |
 
@@ -177,10 +179,10 @@ Types differ per endpoint for the same thing: a snapshot's `creation` is
 `int64` in the all-snapshots list and a string in the reply by name;
 `volsize` and the pool's `available` are strings holding numbers, which the
 hand-written decoders parse today. jdss1 and jdss2 agree on types
-for the endpoints the plugin uses. The compiled YAML has a defect: the jdss1 v4 file, which the generator
-would read, holds a literal tab inside a `pattern:` value on five lines, the
-first at line 14954, and the jdss2 v4 file at line 15389; Python's YAML
-parser refuses both files. The emitter can write JSON instead.
+for the endpoints the plugin uses. The compiled YAML, which
+nothing here reads, has a defect: the jdss1 v4 file holds a literal tab inside
+a `pattern:` value on five lines, the first at line 14954, and the jdss2 v4
+file at line 15389; Python's YAML parser refuses both files.
 
 ### The REST layer, measured
 [The_REST_layer_measured](#the-rest-layer-measured)
@@ -264,8 +266,9 @@ The project values that weigh on this document, in the order they weigh here:
    not on what the company documentation says a version does.
 4. **Bugs stay visible.** A field the plugin reads keeps an exact type and
    fails loudly when absent or changed; a field it does not read cannot fail.
-5. **Repeatable checks.** A new recording regenerates the types and re-runs
-   the audit; the diff is the report.
+5. **Repeatable checks.** After a new recording the types are read
+   again from the spec and the fixtures and the audit are re-run; the diff is
+   the report.
 6. **Smallest change for the callers, one code path, revertable commits.**
    One set of paths and fixtures; the seven type names and the accessors stay;
    the path move and the types are commits that can be reverted alone.
@@ -334,10 +337,11 @@ name of exactly 132 characters ([risk 13](#risks)) and a reply behind the
 request ([risk 14](#risks)).
 
 The decisions below the options were taken as questions and are kept in the
-[Decisions](#decisions) table: the reply types are generated from the
-recorded jdss1 v4 API under the same names, only a read field can fail, and
+[Decisions](#decisions) table: the reply types are transcribed by an
+agent from the spec project's TypeSpec of the recorded jdss1 v4 API, under
+the same names, only a read field can fail, and
 the drivers change where they read a field whose type or key changes
-(question 28); every appliance error is mapped from its recorded message
+(question 38, which replaces 28); every appliance error is mapped from its recorded message
 only, and an unknown one is logged once in full by the REST module
 ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue));
 each driver lists only its own snapshot kind (question 7); IDs and names are validated where the CSI parsers read them, with two
@@ -516,7 +520,7 @@ no difference on jdss1, v3 and v4, or on jdss2 v4; [gap_jdss_rest_list_paging_wi
 
 **Deprecating v3:** the plugin docs would say it needs a JovianDSS release with API
 v4; `CHANGELOG.md` would name the oldest supported JovianDSS 1 release,
-`1.0up33.65410`; the generated types, the audit and the fixtures would use v4
+`1.0up33.65410`; the reply types, the audit and the fixtures would use v4
 replies; comments and
 constants that mention v3 would be removed.
 
@@ -524,44 +528,50 @@ constants that mention v3 would be removed.
 [Stage_2_response_types](#stage-2-response-types)
 
 Would replace the hand-written [response types](#response-types) with types
-generated from the recorded API ([question 28](#decisions)). That closes
+transcribed from the spec project's description of the recorded API ([question 38](#decisions)). That closes
 [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch), [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch), [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch),
 [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch), [bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec) and
 [bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead) in one commit, and parse errors would be
 returned instead of swallowed ([impl_plugin_rest_return_parse_errors](#impl_plugin_rest_return_parse_errors)).
 
-#### impl_plugin_rest_generated_reply_types
+#### impl_plugin_rest_reply_types_transcribed_from_observed_typespec
 
-**Generated reply types.** A generator in the plugin repository,
-`tools/rest-types-gen.py`, would read the spec repo's compiled OpenAPI for jdss1
-v4 (`empirical/pilot/tools/tsp/b_jdss1_v4/out/openapi/`, which its
-`build_typespec.py --check` validates against every recorded reply) and a
-mapping file, `pkg/rest/types_gen.yaml`, and write `pkg/rest/types_gen.go`,
-committed, with a header naming the spec commit, the evidence runs and the
-generator version. The 19 `Resource*` type names would stay, so the drivers and
-the controller keep compiling against them; the accessors and the conversions
-(`GetSize`, `OriginSnapshot`, `ClonesNames`, the parsing of numbers sent as
-strings that the custom decoders do today) would move to a hand-written
-`pkg/rest/types_methods.go`. The rest of `types.go` would follow the same
-split: the reply sub-types `Disk`, `ShareNFS` and `ShareSMB` would be generated
-under their names, and the envelopes `GeneralResponse` and `ResultEntries` and
-the two regular expressions the accessors use would move to
-`types_methods.go`. The spec repo stays read only: the user runs its
-tools; the build never needs them, because the generated file is committed.
-`make gen-types` would run the generator; `make check-types` would regenerate
-and fail on a difference, the guard against the committed file drifting from
-the spec.
+**Reply types transcribed from the observed TypeSpec** (user decision,
+[question 38](#decisions)). An agent would read the spec repo's tracked
+TypeSpec for jdss1 v4, one `.tsp` file per method under
+`empirical/jdss1/v4/typespec/` (which its `build_typespec.py --check`
+validates against every recorded reply), and write the reply types into
+`pkg/rest/types.go`, which replaces today's file. There is no generator, no
+mapping file and no compiler, and nothing is read from the spec repo's build
+folders ([question 31](#decisions)). The file would open with a header
+naming the spec commit and, for each type, the `.tsp` file it was read from,
+so that a later reading knows what to compare with. The 19 `Resource*` type
+names would stay, so the drivers and the controller keep compiling against
+them; the accessors and the conversions (`GetSize`, `OriginSnapshot`,
+`ClonesNames`, the parsing of numbers sent as strings that the custom
+decoders do today) would move to `pkg/rest/types_methods.go`, with a
+`checkRequired()` per type. The rest of today's `types.go` would follow the
+same split: the reply sub-types `Disk`, `ShareNFS` and `ShareSMB` would be
+transcribed under their names, and the envelopes `GeneralResponse` and
+`ResultEntries` and the two regular expressions the accessors use would move
+to `types_methods.go`. The spec repo stays read only: the user runs its
+tools, and reading its tracked files needs none of them. When the spec
+project adds recordings, the types would be read again from the `.tsp` files
+that changed between the header's commit and the new one, and the diff of
+`types.go` reviewed. No command proves that the types match the spec; the
+guard is the fixtures, which decode every recorded reply with them
+([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures), [risk 17](#risks)).
 
-**Table 2 — Generated reply types** · `tbl_type_generation`
+**Table 2 — Reply type rules** · `tbl_type_generation`
 
 | What | Rule |
 |---|---|
-| a field the plugin reads | the type the recordings show for that endpoint, exact. The mapping names it and marks it **required** or **optional**; where the recordings never show it set, the mapping may state the type by hand, with the reason |
-| a required read field absent from a reply | the call fails with an error that names the field: a generated `checkRequired()` per type, called after decoding. First list: pool `available`, snapshot `creation`, volume `name`, and snapshot `name` in list entries and in the NAS snapshot reply by name; the zvol snapshot reply by name carries no `name` ([bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_get_no_name_key](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_get_no_name_key)) and nothing reads it there |
-| an optional read field absent from a reply | the accessor returns the documented absent value. The list is not closed: a read field that testing finds absent from a reply is added to the mapping as optional, and the required-field tests pin the list as it stands. First list: `origin` on a volume that is not a clone, `clones` on a snapshot without clones, NAS `quota` without a quota ([bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec), review `bug_plugin_driver_nas_quota_null_size_zero`) |
+| a field the plugin reads | the type the recordings show for that endpoint, exact. A comment on the field marks it **required** or **optional**; where the recordings never show it set, the type is stated by hand, with the reason in the comment |
+| a required read field absent from a reply | the call fails with an error that names the field: a `checkRequired()` per type, called after decoding. First list: pool `available`, snapshot `creation`, volume `name`, and snapshot `name` in list entries and in the NAS snapshot reply by name; the zvol snapshot reply by name carries no `name` ([bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_get_no_name_key](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_get_no_name_key)) and nothing reads it there |
+| an optional read field absent from a reply | the accessor returns the documented absent value. The list is not closed: a read field that testing finds absent from a reply is marked optional, and the required-field tests pin the list as it stands. First list: `origin` on a volume that is not a clone, `clones` on a snapshot without clones, NAS `quota` without a quota ([bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec), review `bug_plugin_driver_nas_quota_null_size_zero`) |
 | a field the plugin does not read | kept as `json.RawMessage`: stored as sent, never able to fail. [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch), [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch), [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch) and the keys of [bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec) become this |
 | the key of a read field | the recorded key: [bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead) reads `parent.name`, and [bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key](#bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key)'s `type` comes under its own key (stage 3 filters by it) |
-| a field never seen set in any recording | `json.RawMessage`, unless the mapping types it by hand |
+| a field never seen set in any recording | `json.RawMessage`, unless it is typed by hand |
 | the zvol-or-clone alternatives of a volume reply | one struct with the fields of both, optional |
 | a single-value enum, such as `is_clone` | its base type |
 | one thing typed differently per endpoint, such as snapshot `creation`, a number in the list and a string by name | each type follows its endpoint; the accessor in `types_methods.go` converts, as the decoders do today |
@@ -583,20 +593,21 @@ evidence, and compare the plugin's request
 keys with the company `-src` schemas ([rule_rest_request_body_valid](#rule_rest_request_body_valid)); prototypes:
 `kub-testing/tmp/rest-audit/compliance_matrix.py`, `compliance_bodies.py`. It
 would also list every recorded error of a plugin call that [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)'s catalogue does
-not cover ([rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled)). It would read the plugin's list of calls and success statuses
+not cover, read from the `-scenarios.json` files of the plugin's calls ([rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled)). It would read the plugin's list of calls and success statuses
 from `pkg/rest` (the prototype has them typed in by hand). It would run on the
 analysis machine, where the spec repo is, after each new hurl run the spec
 project adds and after each plugin change in `pkg/rest`. It would only read the
-spec repo. The type check it was to make ([rule_rest_reply_types_decode](#rule_rest_reply_types_decode)) is done by generation instead: a
-new recording is a `make gen-types` and a diff of the generated file.
+spec repo. The type check it was to make ([rule_rest_reply_types_decode](#rule_rest_reply_types_decode)) is not the
+audit's: the fixtures decode every recorded reply with the transcribed types
+([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)).
 
 #### impl_plugin_rest_return_parse_errors
 
 **Return parse errors** ([bug_plugin_rest_pool_and_snapshot_unmarshal_swallow_parse_errors](#bug_plugin_rest_pool_and_snapshot_unmarshal_swallow_parse_errors)). Two custom decoders swallow a
 parse error today and leave the field at zero, so a pool `available` that does
-not parse reads as a full pool. With [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) the conversions move to
+not parse reads as a full pool. With [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) the conversions move to
 `types_methods.go` and would return the error instead; the snapshot decoder is
-replaced by the generated type and its accessor.
+replaced by the transcribed type and its accessor.
 
 ### Stage 3: behaviour and error mapping
 [Stage_3_behaviour_and_error_mapping](#stage-3-behaviour-and-error-mapping)
@@ -688,10 +699,15 @@ reworded message would start the same trouble again. The plugin needs one way of
 handling errors.
 - **A catalogue of known errors.** Every error recorded for a call the plugin
   makes would be mapped on purpose, from its status, `class`, `errno` and message
-  pattern to one `RestError` code. The source is `jdss-rest-api-spec`
-  (`empirical/<app>/v4/ERROR-FIELDS.md`, `STATUS-CODES.md` and the recorded
-  bodies), which lists every error seen, including those with no `class` or no
-  `errno`. This is what [rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled) asks for. The patterns no recording supports
+  pattern to one `RestError` code. The source is `jdss-rest-api-spec`:
+  the `-scenarios.json` file of each call
+  (`empirical/jdss1/v4/typespec/<path>/<METHOD>-scenarios.json`), which gives
+  for every error seen its status, `class`, `errno`, a pattern for the message
+  and the kind of error, and says which of those fields the appliance did not
+  send; `ERROR-FIELDS.md`, `STATUS-CODES.md` and the recorded bodies stand
+  beside it. The agent would transcribe the catalogue from these files, as it
+  does the reply types. Each pattern would be compiled with Go's `regexp` in a
+  unit test, because the spec project states them for Python and JavaScript. This is what [rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled) asks for. The patterns no recording supports
   ([evidence gaps](#evidence-gaps): "already exists" with errno 1 or 100,
   "not found" without an errno) would stay in the catalogue as legacy entries
   marked "no recording", so that [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)'s completeness check does not report them
@@ -934,9 +950,8 @@ passwords removed ([question 4](#decisions)), would go into
 `pkg/rest/testdata/`, including replies to the per-volume snapshot list that
 [bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub) adds (recorded by `list/volume-kinds.hurl`); no jdss2 reply is a
 fixture ([question 19](#decisions)). The tests on them are the implementing
-agent's. What they must show: every fixture decodes with the generated types
-([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)), which holds by construction and
-stays the regression check of the generator and its rules; a required read
+agent's. What they must show: every fixture decodes with the transcribed types
+([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)), which is the check of the transcription; a required read
 field removed from a fixture fails with the error naming it; every recorded
 error body passed through `ErrorFromErrorT` gets its catalogue code; and a fake HTTP server
 (`net/http/httptest`) covers [gap_plugin_rest_appliance_unreachable](#gap_plugin_rest_appliance_unreachable) and [gap_plugin_rest_unexpected_reply_bodies](#gap_plugin_rest_unexpected_reply_bodies), which relies on the fixes for
@@ -967,13 +982,13 @@ does. Anything found would go to the backlog, not into this document.
 
 **Package documentation.** A new `pkg/rest/doc.go` would hold the package
 comment, which Go shows with `go doc` and in editors. It would state the rule of
-[priority 5](#priorities), repeatable checks: the reply types are generated from the replies recorded from real
-appliances ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)) and never edited by hand; only the fields the plugin reads carry a
-type, named in `types_gen.yaml`, and the rest are raw JSON; one field with the
+[priority 5](#priorities), repeatable checks: the reply types are transcribed from the spec project's
+TypeSpec of the replies recorded from real appliances ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)), and the header of
+`types.go` names the spec commit they were read from; only the fields the
+plugin reads carry a type, and the rest are raw JSON; one field with the
 wrong JSON type makes the whole reply fail to decode, which is why read fields
-are exact and the others are not; `make check-types` runs after every change to
-the package and `make gen-types` whenever new recordings are added, with the audit
-([impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)).
+are exact and the others are not; after new recordings the types are read
+again, and `make test` and the audit ([impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)) are re-run.
 
 ## Consequences
 [Consequences](#consequences)
@@ -984,22 +999,24 @@ the package and `make gen-types` whenever new recordings are added, with the aud
   upgrade until the appliance is updated; the documentation and
   `CHANGELOG.md` name the minimum release
   ([risk 2](#risks)).
-- `types.go` is replaced by a generated `types_gen.go` and a hand-written
-  `types_methods.go`; the generated file is committed, so the build never
-  needs the spec repository or Node. Every field the appliance sends is
-  stored, 86 on the volume, and only the read ones have a type; the rule for
-  absent read fields exists from the first generation. Appliance states that
-  no recording shows, such as a volume with encryption enabled, keep their
-  fields tolerant until recorded.
-- Stage 1 is the path move and the deprecation; stage 2 is the mapping, the
-  generator, the generated types, the methods file, the twelve driver lines
-  and the fixtures. The audit ([impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)) keeps only the compliance matrix; the
-  fixtures ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)) become the generator's regression test; the future work on
-  missing fields shrinks to the fields the plugin does not read
+- `types.go` is rewritten from the spec project's observed TypeSpec, with a
+  hand-written `types_methods.go` beside it; neither the build nor the
+  transcription needs the spec repository's tools or Node. Every field the
+  appliance sends is stored, 86 on the volume, and only the read ones have a
+  type; the rule for absent read fields exists from the first version.
+  Appliance states that no recording shows, such as a volume with encryption
+  enabled, keep their fields tolerant until recorded.
+- Stage 1 is the path move and the deprecation; stage 2 is the transcribed
+  types, the methods file, the twelve driver lines and the fixtures. The audit
+  ([impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)) keeps only the compliance matrix; the fixtures ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)) are the check
+  of the transcription; the future work on missing fields shrinks to the
+  fields the plugin does not read
   ([missing fields in replies](#future-work-missing-fields-in-replies)).
 - The spec repository becomes an input of the development process: a new
-  recording means the user runs its `--check`, then `make gen-types`, and
-  reviews the diff.
+  recording means the user runs its `--check` and commits the TypeSpec, an
+  agent reads the changed files into `types.go` and the error catalogue, and
+  the diff is reviewed. No command shows that the types still match the spec;
+  the fixtures show that they decode what was recorded ([risk 17](#risks)).
 - The whole of this document is implemented as one series; stages 3 and 4
   need no further record: their files, risks and tests are in
   [Affected systems and files](#affected-systems-and-files),
@@ -1008,7 +1025,7 @@ the package and `make gen-types` whenever new recordings are added, with the aud
 Confidence: high for JovianDSS 1 at the recorded release, where v3 and v4 are
 recorded identical and every reply of every call is validated against the
 spec the types come from; medium for read fields never seen set in the
-recordings, whose type the mapping has to supply by hand with a reason; none
+recordings, whose type is stated by hand with a reason; none
 is claimed for older JovianDSS 1 releases, which are not supported
 ([question 29](#decisions)).
 
@@ -1059,7 +1076,7 @@ the types ([risk 1](#risks)).
 
 1. **A caller still reads a field whose type or key changes.** Guard: `go build`
    would fail on any remaining use; the twelve lines are changed in
-   the same commit ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)).
+   the same commit ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)).
 2. **Older releases.** All recordings come from current releases. **A JovianDSS 1
    release without v4, or with a different v4, would stop working, and there would
    be no fallback.** Guard: the docs and release notes would state the minimum
@@ -1068,7 +1085,7 @@ the types ([risk 1](#risks)).
    do not serve the same v4 and are not supported: there is no backward
    compatibility with them (user decision, [question 29](#decisions)). The v4
    move would be its own commit, so it could be reverted on its own.
-3. **The generator's rules are wrong, or the spec's output moves.** Two
+3. **A transcription mistake, or the spec's layout moves.** Two
    risks, each described once with its guard: [risks 18 and 19](#risks).
 4. **[bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead), [bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub) and [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots) would change results, not only errors.** ListSnapshots
    would start returning real entries, which could expose paging bugs (the CSI list
@@ -1120,8 +1137,8 @@ the types ([risk 1](#risks)).
    renamed a read field could make GetCapacity report no free space or a size of
    0, lists come back empty without an error, an empty name go into the next
    request's path (see also [security_plugin_rest_unescaped_path_segments](#security_plugin_rest_unescaped_path_segments)), or a snapshot `creation` of
-   year 1 reach Kubernetes. Guard in this delivery: the mapping's
-   required-or-optional rule and the generated `checkRequired()` ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)), a required
+   year 1 reach Kubernetes. Guard in this delivery: the
+   required-or-optional rule and `checkRequired()` ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)), a required
    field removed from its fixture failing by name ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)), and raw JSON for everything the plugin does not
    read, which cannot fail. What stays: a read field the recordings never show
    set is typed by hand until a recording confirms it
@@ -1191,29 +1208,36 @@ the types ([risk 1](#risks)).
    path move being its own commit, `git bisect` can tell its effect from a
    fix's.
 16. **A read field was never seen set, so the recordings give it no type.**
-   Guard: the mapping may state the type by hand, with the reason, and the
-   generator refuses a read field it cannot type otherwise; the live test
-   covers the state when it occurs.
-17. **The generated file drifts from the spec** because someone edits it or
-   forgets to regenerate. Guard: the header names the spec commit;
-   `make check-types` regenerates and diffs, and fails on a difference.
-18. **A widening rule is wrong**, for example the zvol-or-clone merge drops a
-   field. Guard: every recorded jdss1 v4 reply decodes with the generated
-   types, and a required read field removed from its fixture fails by name
+   Guard: the type is stated by hand in the source, with the reason in a
+   comment; the live test covers the state when it occurs.
+17. **The transcribed types drift from the spec**, because the spec gains
+   recordings that nobody reads in, or because someone edits a type. Guard:
+   the header of `types.go` names the spec commit and the file behind each
+   type, so a later reading compares against a known state, and the fixtures
+   decode every recorded reply. No command proves the match: a generator with
+   a check target was set aside (user decision, [question 38](#decisions)), so
+   this guard is weaker than a regeneration and rests on the tests and on
+   review.
+18. **A transcription mistake**, for example a missed `null` alternative or a
+   type read from the wrong endpoint. Guard: every recorded jdss1 v4 reply
+   decodes with the transcribed types, and a required read field removed from
+   its fixture fails by name
    ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)).
-19. **The spec output format moves.** The YAML defect shows it. Guard: the
-   generator is pinned to a spec commit and reads one spec output
-   ([question 31](#open-questions)); a format change is a generator change,
-   not a types change.
+19. **The spec's layout moves.** Its move to one error model per kind shows
+   it. Guard: only files tracked in the spec repository are read, at a commit
+   the header names ([question 31](#decisions)); a layout change shows in
+   that repository's history and changes how the next reading is done, not
+   the types.
 20. **The procedure depends on one person.** Only the user may run the spec
    repository's tools, and only a machine with the recordings can. Guard:
-   the committed generated file. The written procedure is not part of this
+   the TypeSpec is committed in the spec repository and the types in this
+   one, so a reading needs no tool. The written procedure is not part of this
    delivery ([question 33](#decisions)).
 21. **Per-endpoint types diverge for one accessor**, such as `creation` as
    `int64` in a list and a string by name. Guard: conversions live in the
    methods file, per type, as the decoders do today, and the fixtures cover
    both endpoints.
-22. **A later JovianDSS release changes v4.** Guard: regeneration and the
+22. **A later JovianDSS release changes v4.** Guard: a new reading and the
    audit on the new recordings show the change as a diff or a failed check.
 23. **Stage 3 makes an NFS data-loss path reachable
    (`dataloss_plugin_driver_nfs_intermediate_snapshot_delete_destroys_clone_volume`).**
@@ -1245,14 +1269,13 @@ the types ([risk 1](#risks)).
 | System | Effect of this document | Where |
 |---|---|---|
 | Plugin REST client, paths | one API prefix, `api/v4`, replaces the 34 hard-coded `api/v3` strings (30 after the dead-code commit); comments and constants that name v3 go | `pkg/rest/*.go` (Table 3) |
-| Plugin REST client, reply types | `types.go` replaced by the generated types and the methods file; the mapping added | `pkg/rest/types_gen.go` (generated), `pkg/rest/types_methods.go`, `pkg/rest/types_gen.yaml` |
-| Generator and build | the generator script; `gen-types` and `check-types` targets | `tools/rest-types-gen.py`, `Makefile` |
-| Fixtures, tests and audit | fixtures of every recorded jdss1 v4 reply, which the implementing agent's tests decode with the generated types and check field by required field; the audit compares the plugin's calls with the v4 index and keeps no type check | `pkg/rest/*_test.go`, `pkg/rest/testdata/`; `kub-testing/tools/rest-type-audit.py` ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures), [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)) |
+| Plugin REST client, reply types | `types.go` rewritten from the spec project's observed TypeSpec; the accessors, conversions and required-field checks in a methods file | `pkg/rest/types.go` (transcribed), `pkg/rest/types_methods.go` |
+| Fixtures, tests and audit | fixtures of every recorded jdss1 v4 reply, which the implementing agent's tests decode with the transcribed types and check field by required field; the audit compares the plugin's calls with the v4 index and keeps no type check | `pkg/rest/*_test.go`, `pkg/rest/testdata/`; `kub-testing/tools/rest-type-audit.py` ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures), [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)) |
 | Drivers and controller | the twelve lines: `Creation` via accessor, `Parent.Name` for list entries, `GetAvailable()` for the pool; the callers of the per-volume snapshot lists ([impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow)) | `pkg/controller/listers.go:52`, `:54`, `:56`, `:82`, `:124`, `:148`; `pkg/controller/controllerplugin.go:679`, `:802`, `:1017`; `pkg/driver/restwrappers.go:40`; `pkg/driver/iscsi_driver.go:456`; `pkg/driver/nfs_driver.go:591`; the other driver and controller changes are rows of Table 3 |
 | Plugin documentation and release notes | the required JovianDSS release is stated: one that serves API v4, for JovianDSS 1 at least `1.0up33.65410` | `docs/`, `CHANGELOG.md`, `pkg/rest/doc.go` |
 | JovianDSS appliances | must serve API v4: JovianDSS 1 at `1.0up33.65410` or later | the lab appliance and the recorded appliances already do |
 | Test lab | the live cycles become the plugin's first runs on v4; the suite itself does not change | kub-testing `dev_cycle.py` cycles ([Testing](#testing) steps 4 and 5); `ISSUES.md` T9 |
-| Spec repository | read-only input: the compiled OpenAPI for jdss1 v4 and its manifest; the YAML defect reported | `jdss-rest-api-spec/empirical/pilot/tools/tsp/b_jdss1_v4/out/openapi/` |
+| Spec repository | read-only input: the tracked TypeSpec for jdss1 v4, with its error models and scenarios files | `jdss-rest-api-spec/empirical/jdss1/v4/typespec/` |
 | Not affected | the node DaemonSet manifest; the node's mount and iSCSI code, apart from the lines of `pkg/node/publish.go` that print whole CSI requests ([impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs)) | |
 
 The files, one row each, with the stage that changes them:
@@ -1268,9 +1291,8 @@ step 5) and, where it is `pkg/rest` code, by unit tests.
 | `pkg/rest/storageapi.go`, `rest.go`, `rproxy.go`, `payload-def.go`, `reqtypes.go`, `nas_volumes_snapshots.go`, `shares.go`, `targets.go`; `pkg/driver/nfs_driver.go:322`; `pkg/controller/config.go` (removed), `controllerplugin.go:93` | [impl_plugin_rest_remove_dead_code_before_v4_move](#impl_plugin_rest_remove_dead_code_before_v4_move), [dead code](#dead-code); [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete) and [bug_plugin_rest_delete_nas_volume_snapshot_decodes_body_before_204_check](#bug_plugin_rest_delete_nas_volume_snapshot_decodes_body_before_204_check) (switch to `DeleteNASSnapshot`) | before 1 |
 | every `pkg/rest/*.go` with a path | one API prefix, `api/v4` | 1 |
 | plugin docs, `CHANGELOG.md` | v3 deprecated, minimum release `1.0up33.65410` | 1 |
-| `pkg/rest/types.go`, replaced by `types_gen.go` (generated) and `types_methods.go`; `types_gen.yaml` (new) | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types): generated reply types; closes [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch), [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch), [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch), [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch), [bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec) *NFS* and [bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead); [bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key](#bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key) *NFS* key (stage 3 filters by it); [impl_plugin_rest_return_parse_errors](#impl_plugin_rest_return_parse_errors) | 2, 3 |
-| `tools/rest-types-gen.py` (new), `Makefile` (`gen-types`, `check-types`) | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types): the generator and its targets | 2 |
-| `pkg/controller/listers.go`, `controllerplugin.go`; `pkg/driver/restwrappers.go`, `iscsi_driver.go`, `nfs_driver.go` | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types): the twelve lines that read `Creation`, the list entry's `Volume`, the pool's `Available` | 2 |
+| `pkg/rest/types.go` (rewritten), `types_methods.go` (new) | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec): transcribed reply types; closes [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch), [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch), [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch), [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch), [bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec) *NFS* and [bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead); [bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key](#bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key) *NFS* key (stage 3 filters by it); [impl_plugin_rest_return_parse_errors](#impl_plugin_rest_return_parse_errors) | 2, 3 |
+| `pkg/controller/listers.go`, `controllerplugin.go`; `pkg/driver/restwrappers.go`, `iscsi_driver.go`, `nfs_driver.go` | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec): the twelve lines that read `Creation`, the list entry's `Volume`, the pool's `Available` | 2 |
 | `pkg/rest/*_test.go`, `pkg/rest/testdata/` (new) | [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) | 2, 3, 4 |
 | `Makefile` | `vet` (`go vet ./pkg/rest/...`) and `test` targets | first commit |
 | `kub-testing/tools/rest-type-audit.py` (new) | [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool): compliance matrix, request keys, error coverage; no type check | 2 |
@@ -1326,17 +1348,15 @@ agent's: the items say what they must show, and this section only runs them.
    The callers changed by [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow) are not among the seven and have no automated
    check either.
 2. **Audit and compliance (analysis machine, the agent).** Proves that every call
-   the plugin makes meets the rules on jdss1 v4 and that the committed types match
-   the spec. Needs the spec repository refreshed by the user with
+   the plugin makes meets the rules on jdss1 v4. Needs the spec repository refreshed by the user with
    `build_typespec.py --check`, and the audit tool of [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool),
    which does not exist yet and takes `empirical/jdss1/v4/INDEX.md`, the company
    `-src` schemas and the plugin's list of calls. The audit would
-   show [rule_rest_call_exists_on_v4](#rule_rest_call_exists_on_v4), [rule_rest_request_body_valid](#rule_rest_request_body_valid), [rule_rest_success_statuses_accepted](#rule_rest_success_statuses_accepted), [rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled) and [rule_rest_error_bodies_handled](#rule_rest_error_bodies_handled) passing for every call on jdss1 v4, and no recorded error outside the catalogue; [rule_rest_reply_types_decode](#rule_rest_reply_types_decode) holds by construction of
-   the generated types: `make check-types` produces no diff, run here because
-   the spec repo is on the analysis machine only, which has no Go, so the target
-   has to regenerate and diff with Python alone; step 1 decodes every
-   fixture. [rule_rest_docs_vs_appliance_listed](#rule_rest_docs_vs_appliance_listed) has no pass or fail; it is a
-   list of differences. Re-run after each new hurl run, with `make gen-types`.
+   show [rule_rest_call_exists_on_v4](#rule_rest_call_exists_on_v4), [rule_rest_request_body_valid](#rule_rest_request_body_valid), [rule_rest_success_statuses_accepted](#rule_rest_success_statuses_accepted), [rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled) and [rule_rest_error_bodies_handled](#rule_rest_error_bodies_handled) passing for every call on jdss1 v4, and no recorded error outside the catalogue; [rule_rest_reply_types_decode](#rule_rest_reply_types_decode) is not checked here:
+   step 1 decodes every fixture with the transcribed types, and no command
+   compares the types with the spec ([question 38](#decisions)). [rule_rest_docs_vs_appliance_listed](#rule_rest_docs_vs_appliance_listed) has no pass or fail; it is a
+   list of differences. Re-run after each new hurl run, once the types have
+   been read again.
 3. **NFS code.** Folded into step 5, which runs the NFS findings live; their unit
    tests are the implementing agent's, and the NFS part of review
    [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error) is driver code, a T11 check
@@ -1469,12 +1489,7 @@ test appliance.
 ## Open questions
 [Open_questions](#open-questions)
 
-Open: 31. The numbers are kept, gaps included, so that "question 27" means the same thing everywhere; the decided questions follow as a table, each with the section that argues it.
-
-- **31. Which spec output does the generator read?** The compiled YAML has the
-  tab defect; the TypeSpec emitter can write JSON, or the generator can read
-  the `.tsp` files, which are regular but need a parser. Recommendation: the
-  JSON emit, agreed with the spec project.
+Open: none. The numbers are kept, gaps included, so that "question 27" means the same thing everywhere; the decided questions follow as a table, each with the section that argues it.
 
 ### Decisions
 [Decisions](#decisions)
@@ -1485,7 +1500,7 @@ Open: 31. The numbers are kept, gaps included, so that "question 27" means the s
 | 2 | Minimum JovianDSS 1 release? | `1.0up33.65410`, the release of the lab and the recordings. | [Option A](#option-a-v4-only-the-only-option-considered), [risk 2](#risks) |
 | 3 | When does token login come? | with JovianDSS 2 support, a later design. | [Future work: JovianDSS 2](#future-work-joviandss-2-support) |
 | 4 | Fixtures: real replies or hand-written? | real replies from the recordings, trimmed, passwords and the `Authorization` header removed. | [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) |
-| 5 | Unused fields with the wrong type? | removed at first; the same question as 27, both superseded by 28: kept as raw JSON that cannot fail. | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
+| 5 | Unused fields with the wrong type? | removed at first; the same question as 27, both superseded by 28: kept as raw JSON that cannot fail. | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
 | 6 | Group the type fixes, or the two seen live first? | all together, delivered and tested in one go. | [What changes](#what-changes) |
 | 7 | Should the list functions filter by kind? | yes: each driver drops the other kind's entries; other values are kept. | [Stage 3](#stage-3-behaviour-and-error-mapping) |
 | 8 | Who closes the evidence gaps on the appliance side, the first eight under [Evidence gaps](#evidence-gaps)? | the user adds the missing requests to the hurl suite; done for most, see the gaps. | [Evidence gaps](#evidence-gaps) |
@@ -1507,16 +1522,18 @@ Open: 31. The numbers are kept, gaps included, so that "question 27" means the s
 | 24 | Where do release notes live? | `CHANGELOG.md` at the repository root. | [Stage 1](#stage-1-move-to-api-v4) |
 | 25 | Which of the four crashes in the ID and name code does [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) close? | none: the item stays as it is, and the four are handled separately. | [Relationship](#relationship-to-other-designs) |
 | 26 | TLS minimum as a setting? | no; 1.3 fixed, a parameter of `pkg/rest` at most, no `tlsmin` key. | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile) |
-| 27 | Keep or remove the unread fields that fail? | remove; superseded by 28. | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
-| 28 | Generate the reply types instead of fixing them by hand? | yes, from the recorded jdss1 v4 API, same names, only read fields can fail. Weighed against: the rule per field (27), a transcription that drifts again with the next release and only the audit tells; every field modelled by hand, which fails on a field nobody reads and drifts the same way; the whole client generated, which replaces about 2,100 lines and every caller and redoes the stage 3 and 4 work on generated code; tolerant decoding, which lets a real change in a read field pass silently. Price: about 650 lines of generator and mapping to keep, and [risks 19 and 20](#risks). | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) |
+| 27 | Keep or remove the unread fields that fail? | remove; superseded by 28. | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
+| 28 | Generate the reply types instead of fixing them by hand? | superseded by 38, which keeps the names and the rule that only read fields can fail. It was: yes, from the recorded jdss1 v4 API, same names, only read fields can fail. Weighed against: the rule per field (27), a transcription that drifts again with the next release and only the audit tells; every field modelled by hand, which fails on a field nobody reads and drifts the same way; the whole client generated, which replaces about 2,100 lines and every caller and redoes the stage 3 and 4 work on generated code; tolerant decoding, which lets a real change in a read field pass silently. Price: about 650 lines of generator and mapping to keep, and [risks 19 and 20](#risks). | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
 | 29 | Do older JovianDSS 1 releases serve the same v4? | no: they do not serve the same API v4, and there is no backward compatibility with them; nothing older than `1.0up33.65410` is supported. | [Risk 2](#risks) |
 | 30 | Does the `{}` body the plugin sends with every GET matter on jdss1 v4? | no: the replies with and without it are the same on jdss1 v4, as on jdss1 v3 and jdss2 v4. | [gap_jdss_rest_empty_body_on_get_delete](#gap_jdss_rest_empty_body_on_get_delete) |
-| 32 | Which read fields are optional? | `origin`, `clones` and NAS `quota`; the list stays open, and a field that testing finds absent is added as optional. | [Table 2](#impl_plugin_rest_generated_reply_types) |
-| 33 | Where does the regeneration procedure live? | in the plugin's documentation, since the generated file is the plugin's; the page is written separately, not in this delivery. | [Relationship](#relationship-to-other-designs) |
+| 31 | Which spec output is read? | the tracked TypeSpec, `empirical/jdss1/v4/typespec/`: the `.tsp` file of each call for the reply types, its `-scenarios.json` for the errors. Not the compiled OpenAPI under `empirical/pilot/tools/tsp/`, a build folder git ignores. The tracked `openapi.json` the spec project plans is not waited for. | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
+| 32 | Which read fields are optional? | `origin`, `clones` and NAS `quota`; the list stays open, and a field that testing finds absent is added as optional. | [Table 2](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
+| 33 | Where does the procedure for refreshing the reply types live? | in the plugin's documentation, since the types file is the plugin's; the page is written separately, not in this delivery. | [Relationship](#relationship-to-other-designs) |
 | 34 | Where does `cleanIntermediateSnapshots` take a snapshot's clones from, and when? | from `GET .../snapshots/<s>/clones`, asked for each intermediate snapshot before it is deleted, in both drivers and in the same commits as the list change; no waiting for the separate driver fix. | [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow), [risk 23](#risks) |
 | 35 | How does [Testing](#testing) step 5 observe that the clone survived? | by a read made by hand: after the source volume is deleted through the plugin, `GET pools/<pool>/nas-volumes/<clone>` on the appliance answers 200. csi-sanity deletes the source and never looks at the clone, so the cycle alone cannot show it; the check is kept in the tracker with the other driver checks (kub-testing `ISSUES.md`, T11). | [Testing](#testing) step 5, [risk 23](#risks) |
 | 36 | Where in the series do the two logging items go? | at the front, right after the `go vet` commit: no password or CSI secret may reach a log at any level, so no build that is run live may predate them; the log level is set in the configuration. Weighed against: leaving them in stage 4 and tracing a failure on builds at Info, which still print CSI `Secrets` at Warn. | [Before stage 1](#before-stage-1-keep-secrets-out-of-the-logs), [Testing](#testing) step 8 |
 | 37 | What does "logged once" cover? | the REST module: the handler writes the one line of `pkg/rest` for a failed call, with the appliance's fields in full. The driver and the controller make their own log records for a failed operation, and this document does not prescribe or change them. | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) |
+| 38 | Generate the reply types, or have an agent transcribe them? | transcribe: an agent reads the spec project's tracked TypeSpec and writes the Go types and the error catalogue; no generator, mapping file or compiler. Weighed against: generating once the spec project tracks an `openapi.json`, which blocks stage 2 until then; compiling the TypeSpec with Node, a tool chain to keep; a `.tsp` parser in the plugin. Price: no command proves that the types match the spec, and each new recording is a new reading and a review ([risk 17](#risks)). | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
 
 ## Relationship to other designs
 [Relationship_to_other_designs](#relationship-to-other-designs)
@@ -1525,8 +1542,8 @@ Open: 31. The numbers are kept, gaps included, so that "question 27" means the s
   the review files and ID prefixes are in [ID sources](#id-sources).
 - Spec repo `jdss-rest-api-spec`: the reference for compliance
   ([The `jdss-rest-api-spec` repository](#the-jdss-rest-api-spec-repository)).
-  Only read; its TypeSpec of the observed types, compiled to OpenAPI, is the
-  source of the generated reply types ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)), refreshed by the user with
+  Only read; its tracked TypeSpec of the observed types is the
+  source of the reply types, and its scenarios files of the error catalogue ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)), refreshed by the user with
   `build_typespec.py --check`. Also to report: the compiled YAML holds a literal tab inside a
   `pattern:` value (jdss1 v4 from line 14954, jdss2 v4 at line 15389), which Python's YAML
   parser refuses; and a name with non-ASCII characters gets **500
@@ -1576,8 +1593,8 @@ Open: 31. The numbers are kept, gaps included, so that "question 27" means the s
   the build able to run one is handled separately (kub-testing `ISSUES.md`,
   TOOL10 and MK11; DEC11 names the owner). Step 5 stays a requirement of this
   delivery.
-- The regeneration procedure of the reply types
-  ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)): a page in the plugin's documentation, written
+- The procedure for reading the reply types again after new recordings
+  ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)): a page in the plugin's documentation, written
   separately and not in this delivery (kub-testing `ISSUES.md`, DOC27).
 - Format strings outside `pkg/rest`: the controller and the node pass error
   text to `status.Errorf` as the format, 26 of the 34 `go vet` reports
@@ -1662,9 +1679,9 @@ catalogue would need the `ZfsCmdError` message for this case, `name is too long`
 ### Future work: missing fields in replies
 [Future_work_missing_fields_in_replies](#future-work-missing-fields-in-replies)
 
-Mostly done by [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types) ([question 28](#decisions)), which addresses
+Mostly done by [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) ([question 38](#decisions)), which addresses
 [risk 9](#risks) for the fields the plugin reads: each is marked required or
-optional in the mapping, a required one absent from a reply fails the call with
+optional in the source, a required one absent from a reply fails the call with
 an error naming the field (`checkRequired()`), an optional one has a documented
 absent value in its accessor, and a required field removed from its fixture
 fails by name ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)). Fields the plugin does not read are raw JSON and
@@ -1677,7 +1694,7 @@ sent 0" from "the appliance sent nothing". Without the rule, a reply that lacks
 a field the plugin reads would pass silently.
 
 **What stays for later:** a read field the recordings never show set is typed by
-hand in the mapping until a recording confirms it; the audit ([impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)) could report
+hand in the source until a recording confirms it; the audit ([impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)) could report
 every read field that is missing or `null` in any recording, so that the
 required-or-optional list rests on evidence rather than on reading the code.
 
@@ -1721,6 +1738,13 @@ required-or-optional list rests on evidence rather than on reading the code.
   `pkg/rest` (8), `pkg/controller` (23) and `pkg/node` (3).
 - User decision (2026-11-15, question 34): the cleanup takes a snapshot's
   clones from `GET .../snapshots/<s>/clones`, the safest source.
+- jdss-rest-api-spec, commit `a34abc0` and a note from its session (read
+  2026-11-16): one error model per kind of error and a scenarios file per
+  method, tracked beside the TypeSpec; the compiled OpenAPI is a build folder
+  that git ignores; a tracked `openapi.json` is planned.
+- User decision (2026-11-16, questions 31 and 38): the reply types and the
+  error catalogue are transcribed by an agent from the tracked TypeSpec; no
+  generator.
 - User decision (2026-11-16): the default log level should be Info. Today
   it is not a default but a value in the shipped controller configuration;
   the change is recorded in the tracker, not made here.
@@ -1781,7 +1805,7 @@ where the names and the older IDs come from: [ID sources](#id-sources). Jargon:
 | Source | What it is | Use |
 |---|---|---|
 | `jdss-rest-api-spec/empirical/hurl/out/` | every request and reply of the hurl runs on real appliances: 15 jdss1 and 20 jdss2 runs, over 15,900 replies to the calls the plugin decodes. Not in git | **main reference for reply types**, because it has the raw values. Only v4 replies decide pass or fail; v3 replies are background |
-| `jdss-rest-api-spec/empirical/{jdss1,jdss2}/` | specs generated from those runs (`INDEX.md`, `-doc`, `-src`), and the TypeSpec of the observed types, compiled to OpenAPI and validated by the spec repo's `--check` against every recorded reply (`typespec/`; `empirical/pilot/tools/tsp/b_<app>_v4/out/openapi/`) | reference for status codes, errors and behaviour; **the source of the generated reply types** ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)). The values in the generated `-doc` replies are masked, so types are not read from those |
+| `jdss-rest-api-spec/empirical/{jdss1,jdss2}/` | specs generated from those runs (`INDEX.md`, `-doc`, `-src`), and the TypeSpec of the observed types, validated by the spec repo's `--check` against every recorded reply (`typespec/`, with one error model per kind of error and a scenarios file per method) | reference for status codes, errors and behaviour; **the source of the reply types and of the error catalogue** ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)). The values in the generated `-doc` replies are masked, so types are not read from those |
 | `empirical/hurl/project-status.md` | the hurl suite's numbered findings (cited as "hurl Finding n") | behaviour, data safety |
 | `jdss-rest-api-spec/{v4,v3}/d/` | the official (company) API docs | can differ from the appliance; used only where there are no recordings |
 | `kub-testing/tmp/cycles/` | csi-sanity runs against the lab appliance | confirms an effect on a live system |
@@ -1791,8 +1815,8 @@ When sources disagree, recorded replies win, then the v4 docs, then the v3 docs.
 **How the reply types were checked.** The analysis machine has no Go, so a Python
 script imitates what Go's `encoding/json` does with each recorded reply (prototype
 `kub-testing/tmp/rest-audit/audit.py`, output `audit.txt`). That is how the
-mismatches were found. The types themselves would be generated from the spec
-repo's validated description of the replies ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)), and [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)'s unit tests would check
+mismatches were found. The types themselves would be transcribed from the spec
+repo's validated description of the replies ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)), and [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)'s unit tests would check
 them in Go. The [error messages](#error-messages) table and the
 [evidence gaps](#evidence-gaps) were produced the same way (`coverage.py`,
 `bodies.py`, same folder).
@@ -1992,7 +2016,7 @@ written for the JovianDSS-Proxmox and CSI plugin teams.
 | Part | Where | What it says | Role here |
 |---|---|---|---|
 | **Company spec** | `v4/d/<path>/<METHOD>-doc` (description), `-src` (JSON Schema of the request body), `-desc`; also `v4/typespec/`, `v4/openapi3/`. `v3/` is laid out the same way | what Open-E documents, taken from the Swagger HTML shipped with the appliance (`v4/origin/`) | which request keys exist, documented status codes; fills gaps |
-| **Empirical spec** | `empirical/<appliance>/v4/`: `INDEX.md` (every tested endpoint, with documented and observed status codes), `STATUS-CODES.md`, `SRC-COMPARISON.md`, `ERROR-FIELDS.md`, `d/<path>/<METHOD>-doc`/`-src` (as observed), `typespec/` (namespace `Observed`: the observed types, compiled to OpenAPI under `empirical/pilot/tools/tsp/`, the source of the generated reply types, [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)); `empirical/<appliance>/status-codes.json` | what real appliances did, generated from the hurl runs | **decides where the two specs disagree** |
+| **Empirical spec** | `empirical/<appliance>/v4/`: `INDEX.md` (every tested endpoint, with documented and observed status codes), `STATUS-CODES.md`, `SRC-COMPARISON.md`, `ERROR-FIELDS.md`, `d/<path>/<METHOD>-doc`/`-src` (as observed), `typespec/` (namespace `Observed`: the observed types per method, `models/errors/` with one model per kind of error, and a `-scenarios.json` per method; the source of the reply types and the error catalogue, [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)); `empirical/<appliance>/status-codes.json` | what real appliances did, generated from the hurl runs | **decides where the two specs disagree** |
 | Raw responses | `empirical/hurl/out/` (local only, not in git) | every request and reply of every run | value types (the generated `GET pools/<pool>` values are masked) |
 | Findings | `empirical/hurl/project-status.md`, `bug-reports/` | numbered findings, runs, repeatability | behaviour, data safety |
 
@@ -2008,8 +2032,8 @@ The appliances, as the repo's README describes them:
 **Rules for this work.** The spec repo belongs to its own project. This document and
 the plugin work only read it: they never change its code or data, and never run its
 scripts or tests (the tests create and delete objects on real appliances). When new
-recordings arrive, the user runs its `build_typespec.py --check`, whose output the
-generated reply types ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)) are built from. Problems
+recordings arrive, the user runs its `build_typespec.py --check`, whose tracked TypeSpec the
+reply types ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)) are read from. Problems
 found in it are reported to the user. The repo covers only the requests the Proxmox
 and CSI plugins make: an endpoint missing from it was simply not tested, which does
 not mean it is broken.
@@ -2055,7 +2079,7 @@ disagree, the empirical spec wins ([priority 3](#priorities)).
 | | |
 |---|---|
 | Requirement | Reply types: every Go type the plugin decodes accepts every recorded v4 reply of that call |
-| Checked against | the spec repo's TypeSpec of the observed types, validated by its `--check` against the raw replies in `hurl/out/`; the Go types are generated from it ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)), and [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) decodes every recorded reply with them |
+| Checked against | the spec repo's TypeSpec of the observed types, validated by its `--check` against the raw replies in `hurl/out/`; the Go types are transcribed from it ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)), and [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) decodes every recorded reply with them |
 
 #### rule_rest_error_bodies_handled
 
@@ -2074,7 +2098,7 @@ disagree, the empirical spec wins ([priority 3](#priorities)).
 
 The rules would be checked again after each new hurl run that the spec project
 adds to its generated specs: [rule_rest_call_exists_on_v4](#rule_rest_call_exists_on_v4), [rule_rest_request_body_valid](#rule_rest_request_body_valid), [rule_rest_success_statuses_accepted](#rule_rest_success_statuses_accepted), [rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled) and [rule_rest_error_bodies_handled](#rule_rest_error_bodies_handled) by the audit ([impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)), [rule_rest_reply_types_decode](#rule_rest_reply_types_decode) by
-regenerating the types ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)) and running the unit tests ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)).
+reading the types again ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)) and running the unit tests ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures)).
 
 ### Compliance matrix
 [Compliance_matrix](#compliance-matrix)
@@ -2138,7 +2162,7 @@ Where the plugin stands on each rule today:
 | [rule_rest_request_body_valid](#rule_rest_request_body_valid) | **Passes for every key the driver really sets.** Three optional keys in the Go request structs are not in the company schema, but they are never set ([dead code](#dead-code)). `properties` is an open object in the schema, so any sub-key is allowed. The `{}` body sent on GET and DELETE is outside every schema; [gap_jdss_rest_empty_body_on_get_delete](#gap_jdss_rest_empty_body_on_get_delete) found it has no effect. Prototype: `kub-testing/tmp/rest-audit/compliance_bodies.py` | dead-code commit |
 | [rule_rest_success_statuses_accepted](#rule_rest_success_statuses_accepted) | **Every 2xx status returned is accepted.** The code also accepts statuses that were never returned: [bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check), [bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay](#bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay), 202 on both snapshot GETs, 200 on `DeleteVolume`, 201 on list GETs, and 200 on creates that answer 201 | stage 3 ([bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check), [bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay](#bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay)); the rest are harmless and would stay |
 | [rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled) | **Fails.** [bug_plugin_rest_get_error_maps_body_only_ignores_http_status](#bug_plugin_rest_get_error_maps_body_only_ignores_http_status); `401` on `GetPool` is not mapped; [bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name](#bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name), [bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised), [bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone](#bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone), [bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised), [bug_rest_v4_shares_post_409_already_exists_unrecognised](#bug_rest_v4_shares_post_409_already_exists_unrecognised), [bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised), [bug_rest_v4_create_calls_out_of_space_messages_unrecognised](#bug_rest_v4_create_calls_out_of_space_messages_unrecognised), [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised) | stage 3 (with [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)) |
-| [rule_rest_reply_types_decode](#rule_rest_reply_types_decode) | **Fails.** [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch), [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch), [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch), [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch). ([bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec) decodes without an error, so it does not fail [rule_rest_reply_types_decode](#rule_rest_reply_types_decode)) | stage 2 ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types), generated types) |
+| [rule_rest_reply_types_decode](#rule_rest_reply_types_decode) | **Fails.** [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch), [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch), [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch), [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch). ([bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec) decodes without an error, so it does not fail [rule_rest_reply_types_decode](#rule_rest_reply_types_decode)) | stage 2 ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), transcribed types) |
 | [rule_rest_error_bodies_handled](#rule_rest_error_bodies_handled) | **Passes on jdss1 v4.** On jdss2, outside this document, [bug_jdss_rest_jdss2_v4_shares_share_delete_404_without_class](#bug_jdss_rest_jdss2_v4_shares_share_delete_404_without_class) fails it; only `DeleteShare` runs into it, and the dead-code commit would remove `DeleteShare` | dead-code commit |
 | [rule_rest_docs_vs_appliance_listed](#rule_rest_docs_vs_appliance_listed) | Differences found so far: `AttachVolumeToTarget` is documented as 200, the appliance returns 201; the [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch) and [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch) fields are documented as strings; [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch)'s v4 example shows `"off"`; for most zvol calls only the success status is documented, while the appliance also returns 400, 404 and 500; the `POST` used by [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete) is not documented and returns 405; target names are documented as up to 255 characters, but 225 is refused (220 accepted); target names are documented as lower case, but upper case is accepted; the name rules for zvols, NAS datasets and snapshots are not documented at all (the company schemas say only `"type": "string"`). The plugin already follows the appliance, except where a finding says otherwise | a list for the spec project ([Relationship](#relationship-to-other-designs)) |
 
@@ -2164,7 +2188,7 @@ entry says otherwise, a mismatch looks the same on jdss1 v3, jdss1 v4 and jdss2 
 | Plugin reads it? | no |
 | Effect | GetVolume and volume lists → `Internal` |
 | Seen live? | yes |
-| Assigned to | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types), stage 2 |
+| Assigned to | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), stage 2 |
 
 #### bug_rest_v4_pools_pool_get_iostats_type_mismatch
 
@@ -2178,7 +2202,7 @@ entry says otherwise, a mismatch looks the same on jdss1 v3, jdss1 v4 and jdss2 
 | Plugin reads it? | no |
 | Effect | GetCapacity → `Internal` |
 | Seen live? | yes |
-| Assigned to | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types), stage 2 |
+| Assigned to | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), stage 2 |
 
 #### bug_rest_v4_pools_pool_get_disk_led_type_mismatch
 
@@ -2192,7 +2216,7 @@ entry says otherwise, a mismatch looks the same on jdss1 v3, jdss1 v4 and jdss2 
 | Plugin reads it? | no |
 | Effect | the same; hidden behind [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch) |
 | Seen live? | present in the replies; never reported, because [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch) fails first |
-| Assigned to | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types), stage 2 |
+| Assigned to | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), stage 2 |
 
 #### bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch
 
@@ -2206,7 +2230,7 @@ entry says otherwise, a mismatch looks the same on jdss1 v3, jdss1 v4 and jdss2 
 | Plugin reads it? | **yes** |
 | Effect | iSCSI ListSnapshots → `Internal` as soon as the pool has a snapshot |
 | Seen live? | not yet: the ctrl-B ListSnapshots specs fail earlier, because the controller has already crashed (`connection refused`) |
-| Assigned to | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types), stage 2 |
+| Assigned to | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), stage 2 |
 
 #### bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch
 
@@ -2220,15 +2244,15 @@ entry says otherwise, a mismatch looks the same on jdss1 v3, jdss1 v4 and jdss2 
 | Plugin reads it? | no |
 | Effect | deleting a snapshot that has clones fails at `iscsi_driver.go:498` |
 | Seen live? | not yet |
-| Assigned to | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types), stage 2 |
+| Assigned to | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), stage 2 |
 
 
 No **type** mismatch was found in pool `available`/`size`, snapshots read by name,
 NAS volumes, NAS snapshots, targets, or error bodies. The other `Encryption` fields
 (`types.go:200`, `:560`) are fine in the recordings. `encoding/json` reports only the
 first type error in a reply, so a live test shows only the first failure and hides
-the rest; that is why all of them would be closed together, by the generated
-types ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)), and checked with [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures), not one at a time. For [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch) and [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch) **the docs are right and the code is
+the rest; that is why all of them would be closed together, by the transcribed
+types ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)), and checked with [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures), not one at a time. For [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch) and [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch) **the docs are right and the code is
 wrong**; for [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch) and [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch) the docs are wrong, and the code follows them.
 
 #### bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec
@@ -2241,7 +2265,7 @@ wrong**; for [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_poo
 | Plugin reads it? | only `name`, `quota`, `origin`, `copies` and `recordsize`, whose keys match |
 | Effect | none today: a type check only sees keys that are present, so the other fields stay empty without an error, and nothing reads them. This is why the NAS volume struct reads so little. With no quota set, `quota` is `null`, which leaves the size at 0 (review `bug_plugin_driver_nas_quota_null_size_zero`, a driver issue) |
 | Seen live? | nothing to see: no failure |
-| Assigned to | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types), stage 2 |
+| Assigned to | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), stage 2 |
 
 ### Response content and defaults
 [Response_content_and_defaults](#response-content-and-defaults)
@@ -2256,7 +2280,7 @@ the plugin never sets.
 | Where | `ResourceSnapshotShort.Volume` ([`types.go:294`](../../pkg/rest/types.go#L294)) |
 | What happens | there is no such key: the appliance sends `parent.name`. `Volume` stays empty, and the lister skips the entry (`controller/listers.go:54`). **Once [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch) is fixed, iSCSI ListSnapshots would return an empty list, without an error** |
 | Evidence | recorded replies, code reading |
-| Assigned to | [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types), stage 2 |
+| Assigned to | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), stage 2 |
 
 #### bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key
 
@@ -2265,7 +2289,7 @@ the plugin never sets.
 | Where | `ResourceNASSnapshotParent.UnmarshalJSON` ([`types.go:658`](../../pkg/rest/types.go#L658)) |
 | What happens | reads `type` under the tag `copies`, so `Parent.Type` is always 0. Unused today, but both all-snapshot lists return zvol **and** NAS snapshots, and `parent.type` (4 zvol, 1 NAS) is the only way to tell them apart (hurl Finding 14); stage 3 would read it and drop the other kind's entries ([question 7](#decisions)) |
 | Evidence | code reading |
-| Assigned to | the key: [impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types), stage 2; the filter by kind: [Stage 3](#stage-3-behaviour-and-error-mapping) ([question 7](#decisions)) |
+| Assigned to | the key: [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec), stage 2; the filter by kind: [Stage 3](#stage-3-behaviour-and-error-mapping) ([question 7](#decisions)) |
 
 #### bug_plugin_rest_list_calls_send_page_without_per_page
 
@@ -2292,7 +2316,7 @@ the plugin never sets.
 | Where | `GetVolumeSnapshot` ([`storageapi.go:191`](../../pkg/rest/storageapi.go#L191)) |
 | What happens | a zvol snapshot GET has **no `name` key** (NAS snapshot GETs do), so `ResourceSnapshot.Name` and the iSCSI `GeneralSnapshot.Name` (`iscsi_driver.go:455`) are always empty. No caller reads it; callers take the name from the snapshot descriptor. Low |
 | Evidence | recorded replies |
-| Assigned to | not assigned: no caller reads the name, and the generated types do not require it ([Table 2](#impl_plugin_rest_generated_reply_types)) |
+| Assigned to | not assigned: no caller reads the name, and the reply types do not require it ([Table 2](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)) |
 
 #### bug_plugin_volume_snapshot_list_entries_read_as_snapshots_by_name
 
@@ -2725,7 +2749,7 @@ appliance numbers; [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest
 `creation`: documented number, appliance number; [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch) `is_clone`: documented
 `true`, appliance boolean.
 
-**The compiled OpenAPI, jdss2 v4 file:** 663 `type: 'null'` fields, 81
+**The compiled OpenAPI, jdss2 v4 file** (a build output, not an input): 663 `type: 'null'` fields, 81
 `anyOf`, no `additionalProperties: false` (closedness is enforced by
 `--check`, not by the schema); `is_clone` as a boolean with a one-value
 enum; the tab defect at line 15389 (in the jdss1 v4 file from line 14954).
@@ -2760,7 +2784,7 @@ enum; the tab defect at line 15389 (in the jdss1 v4 file from line 14954).
 | preset | a group of csi-sanity tests run together, such as ctrl-A, ctrl-B, ctrl-cap or node |
 | cycle | one `dev_cycle.py` run: build the plugin, deploy it to the lab, run the csi-sanity presets. Named by date and time, e.g. `20261102-140341` |
 | kub-gate | the lab machine where the plugin is built, deployed and unit-tested (`dev_cycle.py` runs there) |
-| analysis machine | the machine with the spec repo and the hurl recordings, where the audit scripts and the type generator run; it has no Go |
+| analysis machine | the machine with the spec repo and the hurl recordings, where the audit scripts run and the spec is read; it has no Go |
 | company spec, empirical spec | the API as Open-E documents it, and the API as the appliances behaved in the hurl runs ([Table 5](#the-jdss-rest-api-spec-repository)) |
 | decode | turn a JSON reply into a Go struct (Go's `encoding/json`) |
 | zvol | a ZFS block volume; the plugin uses it for iSCSI volumes |
@@ -2771,8 +2795,7 @@ enum; the tab defect at line 15389 (in the jdss1 v4 file from line 14954).
 | repeated request | CSI may send the same create or delete again; the plugin must treat "already exists" on a create, and "not found" on a delete, as success |
 | request log | the line the plugin writes at Debug for each REST call once [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging) is in the build: method, path with its query string, and status; no body and no header. For a failed call the error handler adds `class`, `errno` and message ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)) |
 | fixture | a recorded reply saved in the repo as test data for unit tests |
-| generated types | the reply types in `pkg/rest/types_gen.go`, written by `tools/rest-types-gen.py` from the spec repo's recorded API and never edited by hand ([impl_plugin_rest_generated_reply_types](#impl_plugin_rest_generated_reply_types)) |
-| mapping | `pkg/rest/types_gen.yaml`: for each generated type, the endpoint it comes from and the fields the plugin reads, each required or optional |
+| transcribed types | the reply types in `pkg/rest/types.go`, written by an agent from the spec repo's tracked TypeSpec of the recorded API; the file's header names the spec commit ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)) |
 | stage 1-4 | the four stages of [What changes](#what-changes); the commits before stage 1 and the supporting work are outside them; not the CSI NodeStage call |
 | `vp_`, `vb_`, `vs_`; `sp_`, `sb_`, `ss_` | the prefixes of the names the plugin gives volumes (`v`) and snapshots (`s`) on the appliance: `p` for the CSI name as it is, `b` for its base32 form, `s` for a SHA-256 hash of it ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids)) |
 | short entry, full snapshot | the two shapes in which the appliance describes a snapshot: the short entry of a list (`name`, `parent`, `properties`), and the full object of a read by name, with `clones` and `volsize` |
