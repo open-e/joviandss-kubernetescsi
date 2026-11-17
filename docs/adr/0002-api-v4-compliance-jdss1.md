@@ -349,6 +349,8 @@ the drivers change where they read a field whose type or key changes
 (question 38, which replaces 28); every error the storage can send for a call is mapped
 for that call, from its status, `class`, `errno` and message, and an unknown one is logged once in full by the REST module
 ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue));
+a 404 means "not found" whatever its body (question 40), and a GET answered
+without data is sent again, `tries` times at most (question 39);
 each driver lists only its own snapshot kind (question 7); IDs and names are validated where the CSI parsers read them, with two
 entry points left uncovered ([Relationship](#relationship-to-other-designs)), generated volume names
 are at most 131 characters and target names lower case (questions 20 and 21); the plugin speaks HTTPS
@@ -686,6 +688,22 @@ Would fix the rest of [response content](#response-content-and-defaults), the
   [bug_rest_v4_shares_post_409_already_exists_unrecognised](#bug_rest_v4_shares_post_409_already_exists_unrecognised) (NFS CreateVolume retry): map `Share ... already exists`
   to "exists" and treat an existing share as success. [bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised)
   (NFS delete of a clone that is already gone): map to "not found".
+- The NFS `deleteIntermediateSnapshot` (`nfs_driver.go:184-228`) would read
+  a snapshot's clones before it deletes the snapshot, by the rule of the
+  cleanup (user decision, [question 34](#decisions)): `GET .../snapshots/<s>/clones`
+  first, the delete only when that reply lists no clone, and nothing
+  deleted when the call fails. `CreateVolumeFromVolume` calls the function
+  when the create of the intermediate snapshot is answered "already exists"
+  (`nfs_driver.go:254-255`), an answer that is not recognised today and
+  would be with [bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised), and when the
+  clone create fails (`:264`). The function deletes first and looks at the
+  clones only after a refusal (`:193-219`), and the appliance does not
+  refuse: it deletes a NAS snapshot that has a clone, and the clone with it
+  ([risk 23](#risks)). With a clone listed, the function would go on as it
+  does today after a refusal. The iSCSI function stays as it is, because
+  the appliance refuses the delete of a zvol snapshot that has a clone.
+  What must hold: the NFS driver deletes no intermediate snapshot before
+  the appliance has answered that it has no clones.
 - [bug_rest_v4_create_calls_out_of_space_messages_unrecognised](#bug_rest_v4_create_calls_out_of_space_messages_unrecognised): an exact entry for each out-of-space reply, matched on status, `class`, `errno` and message pattern like every other entry
   (user decision): on the zvol create 400, `BadRequest`, no errno, `New zvol size(...) exceeds available space`;
   on the NAS volume create 500, `ZfsCmdError`, errno 4, `cannot create ...: out of space`; and the entries not in
@@ -700,7 +718,7 @@ Would fix the rest of [response content](#response-content-and-defaults), the
 - [bug_plugin_rest_get_error_maps_body_only_ignores_http_status](#bug_plugin_rest_get_error_maps_body_only_ignores_http_status): today the code decodes the body first and looks at the HTTP
   status only afterwards, so a reply without a JSON body (a plain-text 401 or 404,
   or a 204 with no body at all) is reported as a parsing problem. The fix: check
-  the status first, which also fixes [bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check); when the body is not
+  the status first, which the handler of [bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check) below needs too; when the body is not
   JSON, map the status itself (401 and 403 to a new "authentication failed" code
   that names the endpoint, 404 to "not found") and keep the first bytes of the body
   in the message. A wrong password would then say so. The JovianDSS 2 design would
@@ -708,10 +726,36 @@ Would fix the rest of [response content](#response-content-and-defaults), the
   plain-text 401 gives the authentication-failed code with the endpoint named,
   a plain-text 404 gives "not found", and neither is reported as a parsing
   problem.
+- [bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check): a GET answered without data would get a handler of
+  its own (user decision, [question 39](#decisions)). A 204 has no body, so
+  it gives the caller nothing to read: no volume, no pool, no list. Five
+  GETs name 204 as success today, in a branch the code cannot reach. One
+  function in `pkg/rest`, which every GET the plugin sends would pass
+  through, would take such a reply and send the same GET again after a
+  pause, until a reply carries data or the request has been sent `tries`
+  times in all. `tries` is the existing setting of the REST endpoint
+  configuration, 3 when it is not set (`rproxy.go:260-262`), which nothing
+  reads today ([bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover)):
+  3 means the first request and two more, 1 means no second request. The
+  pause would be a new setting beside it, a duration written like
+  `idletimeout`; proposed name `retrydelay`, proposed default 1 s. A reply
+  other than 204 to a repeated request would be handled as if it had come
+  first. When a later request gets its data, the call would log one line
+  at Warn with the method, the path and how many requests were answered
+  204 before it: no recording shows a 204 on a GET, so the first one must
+  leave a trace (user decision). When the last reply is a 204 too, the call would fail with an
+  error naming the status and the number of requests sent. A 204 would
+  never become an empty object or an empty list: a caller would read those
+  as a volume of size 0, a full pool, or a snapshot without clones, which
+  the cleanup would then delete ([risk 23](#risks)). What must hold: a GET
+  answered 204 is sent again after `retrydelay`, `tries` times in all at
+  most; a reply with data to any of them is returned as if it were the
+  first, and a call that got its data after a 204 leaves one line at Warn;
+  and 204 to all of them is an error naming the status, never an
+  empty result.
 - [bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay](#bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay): remove the 202 branch, so a 202 would be treated as an error
-  like any other unexpected status ([risk 6](#risks)). What must hold: a GET
-  answered 204 is the empty result, not a parse error ([bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check)),
-  and a 202 on `CreateTarget` is an error naming the status.
+  like any other unexpected status ([risk 6](#risks)). What must hold: a 202
+  on `CreateTarget` is an error naming the status.
 - Review [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error): `cleanIntermediateSnapshots` checks the type of the
   snapshot list before it checks whether the listing failed, so a real error such
   as "not found" turns into "unknown failure"; and the NFS version expects zvol
@@ -827,6 +871,13 @@ handling errors.
   reply against the catalogue entries of the call that failed, and anything that does not match becomes `RestErrorUnknown` with the
   status, `class`, `errno`, message and endpoint kept in the error. Nothing is
   guessed: an unknown error is never turned into "busy", "exists" or "not found".
+  A 404 is not a guess: a reply with that status means "not found" whatever
+  its body (user decision, [question 40](#decisions)). The entry it matches
+  says what is missing, the pool, the parent, the target or the object
+  itself; a 404 that matches no entry of its call, with a JSON body or
+  without one, would get the general not-found code
+  (`RestErrorResourceDNE` today) and keep its fields in the error
+  ([risk 24](#risks)).
   A call that gets no reply at all, a transport error, goes through the same
   handler and gets its log line there ([impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes)).
 - **One log line per failed call, in one format**, written by that handler:
@@ -835,7 +886,9 @@ handling errors.
   that "not found" on a repeated delete is fine), so it logs every error it
   recognises at Debug and every unknown error at Error. An error whose
   entry says Unknown on purpose is logged at Error too: the plugin cannot
-  say what it means, and that has to be seen (user decision). "One line" and "once"
+  say what it means, and that has to be seen (user decision). So would a
+  404 that matches no entry of its call: its status gives the meaning, but
+  the catalogue does not hold the reply, and that has to be seen as well. "One line" and "once"
   mean once in the REST module: no other code in `pkg/rest` logs the same
   failure again. What the driver and the controller log for a failed
   operation is their own record, and this document does not change it
@@ -853,7 +906,8 @@ handling errors.
   call that the catalogue does not cover for that call, so a new error in a hurl run shows up as
   a failed check.
 
-What must hold: every error a call's list holds maps to the code its entry gives for that call; an `errno` that is a number, one that is `null` and one that is missing are three different inputs to the matching; and an
+What must hold: every error a call's list holds maps to the code its entry gives for that call; an `errno` that is a number, one that is `null` and one that is missing are three different inputs to the matching; a 404 that matches no entry of
+its call gets the general not-found code and is logged at Error; and an
 unknown body keeps all its fields and is logged once by `pkg/rest`.
 
 ### Stage 4: robustness and security
@@ -976,7 +1030,8 @@ so the setting decides whether the name meets the target rule above.
 `SetupControllerPlugin` (`controllerplugin.go:143`) would check the prefix once
 against that rule and return an error for upper case, other characters, or a
 prefix so long that `prefix + 1 + 64` exceeds 220; today only the hash's length
-is checked (`iscsi_driver.go:571`).
+is checked (`iscsi_driver.go:571`). What the plugin does with that error at
+startup is not decided here ([question 41](#decisions)).
 
 What must hold: an ID that breaks the rules of the table fails with
 `InvalidArgument` at the two parsers, before any REST call; no generated
@@ -1023,8 +1078,11 @@ error for an `iscsi.iqn` prefix outside the target rule.
   keys, and the same edit would correct what the project review found wrong in
   it: `pool` belongs at the top level, not under `endpoint`
   (`pkg/common/common.go:76`); the key is `logfile`, not `logpath` (`:75`);
-  `tries` and the addresses after the first in `addrs` are not used
-  ([bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover)) and would be marked so.
+  the addresses after the first in `addrs` are not used
+  ([bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover)) and would be marked so; `tries` and
+  `retrydelay` would be described as what stage 3 makes of them, the
+  number of requests and the pause for a GET answered without data
+  ([question 39](#decisions)).
 
 What must hold: with neither setting, a connection to an appliance whose
 certificate does not verify fails with an error that names the certificate
@@ -1142,7 +1200,7 @@ agrees with this document.
 - The whole of this document is implemented as one series; stages 3 and 4
   need no further record: their files, risks and tests are in
   [Affected systems and files](#affected-systems-and-files),
-  [risks 4 to 8, 10, 11, 13, 14 and 23](#risks) and [Testing](#testing).
+  [risks 4 to 8, 10, 11, 13, 14, 23 and 24](#risks) and [Testing](#testing).
 
 Confidence: high for JovianDSS 1 at the recorded release, where v3 and v4 are
 recorded identical and every reply of every call is validated against the
@@ -1154,8 +1212,10 @@ is claimed for older JovianDSS 1 releases, which are not supported
 
 Re-evaluate when a new recording changes the type of a read field, when
 the spec project changes the layout of its OpenAPI, or when the reading
-and review of each new recording costs more than a generator would: the
-tracked OpenAPI makes generating the types possible
+and review of each new recording costs more than a generator would, or
+when a generator has been shown to handle the optional fields: the
+tracked OpenAPI makes generating the types possible, and the optional
+fields are why it is set aside
 ([question 38](#decisions)). An installation on a release
 older than the minimum is outside what this document supports and does not
 reopen it ([question 29](#decisions)).
@@ -1384,14 +1444,45 @@ the types ([risk 1](#risks)).
    [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots),
    [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error) and
    [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete).
-   Guard: the cleanup asks the appliance for each snapshot's clones before
-   it deletes the snapshot ([impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow),
+   Stage 3 would open a second way to the same loss. `CreateVolumeFromVolume`
+   calls `deleteIntermediateSnapshot` when the create of the intermediate
+   snapshot is answered "already exists" (`nfs_driver.go:254-255`), which
+   the NFS driver would recognise for the first time
+   ([bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised)),
+   and that function deletes the snapshot without looking at its clones
+   (`:193`). The controller checks first whether the volume exists
+   (`controllerplugin.go:506`), so this way needs a volume left half-created,
+   or two requests for the same volume at the same time, which nothing
+   serialises (`lockVolume`, `controllerplugin.go:200`, has no caller).
+   Guard: the cleanup and the NFS `deleteIntermediateSnapshot` ask the
+   appliance for a snapshot's clones before they delete it
+   ([impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow),
+   [Stage 3](#stage-3-behaviour-and-error-mapping),
    [question 34](#decisions)), and [Testing](#testing) step 5 deletes such a
-   volume and checks that its clone is still there. The clones reply is a
+   volume and checks that its clone is still there; the second way has no
+   test in this delivery ([Testing](#testing) step 1). The clones reply is a
    read like any other: a clone made moments before could be missing from it
    ([risk 14](#risks)). The same loss through
    DeleteSnapshot does not depend on this delivery and is handled outside it
    ([Relationship](#relationship-to-other-designs)).
+24. **A 404 is "not found" whatever its body ([question 40](#decisions)).**
+   Not every 404 has to mean that an object is missing. The plain-text 404s
+   in the recordings answer a name with an escaped slash, a path the
+   appliance does not route, and a path it does not serve at all would
+   likely get the same; a 404 could also carry a message no recording
+   shows. The call would take any of them as "does not exist", so a delete
+   would report success while the object stays: on an appliance that does
+   not serve this v4 ([risk 2](#risks)), possibly every delete. In the
+   recordings a 404 always names something that does not exist: the 34 that
+   the scenarios files of the plugin's calls hold on jdss1 v4 are a missing
+   pool, parent, target, attachment or clone, or a name no object can
+   have. Guard: IDs and names are checked before any REST call
+   ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids)), except at the two entry
+   points the [Relationship](#relationship-to-other-designs) names; a 404
+   that matches no entry of its call is logged at Error with its fields
+   ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)); and the minimum release is stated
+   ([risk 2](#risks)). What these do not cover has no guard in this
+   delivery.
 
 ## Affected systems and files
 [Affected_systems_and_files](#affected-systems-and-files)
@@ -1432,12 +1523,13 @@ step 5) and, where it is `pkg/rest` code, by unit tests.
 | `pkg/rest/errors.go`, `targets.go` | [bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name](#bug_plugin_rest_target_not_exists_pattern_is_a_hard_coded_test_name), [bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised), [bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone](#bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone), [bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised), [bug_rest_v4_shares_post_409_already_exists_unrecognised](#bug_rest_v4_shares_post_409_already_exists_unrecognised) and [bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised) *NFS*, [bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay](#bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay), [bug_rest_v4_create_calls_out_of_space_messages_unrecognised](#bug_rest_v4_create_calls_out_of_space_messages_unrecognised), [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised) | 3 |
 | `pkg/rest/errors.go`, `storageapi.go` (`getError`); `pkg/driver/iscsi_driver.go`, `nfs_driver.go`, `pkg/controller/*.go` (callers) | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue): error catalogue, one handler and log line, codes per kind; callers decide on the code only (`iscsi_driver.go:520` included) | 3 |
 | `pkg/driver/iscsi_driver.go`, `nfs_driver.go` (`DeleteVolume`, `cleanIntermediateSnapshots`) | review [bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children](#bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children) (cleanup also on `volume has children`, with [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)), [bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error](#bug_plugin_driver_clean_intermediate_snapshots_type_check_before_list_error) (listing error first; NFS takes the NAS short entries, *NFS*) | 3 |
-| `pkg/rest/storageapi.go` (`getError`), `clones.go`, `pools.go`, `targets.go`, `nas_volumes.go`, `nas_volumes_snapshots.go`, `nas_volumes_snapshots_clones.go`, `shares.go`, `entrielisters.go` | [bug_plugin_rest_get_error_maps_body_only_ignores_http_status](#bug_plugin_rest_get_error_maps_body_only_ignores_http_status) and [bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check): status checked before decoding, non-JSON bodies mapped by status | 3 |
+| `pkg/rest/storageapi.go` (`getError`), `clones.go`, `pools.go`, `targets.go`, `nas_volumes.go`, `nas_volumes_snapshots.go`, `nas_volumes_snapshots_clones.go`, `shares.go`, `entrielisters.go`; `rproxy.go` and `pkg/common/common.go` (`RestEndpointCfg`: `tries` read, `retrydelay` new) | [bug_plugin_rest_get_error_maps_body_only_ignores_http_status](#bug_plugin_rest_get_error_maps_body_only_ignores_http_status) and [bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check): status checked before decoding, non-JSON bodies mapped by status, a GET answered 204 sent again ([question 39](#decisions)) | 3 |
+| `pkg/driver/nfs_driver.go` (`deleteIntermediateSnapshot`) | the clones read before an intermediate snapshot is deleted ([question 34](#decisions), [risk 23](#risks)) *NFS* | 3 |
 | `pkg/rest/rproxy.go`, `errors.go`, `rest.go` | [impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes): [crash_plugin_rest_nil_response_on_transport_error](#crash_plugin_rest_nil_response_on_transport_error), [crash_plugin_rest_basic_auth_before_request_check](#crash_plugin_rest_basic_auth_before_request_check), [crash_plugin_rest_error_from_nil_body](#crash_plugin_rest_error_from_nil_body), [crash_plugin_rest_setup_endpoint_ignores_error](#crash_plugin_rest_setup_endpoint_ignores_error), [crash_plugin_rest_endpoint_string_empty_addrs](#crash_plugin_rest_endpoint_string_empty_addrs) | 4 |
 | `pkg/rest/rproxy.go` | [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging): no request body or header logged ([security_plugin_secrets_in_logs](#security_plugin_secrets_in_logs), [security_plugin_rest_request_dump_every_call](#security_plugin_rest_request_dump_every_call)) | before 1 |
 | every `pkg/rest/*.go` with a path builder | [impl_plugin_rest_escape_path_segments](#impl_plugin_rest_escape_path_segments): `url.PathEscape` on every path segment ([security_plugin_rest_unescaped_path_segments](#security_plugin_rest_unescaped_path_segments)) | 4 |
 | `pkg/driver/lunid.go` (`NewVolumeDescFromName` threshold 240 → 128), `snapid.go`; `pkg/controller/controllerplugin.go` (`iscsi.iqn` prefix check); `pkg/rest` path builders | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids): ID and name validation, generated names at most 131 characters, target prefix checked | 4 |
-| `pkg/rest/rproxy.go`, `pkg/common/common.go` (`RestEndpointCfg`, with `yaml` tags), `docs/configuration.md` (new keys; `pool` and `logfile` corrected; `tries`, extra `addrs` and `prot` marked unused), `docs/install.md`, `docs/install-nfs.md`, the controller manifests (the CA file in the config Secret) | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile): HTTPS only, certificate checks, `insecure`, `cafile`, TLS 1.3, no redirects; [impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit): `maxreplysize` | 4 |
+| `pkg/rest/rproxy.go`, `pkg/common/common.go` (`RestEndpointCfg`, with `yaml` tags), `docs/configuration.md` (new keys; `pool` and `logfile` corrected; `tries` and `retrydelay` described; extra `addrs` and `prot` marked unused), `docs/install.md`, `docs/install-nfs.md`, the controller manifests (the CA file in the config Secret) | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile): HTTPS only, certificate checks, `insecure`, `cafile`, TLS 1.3, no redirects; [impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit): `maxreplysize` | 4 |
 | `pkg/rest/storageapi.go:51`, `:53`, `errors.go:173`, `:265`, `targets.go:45`, `:76`, `:150`, `:184` | [impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply): `"%s"` formats and direct arguments, so `go vet` passes for `pkg/rest` | first commit |
 | `pkg/controller/controllerplugin.go`, `pkg/node/publish.go` | [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs): no whole CSI requests in logs | before 1 |
 | `CHANGELOG.md` | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile): certificate checks on by default, `cafile`/`insecure` needed for self-signed certificates | 4 |
@@ -1476,7 +1568,10 @@ agent's: the items say what they must show, and this section only runs them.
    NFS cleanup reaching [bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete](#bug_plugin_rest_delete_nas_volume_snapshot_sends_post_not_delete)'s call. kub-testing holds these seven as checks of T11 (`testcases/plugin-checks-design-0002.md`) for later; the
    live cycles (steps 4 and 5) exercise them as far as csi-sanity reaches them.
    The callers changed by [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow) are not among the seven and have no automated
-   check either.
+   check either. Nor has the clones read of the NFS
+   `deleteIntermediateSnapshot` ([risk 23](#risks)), and the live cycles
+   are not expected to reach it: the state it guards needs a volume left
+   half-created or two requests for one volume at the same time.
 2. **Audit and compliance (analysis machine, the agent).** Proves that every call
    the plugin makes meets the rules on jdss1 v4. Needs the spec repository refreshed by the user with
    `build_typespec.py --check`, and the audit tool of [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool),
@@ -1608,8 +1703,10 @@ test appliance.
 10. **Not testable here:** [gap_jdss_rest_detach_and_delete_with_connected_clients](#gap_jdss_rest_detach_and_delete_with_connected_clients) beyond steps 6 and 7 (several nodes, a pool moving
     between nodes), [gap_plugin_rest_failover_during_call](#gap_plugin_rest_failover_during_call), JovianDSS 2 live, which needs
     [JovianDSS 2 support](#future-work-joviandss-2-support) (a later version) and a
-    jdss2 pool, and `maxreplysize` ([impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit)), which the
-    lab's replies, about 66 KB at most against a default of 16 MiB, never reach.
+    jdss2 pool, `maxreplysize` ([impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit)), which the
+    lab's replies, about 66 KB at most against a default of 16 MiB, never reach,
+    and the handler of a GET answered 204 ([question 39](#decisions)), a
+    reply no appliance has given in any recorded run.
 11. **No test of a verified connection.** Step 4 runs with `cafile` or
     `insecure`, whichever the lab appliance's certificate allows, and no test
     here covers the cases apart: a certificate imported into the appliance and
@@ -1660,11 +1757,14 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
 | 31 | Which spec output is read? | the tracked OpenAPI, `empirical/jdss1/v4/openapi3/`: the path file of each call for the reply types, the schema of each kind of error, and the `-scenarios.json` beside the TypeSpec for which case gave which error. Not the build folder under `empirical/pilot/tools/tsp/`, which git ignores. It was: the tracked `.tsp` files, while the spec project had no tracked OpenAPI. | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
 | 32 | Which read fields are optional? | read from the spec project's OpenAPI, not listed by hand: a read field is optional when the recordings show it missing or `null` at least once, and required when no recording does; each call so has one reply template. `origin`, `clones` and NAS `quota` are the ones the OpenAPI shows. A required field that an unrecorded appliance state drops fails by name ([risks 9 and 16](#risks)). It was: those three, with the list left open for testing to extend. | [Table 2](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
 | 33 | Where does the procedure for refreshing the reply types live? | in the plugin's documentation, since the types file is the plugin's; the page is written separately, not in this delivery. | [Relationship](#relationship-to-other-designs) |
-| 34 | Where does `cleanIntermediateSnapshots` take a snapshot's clones from, and when? | from `GET .../snapshots/<s>/clones`, asked for each intermediate snapshot before it is deleted, in both drivers and in the same commits as the list change; no waiting for the separate driver fix. | [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow), [risk 23](#risks) |
+| 34 | Where does `cleanIntermediateSnapshots` take a snapshot's clones from, and when? | from `GET .../snapshots/<s>/clones`, asked for each intermediate snapshot before it is deleted, in both drivers and in the same commits as the list change; no waiting for the separate driver fix. The NFS `deleteIntermediateSnapshot` reads the clones the same way before its delete. | [impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow), [Stage 3](#stage-3-behaviour-and-error-mapping), [risk 23](#risks) |
 | 35 | How does [Testing](#testing) step 5 observe that the clone survived? | by a read made by hand: after the source volume is deleted through the plugin, `GET pools/<pool>/nas-volumes/<clone>` on the appliance answers 200. csi-sanity deletes the source and never looks at the clone, so the cycle alone cannot show it; the check is kept in the tracker with the other driver checks (kub-testing `ISSUES.md`, T11). | [Testing](#testing) step 5, [risk 23](#risks) |
 | 36 | Where in the series do the two logging items go? | at the front, right after the `go vet` commit: no password or CSI secret may reach a log at any level, so no build that is run live may predate them; the log level is set in the configuration. Weighed against: leaving them in stage 4 and tracing a failure on builds at Info, which still print CSI `Secrets` at Warn. | [Before stage 1](#before-stage-1-keep-secrets-out-of-the-logs), [Testing](#testing) step 8 |
 | 37 | What does "logged once" cover? | the REST module: the handler writes the one line of `pkg/rest` for a failed call, with the appliance's fields in full. The driver and the controller make their own log records for a failed operation, and this document does not prescribe or change them. | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) |
-| 38 | Generate the reply types, or have an agent transcribe them? | transcribe: an agent reads the spec project's tracked OpenAPI and writes the Go types and the error catalogue; no generator, mapping file or compiler. Weighed against: generating from an OpenAPI, which the spec project did not track when this was decided; compiling the TypeSpec with Node, a tool chain to keep; a `.tsp` parser in the plugin. Kept when the tracked OpenAPI arrived: it became what the agent reads, and a generator stays set aside. Price: each new recording is a new reading and a review, and the match with the spec is shown by the audit's comparison, not by regenerating ([risk 17](#risks)). | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
+| 38 | Generate the reply types, or have an agent transcribe them? | transcribe: an agent reads the spec project's tracked OpenAPI and writes the Go types and the error catalogue; no generator, mapping file or compiler. Weighed against: generating from an OpenAPI, which the spec project did not track when this was decided; compiling the TypeSpec with Node, a tool chain to keep; a `.tsp` parser in the plugin. Kept when the tracked OpenAPI arrived: it became what the agent reads, and a generator stays set aside because of the optional fields: how well an automated tool would handle them is not known. Price: each new recording is a new reading and a review, and the match with the spec is shown by the audit's comparison, not by regenerating ([risk 17](#risks)). | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
+| 39 | What does the plugin do with a GET answered without data, a 204? | a handler of its own in `pkg/rest` sends the GET again after a configurable pause, `tries` times in all at most; a 204 that a later request makes good is logged at Warn; 204 to the last one is an error naming the status, never an empty result. | [Stage 3](#stage-3-behaviour-and-error-mapping) |
+| 40 | What does a 404 mean when its body is not JSON, or matches no entry of its call? | "not found": the status decides, whatever the body; the entry a 404 matches says only what is missing. | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), [risk 24](#risks) |
+| 41 | What does the plugin do at startup when controller setup returns an error, as it would for a refused `iscsi.iqn` prefix? | not decided here: today the error ends in a panic, and the question is kept in the issue tracker. | [Relationship](#relationship-to-other-designs) |
 
 ## Relationship to other designs
 [Relationship_to_other_designs](#relationship-to-other-designs)
@@ -1716,6 +1816,14 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
   `NewVolumeDescFromVDS` without passing the CSI parser
   (`controllerplugin.go:550`, `:345`): `bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser`
   (kub-testing `issues/security.md`), handled with the same work.
+- What the plugin does at startup when controller setup returns an error
+  ([question 41](#decisions)): `main.go` drops the error and calls `Run()`
+  on a server that was never made, so the controller ends in a nil-pointer
+  panic (`crash_plugin_ctrl_main_ignores_setup_error`, kub-testing
+  `issues/crashes.md`; `app/joviandssplugin/main.go:124`, `:126`). Not
+  fixed and not decided here. The `iscsi.iqn` check of
+  [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) adds one more setup error
+  that ends there; 0003 holds the crash as its open question 3.
 - `sparse` provisioning ([bug_plugin_rest_create_volume_never_sets_sparse](#bug_plugin_rest_create_volume_never_sets_sparse)): sparse by default,
   configurable in the plugin configuration and per StorageClass; its own design
   ([question 9](#decisions)).
@@ -1742,7 +1850,10 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
   ([REST client behaviour](#rest-client-behaviour)) this delivery leaves
   [bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover) and
   [bug_plugin_rest_request_built_without_context_csi_deadline_not_applied](#bug_plugin_rest_request_built_without_context_csi_deadline_not_applied) to a later REST client
-  design; the other three entries are fixed here.
+  design; the other three entries are fixed here. Of the first, stage 3
+  uses `tries` for one case only, a GET answered without data
+  ([question 39](#decisions)); a request that fails in transport is still
+  not sent again, and the other addresses are still not used.
 - Security: every [security finding](#security-findings) is fixed in this delivery:
   [impl_plugin_rest_escape_path_segments](#impl_plugin_rest_escape_path_segments), [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids), [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile) and [impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit) in [stage 4](#stage-4-robustness-and-security), [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging) and [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs) [before stage 1](#before-stage-1-keep-secrets-out-of-the-logs), [impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply) in the
   [first commit](#first-commit-make-go-vet-pass-in-pkgrest).
@@ -1887,6 +1998,30 @@ list already rests on the recordings, through the OpenAPI
   apart, a number, `null` and a missing key, with the extra code that needs.
 - User decision (2026-11-17): out of space gets exact catalogue entries;
   it is no longer recognised by its message whatever the errno.
+- Review of this document (2026-11-17): the NFS
+  `deleteIntermediateSnapshot` deletes an intermediate snapshot without
+  reading its clones, a second way to the loss of risk 23; a GET answered
+  204 has no data to return as "the empty result"; a controller setup
+  error ends in a panic at startup.
+- User decision (2026-11-17, question 34): the clones read also covers the
+  NFS `deleteIntermediateSnapshot`, in this delivery.
+- User decisions (2026-11-17, question 39): a GET answered without data
+  gets a handler of its own and is sent again; the number of requests is
+  the existing `tries` setting; the pause between them is configurable;
+  when the last one is answered 204 too, the call fails with an error
+  naming the status; a 204 that a later request makes good is logged at
+  Warn.
+- User decision (2026-11-17, question 40): a reply with status 404 is
+  treated as "not found".
+- User decision (2026-11-17, question 41): what the plugin does at startup
+  when controller setup returns an error is outside this document and is
+  kept in the issue tracker.
+- User decision (2026-11-17, question 38): transcription was chosen because
+  the replies have optional fields, and it is not known how well an
+  automated tool would handle them.
+- jdss-rest-api-spec, the scenarios files of the plugin's calls on jdss1 v4
+  at commit `94d0c4f` (read 2026-11-17): 34 of the 333 recorded errors are
+  404s, each for something that does not exist.
 - User decision (2026-11-16): the audit checks the reply types too, by
   comparing `types.go` with the OpenAPI.
 - User decisions (2026-11-16): an error handled as Unknown on purpose is
@@ -2644,7 +2779,7 @@ Bugs in the REST code itself, whatever the appliance does.
 | Where | every `Get*` that accepts 204 (`GetVolume`, `GetPool`, `GetNASVolume`, `GetVolumeSnapshotClones`, `GetNASVolumeSnapshotClones`; e.g. [`storageapi.go:95-99`](../../pkg/rest/storageapi.go#L95)) |
 | What happens | decodes the body **before** checking the status. A real 204 has no body, so decoding fails and returns `RestErrorRPM`: the 204 success branch can never be reached. No GET answered 204 in any recorded run |
 | Evidence | code reading |
-| Assigned to | [Stage 3](#stage-3-behaviour-and-error-mapping): the status is checked before the body is decoded |
+| Assigned to | [Stage 3](#stage-3-behaviour-and-error-mapping): the status is checked before the body is decoded, and a GET answered 204 is sent again ([question 39](#decisions)) |
 
 #### bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay
 
@@ -2819,7 +2954,7 @@ stage 3 by [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)
 | Where | `rproxy.go:91`, `:274`, `:281` |
 | Behaviour | `tries` and every address after the first are never used: no retry and no failover (gap [gap_plugin_rest_failover_during_call](#gap_plugin_rest_failover_during_call)) |
 | Evidence | code reading (the code reviews, [ID sources](#id-sources)) |
-| Assigned to | not this document: a later REST client design ([Relationship](#relationship-to-other-designs)) |
+| Assigned to | not this document: a later REST client design ([Relationship](#relationship-to-other-designs)). Only `tries` gets a use here, for a GET answered without data ([Stage 3](#stage-3-behaviour-and-error-mapping), [question 39](#decisions)) |
 
 #### bug_plugin_rest_reply_text_as_format_string
 
