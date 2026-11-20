@@ -120,14 +120,21 @@ print(f"Stages: 1..{len(stages)}")
 dec_s = next(i for i, _, h in headings if h == "Decisions")
 dec_e = next(i for i, _, h in headings if h == "Relationship to other designs")
 dec = [int(m.group(1)) for l in lines[dec_s:dec_e] if (m := re.match(r"^\| (\d+) \|", l))]
+if len(dec) != len(set(dec)):
+    problems.append(f"Decisions: duplicate rows {sorted({n for n in dec if dec.count(n) > 1})}")
 print(f"Decisions: {dec}")
 openq = numbered("Open questions", "Decisions")
 if set(dec) & set(openq):
     problems.append(f"questions both open and decided: {set(dec) & set(openq)}")
 
-# bare letter-and-number IDs outside the ID sources table (information)
-id_s = next(i for i, _, h in headings if h == "ID sources")
-id_e = next(i for i, _, h in headings if h == "Terms")
+# bare letter-and-number IDs outside the ID sources table (information);
+# ID sources may be left out, and then the whole record is scanned
+id_h = next(((i, lvl) for i, lvl, h in headings if h == "ID sources"), None)
+if id_h:
+    id_s = id_h[0]
+    id_e = next((i for i, lvl, _ in headings if i > id_s and len(lvl) <= len(id_h[1])), len(lines) + 1)
+else:
+    id_s = id_e = 0
 bare = Counter()
 for i, l in enumerate(lines, 1):
     if id_s <= i < id_e:

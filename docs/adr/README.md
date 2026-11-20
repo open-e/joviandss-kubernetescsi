@@ -33,8 +33,9 @@ of its own.
     together.
   - **Example:** supporting a new API version needs the move to it, the reply
     types that match it and a client that is correct against it; none solves
-    the problem alone, so they are one record, whose Options weigh the first
-    two and whose questions decide the third, which the evidence dictates.
+    the problem alone, so they are one record: its Options weigh the move,
+    and its questions decide the reply types and, as the evidence dictates,
+    the client.
   - **Not:** a record per decision, each waiting on the others.
 - **Records are not piled up: a record is implemented after it is accepted,
   and the next record, about the next problem, is written after that.**
@@ -73,9 +74,11 @@ of its own.
   - **Not:** a name that says the decision, wrong the day the decision
     changes.
 - **Numbers are never reused. The sequence of this folder starts at 0002;
-  0001 is not used.**
+  0001 is not used, since design 0001 in `docs/design/` is a predecessor
+  of these records.**
   - **Why:** a number cited anywhere must keep pointing at the same record,
-    and a superseded record keeps its text and its number.
+    and a superseded record keeps its text and its number. Record 0002
+    keeps the number of design 0002, which it reworks.
 - **The status is one word from this table, with a link when Superseded.**
   - **Why:** a reader must know whether the text can still change and what to
     read instead.
@@ -117,6 +120,21 @@ of its own.
     pointer each; the Context repeated with its evidence; the instances
     of the problem, such as the calls that fail, where the problem itself
     is meant.
+- **An open question holds what is asked, why it is still open and, where
+  there are some, the choices it is between, and nothing of its answer.
+  Once answered, it moves to the Decisions table with its answer, the
+  choices it was made between and who decided it.**
+  - **Why:** the reader who has to answer must see where the question ends;
+    an answer, or the way to one, written into it reads as part of what is
+    asked, or as if it were answered already.
+  - **Example:** "Which code does a missing parent get? Its error reads like
+    a missing pool's. Two ways are open: tell the two apart by the names in
+    the message, or give both one code."
+  - **Not:** the way to the answer run into the explanation, with nothing to
+    mark where the question ends: "Which TLS versions does the appliance
+    offer? No recording shows one, and its certificate has not been read.
+    Answered by a handshake check and a read of the certificate, before the
+    record is accepted."
 
 | Section | What it holds |
 |---|---|
@@ -129,67 +147,72 @@ of its own.
 | Priorities | the project values that weigh on this record, in the order they weigh here. Values are the project's and stable; priorities are this record's order among them, and the options argue against them by number; the number is the rank, so a priority added later takes its place and the ones below it move down, every reference rewritten in the same change |
 | Options considered | the architectural and strategic decisions of the record: the ways the problem in the Problem statement could be solved, and which one is taken. The section answers the Problem statement and is read against it, each group of options (A, B, …) answering one part of the problem; a part whose fix follows from the evidence has no group, and its decisions are questions in the Decisions table. Decisions below that level, on how a chosen way is carried out, are questions too, never options. For each choice, what was evaluated: two or three real contenders, their trade-offs stated honestly against the priorities, one subsection per option, named by its group letter and its number within the group (Option A1, Option A2), the adopted one first and marked. Where only one option was considered, the subsection, the group letter alone without a number (Option B), says so and explains why, with the price that option carries; alternatives nobody weighed are not written up to fill the list. An option carries what distinguishes it, not the mechanism, which belongs to the implementation item |
 | Decision | its own section, right after Options considered: the decision that has been taken, in a few sentences, bold so that it stands out; then the rationale naming each priority; then, for a choice with contenders, the sentence that tells a reader with another order of priorities which option they would pick; then, where question decisions shape the delivery, a paragraph naming them with their question numbers and a link to the Decisions table |
-| What changes | the work: the commits in order, grouped in stages, each implementation item a named heading with what changes, why, how, and what must hold once it is done. The mechanism lives here and nowhere else. The unit tests that show an item works are the implementing agent's, not the record's ([The Testing section](#the-testing-section)) |
+| What changes | the work: the commits in order, grouped in stages, a commit that has to come before the first stage under a heading of its own; each implementation item a named heading with what changes, why, how, and what must hold once it is done. The mechanism lives here and nowhere else. The unit tests that show an item works are the implementing agent's, not the record's ([The Testing section](#the-testing-section)) |
 | Consequences | what becomes true once the record is applied, positive and negative: what is certain, while a possible failure is a risk; then the confidence level and the condition that should trigger a re-evaluation. It follows What changes because it refers to its stages and items |
 | Risks | backward compatibility first, preserved and not preserved; then numbered risks, each with the concrete failure and its guard |
 | Affected systems and files | a table by system first, then the files one row each with the stage that changes them; a last row for what is not affected |
-| Testing | the tests that check the implementation, from the cheapest to the live one, as numbered steps; each a general description that an agent other than the author can construct and run; no unit tests ([The Testing section](#the-testing-section)) |
-| Open questions | the open ones, as bullets with the number in bold, each with how it gets answered; then the subsection **Decisions**, a table of the decided questions with their numbers kept, one line of decision each and a link to the section that argues it |
+| Testing | the corner cases that have to be tested, as numbered steps from the cheapest to the live one: mostly behaviour, integration and what has to be tested in general. Not the tests themselves but the foundation for developing them later, each step a general description that an agent other than the author can build a test from; unit tests are not listed ([The Testing section](#the-testing-section)) |
+| Open questions | the open ones, as bullets with the number in bold, each what is asked, why it is still open and its choices, without its answer (the rule above); then the subsection **Decisions**, a table of the decided questions with their numbers kept: one line of decision each, with the choices it was made between where there were some, who decided it, and a link to the section that argues it |
 | Relationship to other designs | the designs, records and repositories this record touches, one line each with the link; then **Future work** subsections for what is deliberately left to a later record |
 | Advice | the inputs the decision was formed from, each with its date: findings, reviews, tracker entries, user decisions |
 | Appendix | what is looked up rather than read: the evidence sources, the evidence gaps, the compliance rules and matrix, the finding catalogues by kind, the measurements, where the names and IDs come from, and the terms; its parts and their formats are in [The Appendix](#the-appendix) |
 
 ## The Testing section
 
-- **The Testing section pins the conditions the implementation must meet
-  that only the evidence or the lab know, and finds the edges the design did
-  not foresee by running the result against the real thing.**
+- **The Testing section describes the corner cases that have to be tested,
+  such as the conditions the implementation must meet that only the evidence
+  or the lab know. It is not a description of the tests themselves but the
+  foundation for developing them later.**
   - **Why:** a record is written before the code, so this section is where
     the implementation meets what the designer could not see from the design.
   - **Example:** a reply shape, a tool that refuses an image, a log that leaks
     secrets at Debug.
 - **Unit tests are not listed: the agent implementing an item writes them as
   part of the item, and the item says only what must hold once it is done.**
-  - **Why:** unit tests do neither of the section's jobs, and how many there
-    are or how they are built is the implementer's.
+  - **Why:** the record does not have the full, exact picture of what will be
+    implemented and how, so it cannot guide how unit tests are written; the
+    agent implementing the item has that picture.
   - **Example:** "a reply over the limit fails with an error naming the
     limit".
   - **Not:** a count of tests, a fake server described, a list of cases.
-- **Each step is one test, described so that an agent other than the author
-  can construct it and run it without asking.**
-  - **Why:** the author is not there when it runs.
+- **Each step names one corner case, what has to hold there, and the
+  finding, risk or question it comes from. It says where only when the case
+  can be seen in one place alone.**
+  - **Why:** a step is what a test is built from later. Who runs the test,
+    what has to be in place first and its commands are known when the test
+    is written, not when the record is, so they belong to the test.
   - **Parts:**
-    - what it proves: the edge or the condition, with a link to the finding,
-      risk or question it answers;
-    - where it runs and who runs it: the machine, the appliance or the build,
-      and whether the user, the implementing agent or a tool drives it. A test
-      the agent cannot run itself, because the lab is out of its reach, says
-      so;
-    - what has to be in place first: builds, settings, fixes committed, tools
-      that exist, data to compare with. A prerequisite that does not exist yet
-      is named, with where it is tracked and who provides it;
-    - what is done: the command or the sequence, concrete enough to repeat;
-    - what counts as pass, as something observed: a log line, a status, a
-      diff, a comparison with a named baseline; and what is recorded when the
-      result is neither pass nor fail, so that an unknown outcome becomes a
-      result instead of being passed over.
-- **How much a step spells out follows the nature of the test.**
+    - the corner case: the edge or the condition, with a link to the
+      finding, risk or question it comes from;
+    - what has to hold there, as something someone can observe: a status, a
+      reply, a log line, what is left on the appliance; and what counts as
+      a result when the case cannot be brought about, so that an unknown
+      outcome becomes a result instead of being passed over;
+    - where, only when the case can be seen in one place alone, such as the
+      lab appliance.
+  - **Example:** "**A reply larger than `maxreplysize`**
+    (`impl_plugin_rest_reply_size_limit`). The call fails with an error that
+    names the limit, and no more of the reply is read."
+  - **Not:** "**Reply size test** (the lab machine, run by the user). Build
+    the plugin, set `maxreplysize: 1000`, run `dev_cycle.py all` and look for
+    the error in `plugin.log`": who runs it, the setting and the commands
+    belong to the test written from the step.
+- **How much a step spells out follows the nature of the case.**
   - **Why:** the parts above are what a reader needs, in as many words as the
-    test takes, not a form to fill in.
-  - **Example:** a simple test is a sentence: delete a volume, then send the
-    same delete again, and check that the REST request that now fails is
-    handled as "already gone" and not as an error. A scenario needs its
-    sequence, its timing and what to watch: shut the appliance off by force
-    while create and delete requests are in flight, and record how the
-    cluster behaves under that load and what each request is answered while
-    the pool moves to the other node.
+    case takes, not a form to fill in.
+  - **Example:** a simple case is a sentence: a volume deleted twice, whose
+    second delete is handled as "already gone" and not as an error. A
+    scenario needs its sequence, its timing and what to watch: an appliance
+    shut off by force while create and delete requests are in flight, how
+    the cluster behaves under that load, and what each request is answered
+    while the pool moves to the other node.
 - **The steps go from the cheapest to the live one, and the section ends
   with what the tests cannot reach.**
   - **Why:** a reader knows which findings have no cover in this delivery.
-- **A test that depends on an implementation detail says so, and that
+- **A step that depends on an implementation detail says so, and that
   detail becomes part of the item it depends on.**
   - **Why:** otherwise the implementer may remove, without knowing it, what
-    the test reads.
+    the test built from the step reads.
   - **Example:** a log line keeping its query string, an error text staying
     searchable.
 - **Results go to the testing repository with the rest of the lab's data,
@@ -224,19 +247,34 @@ of its own.
   - **Why:** the body describes the current code and what the record changes;
     dates belong to Metadata and Advice, where a reader looks for them.
   - **Not:** "on the day the evidence came in we decided" in Context.
-- **The tense rule: while Proposed the record says what "would" change;
-  facts about the current code and the evidence are in the present tense;
-  after implementation the tense is converted, not the text rewritten.**
-  - **Why:** the same text serves before and after implementation.
+- **The mood rule: the record describes the changes it makes in the
+  imperative mood, as a commit message of the Linux kernel does; what
+  would follow from them, as in Consequences and Risks, is in the
+  conditional; facts about the current code and the evidence are in the
+  present tense. The wording is not changed once the record is accepted or
+  implemented.**
+  - **Why:** the kernel's guide to submitting patches asks to "describe
+    your changes in imperative mood, as if you are giving orders to the
+    codebase to change its behaviour". An order reads the same before and
+    after the work is merged, so the text, frozen at acceptance, stays
+    true; the present tense of the facts is about the commit named in
+    Metadata.
+  - **Example:** "make `getResourcesList` read the list once on every
+    call"; "send `per_page=100` on every list request".
+  - **Not:** "`getResourcesList` would read the list once", "this commit
+    makes `getResourcesList` read the list once" or "I changed
+    `getResourcesList` to read the list once"; nor an order rewritten as
+    "does" once the work is merged.
 - **The record calls itself "this document", never "this design" or "this
   record".**
   - **Why:** the text reads the same whether the reader came for the design
     or for the decision.
 - **References are links: `file:line` of the commit named in Metadata, as
   relative links into the code where a link helps; sections by their anchor;
-  the spec repository's findings by their number.**
-  - **Why:** a link is checked by a script and followed by a click; the spec
-    repository is read only for this work, so its findings keep its numbers.
+  the findings of `jdss-rest-api-spec` by their number.**
+  - **Why:** a link is checked by a script and followed by a click;
+    `jdss-rest-api-spec` is read only for this work, so its findings keep its
+    numbers.
 - **No test-environment details and no secrets in a record.**
   - **Why:** machine names, pool names and addresses change with the lab and
     belong to the testing repository, which holds them; a secret in a
@@ -257,8 +295,8 @@ of its own.
     `rule_rest_reply_types_decode`, `impl_plugin_driver_validate_names_and_ids`.
   - **Not:** the letter-and-number IDs of the reviews, F8, C3, G5, A11, which
     are mapped to names (below).
-- **The kind comes first and says whether the name is a finding or a
-  prescription.**
+- **The kind comes first and says what the name is: a finding, a gap, a
+  rule or an implementation item.**
   - **Why:** a reader knows from the first word whether the entry describes
     what is or prescribes what is done.
 
@@ -270,16 +308,22 @@ of its own.
   | `security` | a finding of the security review | Appendix, Security findings |
   | `gap` | evidence that is missing: a case no recording shows | Appendix, Evidence gaps |
   | `rule` | a compliance rule the code is checked against | Appendix, What "compliant" means |
-  | `impl` | an implementation item: a change the record delivers, which implements the decision | What changes, under its stage |
+  | `impl` | an implementation item: a change the record delivers, which implements the decision | What changes, under its stage or its commit |
 
-  - **Definitions:** the first five are findings: they describe what is, and
+  - **Format:** `tools/check_names.py` reads the kinds from the rows of this
+    table that start with a kind in backquotes, and the areas from the
+    paragraph that begins "The areas:" and ends with `build`; both keep
+    that form.
+
+  - **Definitions:** the first four are findings: they describe what is, and
     their field table says where, what happens, the evidence, and which
-    implementation item or stage they are assigned to
-    ([The Appendix](#the-appendix)). A rule says what must hold. An
-    implementation item says what is done, whatever its form: a repair, a new
-    file, a tool, a setting.
+    implementation item, stage or commit they are assigned to
+    ([The Appendix](#the-appendix)). A gap says what no source shows, and its
+    field table why that matters and what the attempts to close it showed. A
+    rule says what must hold. An implementation item says what is done,
+    whatever its form: a repair, a new file, a tool, a setting.
 - **An implementation item names the findings and rules it closes, and a
-  finding names the item or stage it is assigned to.**
+  finding names the item, stage or commit it is assigned to.**
   - **Why:** the two directions link each other, so a reader goes from a
     finding to its fix and back.
 - **Then the area; lower-case letters, digits and underscores only.**
@@ -304,9 +348,10 @@ of its own.
   - **Not:** `bug_plugin_rest_nas_volume_keys_never_match`, a symptom in the
     code that could belong to several endpoints and versions;
     `rollback_volume`, the object not first.
-- **Each named thing is a `####` heading with a small field table under it:
-  in the Appendix for findings, gaps and rules, in What changes for
-  implementation items.**
+- **Each named thing is a `####` heading, the reference point that the rest
+  of the record and other documents link to: in the Appendix for findings,
+  gaps and rules, each with a field table under it; in What changes for
+  implementation items, which are prose.**
   - **Why:** the heading is its own anchor and a single word, so `*` in vim
     and a link on GitHub both reach it; such headings need no self-anchor line
     and are not listed in the Table of Contents.
@@ -384,7 +429,7 @@ of its own.
   | Compliance matrix | where the code stands on each rule | a numbered table with one row per checked unit, such as a call, and a second with one row per rule |
   | Finding catalogues | the findings, grouped by subject: one catalogue per kind of fault | one `###` section per catalogue, one finding heading per entry with a field table |
   | Dead code | what nothing uses and a commit would remove | a bullet list by kind: functions, types, keys |
-  | Measurements | the counts and sizes the record quotes | tables without numbers, each under a bold line saying what was measured and on which commit |
+  | Measurements | the counts and sizes the record quotes | numbered tables, each under a bold line saying what was measured and on which commit |
   | ID sources | where the names and every foreign numbering in the record come from | a numbered table: Names and IDs, Meaning, Source |
   | Terms | the jargon | a numbered table: Term, Meaning |
 
@@ -395,9 +440,9 @@ of its own.
   - **Example:** "Error replies the code does not recognise. Each becomes an
     unknown error today."
   - **Not:** a statement in the opening that some entry contradicts.
-- **Every named entry has a field table: two columns without a header, the
-  field in the first and its value in the second, the fields in the order
-  below.**
+- **Every named entry in the Appendix has a field table: two columns without
+  a header, the field in the first and its value in the second, the fields in
+  the order below.**
   - **Why:** a reader who has seen one entry knows where to look in the
     next, and a script can read the fields.
   - **Parts:**
@@ -414,8 +459,8 @@ of its own.
     unrecognised error, "Crash" and "Trigger" for a crash.
   - **Not:** a field left empty; a field present in some entries of a
     catalogue and absent in others without a reason.
-- **Every finding has an "Assigned to" row: the implementation item or stage
-  of this record that takes it, as a link; or, when the record leaves it,
+- **Every finding has an "Assigned to" row: the implementation item, stage
+  or commit of this record that takes it, as a link; or, when the record leaves it,
   the record, design or tracker entry that takes it; or "not assigned" with
   the reason.**
   - **Why:** a reader who lands on a finding sees who has it without
@@ -423,14 +468,10 @@ of its own.
     the two link each other. The row says who has the finding, not that it
     is fixed: a Proposed record has fixed nothing, and the row stays true
     when the work is done.
-  - **Example:** "`impl_plugin_rest_error_catalogue`, stage 3"; "design
-    0003"; "not assigned: no caller reads the field".
+  - **Example:** "`impl_plugin_rest_error_catalogue`, stage 3"; "the
+    `per_page` commit before stage 1"; "design 0003"; "not assigned: no caller reads the field".
   - **Not:** "Fixed by", which claims work that has not happened; a finding
     whose only pointer to its item is in the catalogue's opening sentence.
-- **A table in the Appendix carries a number only when the text refers to
-  it; a field table never does.**
-  - **Why:** a number is for finding a table from elsewhere, and a field
-    table is found by its heading.
 
 ## Navigation
 
@@ -440,6 +481,10 @@ of its own.
   - **Why:** `*` in vim jumps between an entry and its section, and the links
     work on GitHub.
   - **Example:** `[Open_questions](#open-questions)`.
+- **Every table but a field table carries a number, whether the text refers
+  to it or not.**
+  - **Why:** the List of Tables then shows every table, and citing a table
+    later renumbers nothing; a field table is found by its heading.
 - **A table that carries a number has a caption
   `` **Table n — Title** · `tbl_tag` `` and appears in the List of Tables;
   numbering follows order of appearance, so a table inserted or removed
@@ -464,7 +509,8 @@ of its own.
     in the mapping file and links from where it matters; a new question gets
     the next number and, when decided, moves to the Decisions table with its
     number kept; a new risk is appended with the next number; a Testing step
-    folded into another keeps its number, with one line saying where it went.
+    folded into another, or moved to the testing repository, keeps its
+    number, with one line saying where it went.
 - **Once Accepted, the text is frozen; a change of decision is a new record
   that supersedes this one, and the status line links it.**
   - **Why:** the frozen text is the history half of a record's value.
@@ -472,29 +518,40 @@ of its own.
 - **Checks before a review, by script or by hand.**
   - **Why:** the reviewer's time goes to the content, not to what a script
     can find.
+  - **By hand:** the checks marked so below; the scripts run the others,
+    and a record they fail is not ready for review.
   - **Scripts:** `tools/check_record.py`, and `tools/check_names.py` for the
     names, which reads `kub-testing/issues/` from a checkout beside this
     repository.
   - **The checks:**
     - every `](#anchor)` resolves to a heading;
+    - every `##` and `###` heading has its anchor line under it, such as
+      `[Decisions](#decisions)`;
     - every entry in the Table of Contents and the List of Tables matches a
       heading or a caption;
     - risks, steps, stages, key observations, priorities and tables are
       numbered without gaps or duplicates;
-    - questions have no duplicates, their numbers are kept when they move to
-      the Decisions table, and the open ones are written as bullets with the
+    - questions have no duplicates, in the open list or in the Decisions
+      table, their numbers are kept when they move to the Decisions table, and the open ones are written as bullets with the
       number in bold;
     - every "Table n" reference is within range;
-    - every Testing step says where it runs and who runs it;
+    - every Testing step names the finding, risk or question it comes from
+      (by hand);
     - every name is unique and every linked name has a heading;
     - no letter-and-number ID remains outside the ID sources table and the
-      citations of other documents' numbering;
+      citations of other documents' numbering (by hand: the script lists the
+      IDs it finds);
     - every relative link to a file exists;
     - no horizontal rule;
     - no sentence over sixty characters repeated outside tables;
-    - no link to the section it sits in;
-    - no "design NNNN" with the record's own number, "this design" or "this
-      record" phrasing has crept back in.
+    - no link to the section it sits in, except from a section that numbers
+      or catalogues its entries to those entries: Key observations, What
+      changes, Risks, Testing, Open questions, Decisions, the Appendix and its
+      Evidence gaps;
+    - none of these phrases: "design NNNN" or "ADR NNNN" with the record's
+      own number, "this design", "this record", "this ADR", "the design"
+      and "the design's" in any case (another design is cited as "design
+      NNNN"), "earlier text", "earlier list" and "as listed above";
     - no name that the registry marks superseded is written in the record.
 
 ## Skeleton
@@ -519,6 +576,7 @@ of its own.
   - [Option_B_<slug>_the_only_option_considered](#option-b-<slug>-the-only-option-considered)
 - [Decision](#decision)
 - [What_changes](#what-changes)
+  - [Before_stage_1_<slug>](#before-stage-1-<slug>)
   - [Stage_1_<slug>](#stage-1-<slug>)
 - [Consequences](#consequences)
 - [Risks](#risks)
@@ -625,12 +683,19 @@ their question numbers and a link to the Decisions table>
 ## What changes
 [What_changes](#what-changes)
 
+### Before stage 1: <slug>
+[Before_stage_1_<slug>](#before-stage-1-<slug>)
+
+<only for a commit that has to come before the stages: what it changes and
+why it comes first>
+
 ### Stage 1: <slug>
 [Stage_1_<slug>](#stage-1-<slug>)
 
 #### impl_<area>_<slug>
 
-**<Title>.** <what changes, why, how, what must hold once it is done>
+**<Title>.** <the change, in the imperative mood; why; how; what must hold
+once it is done>
 
 ## Consequences
 [Consequences](#consequences)
@@ -651,6 +716,8 @@ Re-evaluate when ...
 ## Affected systems and files
 [Affected_systems_and_files](#affected-systems-and-files)
 
+**Table n — <Title>** · `tbl_<tag>`
+
 | System | Effect of this document | Where |
 |---|---|---|
 | Not affected | ... | |
@@ -658,21 +725,26 @@ Re-evaluate when ...
 ## Testing
 [Testing](#testing)
 
-1. **<test>** (<where>, run by <who>). <What it proves, with the link; what
-   is in place first; what is done; what is observed as pass, and what is
-   recorded when the result is neither pass nor fail. One sentence for a
-   simple test, the sequence and the timing for a scenario.>
+1. **<corner case>** ([<finding, risk or question>](#<anchor>)). <What has
+   to hold there, as something observed, and what counts as a result when
+   the case cannot be brought about; where, only when the case can be seen
+   in one place alone. One sentence for a simple case, the sequence and the
+   timing for a scenario.>
 
 ## Open questions
 [Open_questions](#open-questions)
+  List of questions that are not clear to agent and require explicit explanation from human.
+  Once question gets clear answer, or decision being made by human, the question with answer moves to `Decisions`
 
-- **1. <question>?** <how it gets answered>
+- **1. <question>?**
 
 ### Decisions
 [Decisions](#decisions)
 
-| # | Question | Decision | Where it is argued |
-|---|---|---|---|
+**Table n — <Title>** · `tbl_<tag>`
+
+| # | Question | Decision | Decided by | Where it is argued |
+|---|---|---|---|---|
 
 ## Relationship to other designs
 [Relationship_to_other_designs](#relationship-to-other-designs)
@@ -721,9 +793,9 @@ Re-evaluate when ...
 ### <catalogue by kind>
 [<catalogue>](#<catalogue>)
 
-#### <kind>_<area>_<slug>
-
 <what the entries have in common>
+
+#### <kind>_<area>_<slug>
 
 | | |
 |---|---|
@@ -731,7 +803,7 @@ Re-evaluate when ...
 | What happens | ... |
 | Effect | ... |
 | Evidence | ... |
-| Assigned to | <impl item or stage; another record or tracker entry; "not assigned: <reason>"> |
+| Assigned to | <impl item, stage or commit; another record or tracker entry; "not assigned: <reason>"> |
 
 ### Measurements
 [Measurements](#measurements)
