@@ -113,7 +113,8 @@ print("  in design-items only:", sorted(di_names - rec_impl))
 
 print("\nF. areas used by names vs the README's list:")
 readme = README.read_text()
-m = re.search(r"The areas:\**\s*(.*?`build`)", readme, re.S)
+# the list item itself, not a mention of it elsewhere in the README
+m = re.search(r"^\s*- \*\*The areas:\*\*\s*(.*?`build`)", readme, re.S | re.M)
 readme_areas = set(a for a in re.findall(r"`([a-z_]+)`", m.group(0))) if m else set()
 used_areas = Counter()
 for n in all_names:
