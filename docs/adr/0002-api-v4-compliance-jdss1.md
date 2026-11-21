@@ -17,7 +17,6 @@
   - [Key_observations](#key-observations)
 - [Priorities](#priorities)
 - [Options_considered](#options-considered)
-  - [Option_A_v4_only_the_only_option_considered](#option-a-v4-only-the-only-option-considered)
 - [Decision](#decision)
 - [What_changes](#what-changes)
   - [First_commit_make_go_vet_pass_in_pkg_rest](#first-commit-make-go-vet-pass-in-pkgrest)
@@ -358,18 +357,17 @@ The project values that weigh on this document, in the order they weigh here:
 ## Options considered
 [Options_considered](#options-considered)
 
-One matter is decided here: the API version (A), where only one option was
+One matter is decided here: the API version, where only one option was
 considered. How the client is made compliant, the reply types, the error
 mapping, the transport and the paging of the lists, is implementation, decided as questions, with the alternatives they were weighed against where there were some, named in the [Decision](#decision)
 where they shape the delivery and kept in the [Decisions](#decisions) table.
 
-### Option A: v4 only, the only option considered
-[Option_A_v4_only_the_only_option_considered](#option-a-v4-only-the-only-option-considered)
+#### aopt_rest_api_version_v4_only
 
-Only one option was considered for the API version: replace the `api/v3`
-prefix with `api/v4` everywhere and abandon v3 in favour of v4, with no
-fallback and no setting: the appliance still serves v3, but the plugin no
-longer calls it. The minimum JovianDSS 1 release is stated in the
+**v4 only.** Only one option was considered for the API version: replace
+the `api/v3` prefix with `api/v4` everywhere and abandon v3 in favour of
+v4, with no fallback and no setting: the appliance still serves v3, but the
+plugin no longer calls it. The minimum JovianDSS 1 release is stated in the
 documentation and the changelog. Why no other: API v3 is deprecated, as the
 [Problem statement](#problem-statement) says; it ends with JovianDSS 1,
 JovianDSS 2 serves only v4, and the Proxmox plugin has already moved
@@ -413,11 +411,11 @@ plugin uses v4 only: v3 is abandoned in favour of v4, with no fallback and
 no setting (the appliance still serves v3; the plugin no longer calls it),
 and the minimum supported JovianDSS 1 release is `1.0up33.65410`, the latest JovianDSS 1 release and the one the recordings and the test lab run,
 or the newer one the live tests ran on ([question 58](#decisions)). The work
-changes `pkg/rest`, the driver and the controller, of the node only the lines that log whole CSI requests, the configuration and its documentation and the `Makefile`, and adds an audit tool to kub-testing; it leaves alone the node's mount and iSCSI code, everything on the appliances, and `jdss-rest-api-spec`, which is only read ([Option A](#option-a-v4-only-the-only-option-considered)); the code it adds
+changes `pkg/rest`, the driver and the controller, of the node only the lines that log whole CSI requests, the configuration and its documentation and the `Makefile`, and adds an audit tool to kub-testing; it leaves alone the node's mount and iSCSI code, everything on the appliances, and `jdss-rest-api-spec`, which is only read ([aopt_rest_api_version_v4_only](#aopt_rest_api_version_v4_only)); the code it adds
 or changes brings no new vulnerability, and the existing ones within its
 scope are removed. JovianDSS 2 is not supported within this iteration.**
 
-Rationale, from [Option A](#option-a-v4-only-the-only-option-considered)
+Rationale, from [aopt_rest_api_version_v4_only](#aopt_rest_api_version_v4_only)
 and the [Risks](#risks): v3 ends with JovianDSS 1, and the recordings show
 that the move would change no behaviour the plugin reaches there today (priority 1); its price, a release
 without this v4 stopping with no fallback ([risk 2](#risks)), is accepted
@@ -1700,7 +1698,7 @@ snapshot lists in stage 3 ([risk 1](#risks), [question 43](#decisions)).
 14. **Replies may be behind the request.** Two cases are recorded. On jdss2, a
     snapshot list read within half a second of a snapshot create or delete still
     shows the old state, while a read by name is current at once (hurl
-    Finding 20; in that run jdss1 showed the lag twice in eight reads, on v3, and in three of four earlier runs its v4 NAS snapshot lists missed a new snapshot up to 0.55 s after the create, hurl R4). And
+    Finding 20; in that run jdss1 showed the lag twice in eight reads, on v3, and in three of four earlier runs its v4 NAS snapshot lists missed a new snapshot up to 0.55 s after the create, as `jdss-rest-api-spec/empirical/hurl/project-status.md` records). And
     a new clone's `san:volume_id` is empty in the first read of the clone, by name
     or in a list, however long after the create; the next read has it (hurl
     Findings 14 and 15). The plugin decodes that field (`types.go:100`, `:211`)
@@ -2133,8 +2131,8 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
 
 | # | Question | Decision | Decided by | Where it is argued |
 |---|---|---|---|---|
-| 1 | Which API? | v4 only; v3 abandoned in favour of v4: the appliance still serves it, the plugin no longer calls it; no other option was considered. | the user | [Option A](#option-a-v4-only-the-only-option-considered) |
-| 2 | Minimum JovianDSS 1 release? | `1.0up33.65410`, the release of the lab and the recordings; a newer one if the live tests run on it ([question 58](#decisions)). | the user | [Option A](#option-a-v4-only-the-only-option-considered), [risk 2](#risks) |
+| 1 | Which API? | v4 only; v3 abandoned in favour of v4: the appliance still serves it, the plugin no longer calls it; no other option was considered. | the user | [aopt_rest_api_version_v4_only](#aopt_rest_api_version_v4_only) |
+| 2 | Minimum JovianDSS 1 release? | `1.0up33.65410`, the release of the lab and the recordings; a newer one if the live tests run on it ([question 58](#decisions)). | the user | [aopt_rest_api_version_v4_only](#aopt_rest_api_version_v4_only), [risk 2](#risks) |
 | 3 | When does token login come? | with JovianDSS 2 support, a later design. | the user | [Future work: JovianDSS 2](#future-work-joviandss-2-support) |
 | 4 | Fixtures: real replies or hand-written? | real replies from the recordings, trimmed, passwords and the `Authorization` header removed. | the user | [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) |
 | 5 | Unused fields with the wrong type? | remove, as in 27; both superseded by 28: kept as raw JSON that cannot fail. | the user | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
@@ -2154,7 +2152,7 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
 | 19 | jdss2 tokens in fixtures? | tokens are secrets: never logged, never in a fixture; no jdss2 reply is a fixture now. | the user | [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) |
 | 20 | Exact rules for the name check? | the rules of [Table 6](#impl_plugin_driver_validate_names_and_ids): the characters the appliance accepts in the strings tests, `a-z A-Z 0-9 _ -`; at most 131 characters, one below its limit of 132 ([question 21](#decisions)); targets in lower case only, which the appliance does not require. | the user | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) |
 | 21 | Cap generated names at 131 or 132? | 131; a volume of exactly 132 characters is the accepted edge (risk 13). | the user | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) |
-| 22 | Who prepares the NFS live cycle? | not this document: the test suite and the image name are prepared separately, before [Testing](#testing) step 5 can run; who prepares them is a decision for the user in the tracker (kub-testing `ISSUES.md`, DEC11). | the user | [Relationship](#relationship-to-other-designs) |
+| 22 | Who prepares the NFS live cycle? | not this document: the test suite and the image name are prepared separately, before [Testing](#testing) step 5 can run; who prepares them is still for the user to decide, in the tracker (kub-testing `ISSUES.md`). | the user | [Relationship](#relationship-to-other-designs) |
 | 23 | Is `prot: http` still allowed? | no; HTTPS only, `prot` other than `https` is a configuration error. | the user | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile) |
 | 24 | Where do release notes live? | `CHANGELOG.md` at the repository root. | the user | [Stage 1](#stage-1-move-to-api-v4) |
 | 25 | Which of the four crashes in the ID and name code does [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) close? | none: the item stays as it is, and the four are handled separately. | the user | [Relationship](#relationship-to-other-designs) |
@@ -2265,7 +2263,7 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
   ([question 9](#decisions)).
 - The NFS live cycle ([Testing](#testing) step 5): making the test suite and
   the build able to run one is handled separately (kub-testing `ISSUES.md`,
-  TOOL10 and MK11; who prepares them is DEC11, a decision for the user). Step 5 stays a requirement of this
+  TOOL10 and MK11; who prepares them is still for the user to decide). Step 5 stays a requirement of this
   delivery.
 - The procedure for reading the reply types again after new recordings
   ([impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec)): a page in the plugin's documentation, written
@@ -2604,8 +2602,9 @@ list already rests on the recordings, through the OpenAPI, but for `is_clone`, o
   statement is now the README's example of one ("api v4 compliance jdss1"); that JovianDSS 2 is not
   supported within this iteration, and that the code this document adds or
   changes brings no new vulnerability while the existing ones within its
-  scope are removed, move to the Decision; Option A says how far the work
-  reaches. The paging item links its code segment last, as the README's
+  scope are removed, move to the Decision;
+  [aopt_rest_api_version_v4_only](#aopt_rest_api_version_v4_only) says how far
+  the work reaches. The paging item links its code segment last, as the README's
   skeleton shows.
 - User decision (2026-11-21): the most critical points of this document are
   drafted in code segments, for the implementations that follow them.
@@ -2644,8 +2643,7 @@ list already rests on the recordings, through the OpenAPI, but for `is_clone`, o
   has snapshots is deleted, on iSCSI and NFS alike ("both iscsi and nfs
   volume should not be deleted if they have snapshots"); the NFS driver,
   whose appliance deletes a NAS volume with its snapshots (hurl Finding 7),
-  looks for them first (dataloss_plugin_driver_nfs_delete_volume_destroys_its_snapshots, registered
-  in kub-testing as D19, beside the iSCSI bug D12). For the REST API the
+  looks for them first ([dataloss_plugin_driver_nfs_delete_volume_destroys_its_snapshots](#dataloss_plugin_driver_nfs_delete_volume_destroys_its_snapshots)). For the REST API the
   empirical findings are the source of truth over the documentation ("in
   terms of rest api trust empirical findings over documentation as source
   of truth"): the audit does not compare the two, and the differences
@@ -2654,8 +2652,14 @@ list already rests on the recordings, through the OpenAPI, but for `is_clone`, o
   backlog items 19 and 20, the `yaml` tags of the endpoint configuration
   and the keys the configuration guides get wrong, leave the TLS item
   for an item of their own ("a, give them their own item"),
-  `impl_plugin_config_yaml_tags_and_guide_keys`, which also covers
+  [impl_plugin_config_yaml_tags_and_guide_keys](#impl_plugin_config_yaml_tags_and_guide_keys), which also covers
   `docs/configuration-nfs.md` and `ISCSIEndpointCfg`.
+- User decision (2026-11-22), in the README: an option is named
+  `aopt_<area>_<slug>`, like every other named entry, and not by a letter
+  and a number; Options considered does not say which option is adopted,
+  the Decision names it. The one option here, until then "Option A: v4
+  only, the only option considered", is
+  [aopt_rest_api_version_v4_only](#aopt_rest_api_version_v4_only).
 
 
 
@@ -4744,13 +4748,13 @@ func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool stri
 
 | Names and IDs | Meaning | Source |
 |---|---|---|
-| `gap_…`, `bug_…`, `crash_…`, `security_…`, `rule_…`, `impl_…` | the findings, gaps, compliance rules and implementation items of this document, each a heading in the [What changes](#what-changes) section or in this Appendix; the form is `kind_area_slug` | this document; the old letter-and-number IDs are mapped to them in `kub-testing/issues/`. A name in code font without a link, the `dataloss_…` names among them, has no heading here and is described in `kub-testing/issues/` |
+| `gap_…`, `bug_…`, `crash_…`, `security_…`, `rule_…`, `aopt_…`, `impl_…` | the findings, gaps, compliance rules, architectural options and implementation items of this document, each a heading in the [Options considered](#options-considered) section, the [What changes](#what-changes) section or this Appendix; the form is `kind_area_slug` | this document; the old letter-and-number IDs are mapped to them in `kub-testing/issues/`. A name in code font without a link, the `dataloss_…` names among them, has no heading here and is described in `kub-testing/issues/` |
 | C, D, K, N, R, S, X + number | the code reviews' own IDs, kept in the reviews and the tracker | [`review/2026-10-02-code-review.md`](../../review/2026-10-02-code-review.md) and [`review/2026-11-07-code-review.md`](../../review/2026-11-07-code-review.md); mapped to names in `kub-testing/issues/` |
 | F + number | the test findings' IDs, kept in the tracker | `kub-testing/ISSUES.md`; mapped to names in `kub-testing/issues/test-findings.md` |
 | D1-D7 in 0003 | design 0003's own items, not review IDs | [0003](../design/0003-controller-crash-fixes-design.md) |
 | hurl Finding n, C13, C24 | the hurl suite's findings and caveats | `jdss-rest-api-spec`'s own notes |
 | backlog item n | the items of the plugin's review backlog | [`review/backlog.md`](../../review/backlog.md) |
-| DEC10, DEC11, DOC27, INF8, MF15, MK11, T9 to T13, TOOL10 | kub-testing items: decisions for the user, plugin documentation, lab infrastructure, manifests, Makefile, testing, tooling | `kub-testing/ISSUES.md` |
+| DEC10, DOC27, INF8, MF15, MK11, T9 to T13, TOOL10 | kub-testing items: decisions for the user, plugin documentation, lab infrastructure, manifests, Makefile, testing, tooling | `kub-testing/ISSUES.md` |
 
 ### Terms
 [Terms](#terms)

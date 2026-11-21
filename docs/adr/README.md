@@ -288,8 +288,8 @@ definition has no `desc` of its own.
 ```yaml
 - name: rule_adr_names_entries_named_not_numbered
   rule: |
-    Findings, gaps, compliance rules and implementation items are named
-    `<kind>_<area>_<slug>`, not numbered.
+    Findings, gaps, compliance rules, architectural options and
+    implementation items are named `<kind>_<area>_<slug>`, not numbered.
   desc: |
     a human reader has to keep track of what is referenced. A name says
     what the thing is; a letter and a number say nothing, are hard to
@@ -302,12 +302,12 @@ definition has no `desc` of its own.
     `impl_plugin_driver_validate_names_and_ids`.
   wrong: |
     the letter-and-number IDs of the reviews, F8, C3, G5, A11, which are
-    mapped to names (below).
+    mapped to names (below); an option called `Option A1` or `Option B`.
 
 - name: rule_adr_names_kind_comes_first
   rule: |
     The kind comes first and says what is named: a finding, a gap, a
-    rule or an implementation item.
+    rule, an architectural option or an implementation item.
   mapping:
     bug:
       names: behaviour of the code that is wrong
@@ -328,6 +328,10 @@ definition has no `desc` of its own.
     rule:
       names: a compliance rule the code is checked against
       heading: Appendix, What "compliant" means
+    aopt:
+      names: |
+        an architectural option: a way the problem could be solved
+      heading: Options considered
     impl:
       names: |
         an implementation item: a change the record delivers, which
@@ -342,9 +346,9 @@ definition has no `desc` of its own.
     evidence, and which implementation item, stage or commit they are
     assigned to ([Appendix](#appendix)). A gap says what no source shows,
     and its field table why that matters and what the attempts to close
-    it showed. A rule says what must hold. An implementation item says
-    what is done, whatever its form: a repair, a new file, a tool, a
-    setting.
+    it showed. A rule says what must hold. An architectural option says
+    how the problem could be solved. An implementation item says what is
+    done, whatever its form: a repair, a new file, a tool, a setting.
 
 - name: rule_adr_names_area_second_and_character_set
   rule: |
@@ -393,8 +397,8 @@ definition has no `desc` of its own.
     Each thing the record describes under a name has a `####` heading,
     the reference point that the rest of the record and other documents
     link to: in the Appendix for findings, gaps and rules, each with a
-    field table under it; in What changes for implementation items, which
-    are prose.
+    field table under it; in Options considered for architectural
+    options and in What changes for implementation items, both prose.
   desc: |
     the heading is its own anchor and a single word, so `*` in vim and a
     link on GitHub both reach it; such headings need no self-anchor line
@@ -792,24 +796,22 @@ have clear understanding of the matter that particular ADR addresses.
 
 - **The Options considered section holds the ways the problem in the
   Problem statement could be solved, at the architectural and strategic
-  level, with the adopted one marked.**
+  level.**
   - **Answers:** "which ways were there, and what does each cost?"
   - **Why:** a decision is understood by what was given up for it.
-- **The options come in groups (A, B, …), one for each part of the problem.
-  A part whose fix follows from the evidence has no group, and its
-  decisions are recorded as questions in the Decisions table. Decisions on
-  how a chosen way is carried out are recorded as questions too, never as
-  options.**
+- **The options come in groups, one for each part of the problem; the
+  options of a group stand together. A part whose fix follows from the
+  evidence has no group, and its decisions are recorded as questions in
+  the Decisions table. Decisions on how a chosen way is carried out are
+  recorded as questions too, never as options.**
   - **Why:** a fix that follows from the evidence is not one of several
     ways, and how a way is carried out is below the architectural and
     strategic level.
 - **For each group the section shows what was evaluated: two or three real
-  contenders, their trade-offs stated honestly against the priorities, one
-  subsection per option, named by its group letter and its number within
-  the group (Option A1, Option A2), the adopted one first and marked. Where
-  only one option was considered, its subsection, named by the group letter
-  alone (Option B), says so and explains why, with the price that option
-  carries.**
+  contenders, their trade-offs stated honestly against the priorities, each
+  under its name, `aopt_<area>_<slug>`, as a heading
+  ([Names, not IDs](#names-not-ids)). Where only one option was considered,
+  its text says so and explains why, with the price that option carries.**
   - **Why:** an option told fairly enough that someone who prefers it would
     recognise it lets a later reader, whose priorities have changed, reopen
     the choice without doing the work again.
@@ -830,10 +832,12 @@ have clear understanding of the matter that particular ADR addresses.
   - **Why:** this is what other documents cite and what a reader years
     later looks for.
   - **Not:** the mechanism, which belongs in What changes.
-- **The decision is in sentences that can be quoted alone, with the limits
-  of its scope as finalized: what it changes and what it leaves alone.**
+- **The decision is in sentences that can be quoted alone. It names the
+  option adopted in each group and states the limits of its scope as
+  finalized: what it changes and what it leaves alone.**
   - **Why:** a sentence cited in another document is read without the text
-    around it; the limits of the scope are known once the options are
+    around it; which option is adopted is said here and not in Options
+    considered; the limits of the scope are known once the options are
     weighed
     ([One problem, one record, one at a time](#one-problem-one-record-one-at-a-time)),
     so they are finalized here.
@@ -1176,9 +1180,6 @@ have clear understanding of the matter that particular ADR addresses.
   - [Key_observations](#key-observations)
 - [Priorities](#priorities)
 - [Options_considered](#options-considered)
-  - [Option_A1_<slug>_adopted](#option-a1-<slug>-adopted)
-  - [Option_A2_<slug>](#option-a2-<slug>)
-  - [Option_B_<slug>_the_only_option_considered](#option-b-<slug>-the-only-option-considered)
 - [Decision](#decision)
 - [What_changes](#what-changes)
   - [Before_stage_1_<slug>](#before-stage-1-<slug>)
@@ -1256,38 +1257,36 @@ The project values that weigh on this document, in the order they weigh here:
 <the parts of the Problem statement decided here, one group each; what was
 decided as questions instead>
 
-### Option A1: <name> (adopted)
-[Option_A1_<slug>_adopted](#option-a1-<slug>-adopted)
+#### aopt_<area>_<slug>
 
-<what distinguishes it, in a few sentences; how far it reaches: what it
-changes and what it leaves alone>
+**<Title>.** <what distinguishes it, in a few sentences; how far it
+reaches: what it changes and what it leaves alone>
 
 Advantages: ... (priorities n, m)
 Disadvantages: ... (priority k)
 
-### Option A2: <name>
-[Option_A2_<slug>](#option-a2-<slug>)
+#### aopt_<area>_<slug>
 
-<what distinguishes it, in a few sentences; how far it reaches: what it
-changes and what it leaves alone>
+**<Title>.** <what distinguishes it, in a few sentences; how far it
+reaches: what it changes and what it leaves alone>
 
 Advantages: ... (priority k)
 Disadvantages: ... (priorities n, m)
 
-### Option B: <name>, the only option considered
-[Option_B_<slug>_the_only_option_considered](#option-b-<slug>-the-only-option-considered)
+#### aopt_<area>_<slug>
 
-Only one option was considered. <why; the price it carries; how far it
-reaches>
+**<Title>.** Only one option was considered. <why; the price it carries;
+how far it reaches>
 
 ## Decision
 [Decision](#decision)
 
-**<the decision that has been taken, in a few sentences, with the limits of
-its scope>.**
+**<the decision that has been taken, in a few sentences: the option
+adopted, [aopt_<area>_<slug>](#aopt_<area>_<slug>), and the limits of its
+scope>.**
 
 Rationale: ... (priority 1) ... (priority 2). A reader who puts <other
-priority> first would choose Option A2.
+priority> first would choose [aopt_<area>_<slug>](#aopt_<area>_<slug>).
 
 <where question decisions shape the delivery: the paragraph naming them, with
 their question numbers and a link to the Decisions table>
