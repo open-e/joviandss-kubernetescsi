@@ -1007,6 +1007,15 @@ func (cp *ControllerPlugin) ControllerGetVolume(ctx context.Context, in *csi.Con
 
 // GetCapacity gets storage capacity
 func (cp *ControllerPlugin) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+	l := cp.l.WithFields(log.Fields{
+		"request": "GetCapacity",
+		"func":    "GetCapacity",
+		"section": "controller",
+	})
+	ctx = jcom.WithLogger(ctx, l)
+
+	l.Debugf("Received get capacity request with context %+v", ctx)
+
 	// TODO: add capability check
 	pool, rErr := cp.d.GetPool(ctx, cp.pool)
 	if rErr != nil {
