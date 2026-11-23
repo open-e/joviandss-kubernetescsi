@@ -19,7 +19,7 @@
 - [Options_considered](#options-considered)
 - [Decision](#decision)
 - [What_changes](#what-changes)
-  - [First_commit_make_go_vet_pass_in_pkg_rest](#first-commit-make-go-vet-pass-in-pkgrest)
+  - [First_commit_make_go_vet_pass_in_pkg_rest_and_pkg_controller](#first-commit-make-go-vet-pass-in-pkgrest-and-pkgcontroller)
   - [Before_stage_1_keep_secrets_out_of_the_logs](#before-stage-1-keep-secrets-out-of-the-logs)
   - [Before_stage_1_send_per_page_on_every_list](#before-stage-1-send-per_page-on-every-list)
   - [Before_stage_1_remove_dead_REST_code](#before-stage-1-remove-dead-rest-code)
@@ -81,8 +81,9 @@
 16. `tbl_list_request_times` — **List request times on jdss1 v4**
 17. `tbl_rest_package_files` — **Files of the REST package**
 18. `tbl_reply_type_fields` — **Reply types, fields, accessors and decoders**
-19. `tbl_id_sources` — **Where the names and IDs come from**
-20. `tbl_terms` — **Terms**
+19. `tbl_error_kind_codes` — **Kinds of error and their codes**
+20. `tbl_id_sources` — **Where the names and IDs come from**
+21. `tbl_terms` — **Terms**
 
 ## Metadata
 [Metadata](#metadata)
@@ -90,7 +91,7 @@
 Date: 2026-11-05 (API v4 only decided), 2026-11-10 (the whole migration, compliance with the recorded v4 API, decided as one record); first written 2026-11-05 as the document named under Formerly, in this form 2026-11-09, merged into one record 2026-11-10
 Driver: Andrei Perepiolkin
 Approver: andrei.perepiolkin
-Code: commit `11ffbfd`, called "the current code" below; line numbers refer to it
+Code: commit `a3800e4`, called "the current code" below; line numbers refer to it
 Implementation: the [What changes](#what-changes) section, one series of commits delivered and tested in one go
 Formerly: `docs/design/0002-rest-api-compliance-design.md`, merged into this document on 2026-11-10
 
@@ -440,7 +441,7 @@ pages them, as recorded for the volume list ([question 49](#decisions)), and res
 the whole list on every call (priority 3, [risks 26, 27 and 28](#risks)).
 Without a guard in this delivery: a
 hung call past the CSI deadline ([risk 12](#risks)), the accepted edge of a
-name of exactly 132 characters ([risk 13](#risks)), a reply behind the request ([risk 14](#risks)), the time a CSI list call takes on a long list ([risk 26](#risks)) and a list that serves fewer than 100 entries to a page ([risk 28](#risks)).
+volume name of 129 to 132 characters ([risk 13](#risks)), a reply behind the request ([risk 14](#risks)), the time a CSI list call takes on a long list ([risk 26](#risks)) and a list that serves fewer than 100 entries to a page ([risk 28](#risks)).
 
 The decisions below the options were taken as questions and are kept in the
 [Decisions](#decisions) table: the reply types are transcribed by an
@@ -456,7 +457,7 @@ a 404 means "not found" whatever its body (question 40), and a GET answered
 without data is sent again, `tries` times in all at most (question 39);
 each driver lists only its own snapshot kind (question 7); the CSI lists read the whole appliance list once on every call, with `per_page=100`, count for `max_entries` only the entries their reply carries, and resume after the last name they returned (questions 60 to 62, 64 and 66); IDs and names are validated where the CSI parsers read them, with two
 entry points left uncovered ([Relationship](#relationship-to-other-designs)), generated volume names
-are at most 131 characters and target names lower case (questions 20 and 21); the plugin speaks HTTPS
+are at most 128 bytes, so that a volume's CSI ID is within the CSI spec's limit for a string, names on the appliance at most 131 characters and target names lower case (questions 20, 21 and 71); the plugin speaks HTTPS
 only, TLS 1.2 or higher, with certificate checks on by default (questions 23,
 26 and 50); no secret reaches any log at any level, no request body or header
 is logged, and no Warn line that could print a REST or CHAP credential is
@@ -468,7 +469,7 @@ left (questions 19, for tokens, 36 and 45; [impl_plugin_rest_no_request_logging]
 
 Deliver everything here in one go: one series of commits, built, checked and
 tested together ([Testing](#testing)). Put the commits in this order: a
-`go vet` clean-up ([impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply)), the two
+`go vet` clean-up ([impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply), [impl_plugin_ctrl_no_format_string_from_error_text](#impl_plugin_ctrl_no_format_string_from_error_text)), the two
 logging commits ([impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging), [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs)), `per_page`, dead-code removal, the move to v4, response
 types (stage 2), behaviour and error mapping (stage 3), robustness and security
 (stage 4). Stage 1 alone reaches v4 and stage 2 decodes its replies; the client
@@ -478,19 +479,25 @@ build on its own, except those from the stage 2 types commit up to the
 stage 3 commit that moves the readers of the per-volume snapshot lists to
 their short entries ([question 43](#decisions)), so that if the live test fails,
 `git bisect` can find the commit that caused it, skipping those.
-The implementing agent writes the code and its unit tests without a
-compiler; the user builds, vets and tests the series on the lab machine
-([question 47](#decisions)).
+The implementing agent writes the code and its unit tests on the analysis
+machine, which has no Go, and builds, vets and runs the unit tests on the
+lab machine, commit by commit ([question 47](#decisions)).
+This document stays Proposed while the series is implemented and tested,
+and is accepted with the tested series. Until then, write into its text
+whatever the implementation changes in what it states: the read fields of
+Table 5 ([question 51](#decisions)) and the minimum release
+([question 58](#decisions)) are the changes it expects
+(user decision, [question 72](#decisions)).
 
-### First commit: make `go vet` pass in `pkg/rest`
-[First_commit_make_go_vet_pass_in_pkg_rest](#first-commit-make-go-vet-pass-in-pkgrest)
+### First commit: make `go vet` pass in `pkg/rest` and `pkg/controller`
+[First_commit_make_go_vet_pass_in_pkg_rest_and_pkg_controller](#first-commit-make-go-vet-pass-in-pkgrest-and-pkgcontroller)
 
 #### impl_plugin_rest_no_format_string_from_reply
 
 **Its own commit, first in the series.** [Testing](#testing) step 1 asks that `go vet`,
-Go's built-in static checker, report nothing for `pkg/rest` on every commit that builds ([question 43](#decisions)), so vet has to pass there from the first commit of the series on. Since Go 1.24, vet's
+Go's built-in static checker, report nothing for `pkg/rest`, `pkg/driver` and `pkg/controller` on every commit that builds ([question 43](#decisions)), so vet has to pass there from the first commit of the series on. Since Go 1.24, vet's
 printf check reports a format string that is not a constant and has no arguments;
-the module is Go 1.26, so the check applies. `go vet ./...` on the current code
+the module is Go 1.26, so the check applies. `go vet -a ./...` on the current code
 gives 34 reports, all of this kind and nothing else. Eight are in `pkg/rest`;
 fix those eight:
 
@@ -508,14 +515,52 @@ No message would change for text without a `%`. This is also the fix for
 [bug_plugin_rest_reply_text_as_format_string](#bug_plugin_rest_reply_text_as_format_string)'s format-string
 part: a `%` in an appliance message could no longer garble the message or the log.
 In the same commit, add `vet` and `test` targets to the `Makefile`, so that the vet and the tests of [Testing](#testing) step 1 are a command each from the first commit on: `make vet`
-runs `go vet ./pkg/rest/...`, and `make test` has nothing to run until
-[impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures). Change nothing else in this commit.
+runs `go vet -a ./pkg/rest/... ./pkg/driver/... ./pkg/controller/...`, and `make test` has nothing to run until
+[impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures). Keep the `-a`
+(user decision, [question 76](#decisions)): with Go 1.26.0 the go command
+takes a vet result from its build cache, and a package that was vetted
+before as a dependency of another one then gets no report when it is vetted
+itself. `-a` makes the go command analyse the packages again
+([risk 30](#risks)). Change nothing else in this commit
+but the controller's format strings, which go with it
+([impl_plugin_ctrl_no_format_string_from_error_text](#impl_plugin_ctrl_no_format_string_from_error_text)).
 The other 26 reports are in the controller and the node
-(`bug_plugin_error_text_as_grpc_status_format_string`); they stay
-([Relationship](#relationship-to-other-designs)), so `go vet ./...` keeps
-reporting them after this delivery. What must hold:
-`go vet ./pkg/rest/...` gives no report, `make vet` runs it, `make test` exists, and a `%` in an appliance message or
+(`bug_plugin_error_text_as_grpc_status_format_string`): that item takes the
+23 of the controller, and the three of the node stay
+([Relationship](#relationship-to-other-designs)), so `go vet -a ./...` keeps
+reporting those three after this delivery. What must hold:
+`go vet -a ./pkg/rest/...` gives no report, `make vet` and `make test` exist, and a `%` in an appliance message or
 in a name reaches the error text and the log unchanged.
+
+#### impl_plugin_ctrl_no_format_string_from_error_text
+
+**In the first commit, with the reports of `pkg/rest`** (user decision,
+[question 69](#decisions)): fix the 23 reports of `pkg/controller`, all in
+`controllerplugin.go` and all of the kind that
+[impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply)
+describes; they are the controller's part of
+`bug_plugin_error_text_as_grpc_status_format_string`. `go test` runs vet's
+printf check on a package before it runs the package's tests, and runs no
+test when the check reports anything. Stage 3 gives `pkg/controller` its
+first test files
+([impl_plugin_csi_list_paging_resumes_after_last_name](#impl_plugin_csi_list_paging_resumes_after_last_name),
+[question 63](#decisions)), so with these reports left in, `make test` would
+end there in a failed build before a test ran. `pkg/driver` has no report.
+
+- Where the message is a variable or the text of an error, pass it as the
+  message and not as the format, `status.Error(code, msg)` in place of
+  `status.Errorf(code, msg)`: `:127`, `:134`, `:377`, `:381`, `:386`,
+  `:410`, `:565`, `:659`, `:663`, `:676`, `:732`, `:884`, `:893`, `:897`.
+- Where the message is built by `fmt.Sprintf` inside the call, pass the
+  format and its arguments to `status.Errorf` directly: `:418`, `:422`,
+  `:431`, `:433`, `:439`, `:442`, `:445`.
+- Where `fmt.Sprintf` wraps a joined list of addresses and nothing else,
+  drop it and keep `strings.Join`: `:869`, `:872`.
+
+The status codes stay as they are, and so does every message without a `%`.
+What must hold: `go vet -a ./pkg/controller/...` and
+`go vet -a ./pkg/driver/...` give no report, `make vet` runs them together with that of `pkg/rest`, and a
+`%` in the text of an error reaches the gRPC status unchanged.
 
 ### Before stage 1: keep secrets out of the logs
 [Before_stage_1_keep_secrets_out_of_the_logs](#before-stage-1-keep-secrets-out-of-the-logs)
@@ -571,7 +616,7 @@ capability check of a create, delete or publish fails (`controllerplugin.go:479`
 `:546`, `:634`, `:710`, `:857`). That check cannot fail today: the list of
 capabilities it reads is fixed (`:63-70`) and holds every capability these
 calls ask for, so in practice the secrets reach the log at Debug only.
-`ControllerGetCapabilities` logs its request at Info (`:1069`; no secrets, but
+`ControllerGetCapabilities` logs its request at Info (`:1078`; no secrets, but
 the rule is the same). Make the Debug and Info lines log only the fields
 needed (volume ID, name, capability). Remove the Warn lines that could print a
 REST or CHAP credential, the five above, instead of cutting them down to fields
@@ -737,7 +782,9 @@ of the types not listed (the pool's sub-types, `Disk`,
 `ShareNFS`, `ShareSMB`), is not read and becomes `json.RawMessage`.
 Which fields the plugin would read and require is hard to tell before the
 implementation, so this list may change with it; a field it comes to read
-takes its mark by Table 4's rules ([question 51](#decisions)).
+takes its mark by Table 4's rules ([question 51](#decisions)). Such a change
+is written into this table, since this document stays Proposed until the
+series is tested ([question 72](#decisions)).
 
 **Table 5 — Read fields per reply type** · `tbl_read_fields`
 
@@ -759,7 +806,7 @@ or key changes: read `Creation` through an accessor (`controller/listers.go:52`,
 `:124`, `:148`; `controllerplugin.go:679`, `:802`; `driver/iscsi_driver.go:456`;
 `nfs_driver.go:591`), the list entry's `Parent.Name` instead of a `Volume` key
 the appliance never sends (`listers.go:54`, `:56`; `driver/restwrappers.go:40`),
-the pool's `GetAvailable()` (`controllerplugin.go:1017`); and take the name of a
+the pool's `GetAvailable()` (`controllerplugin.go:1026`); and take the name of a
 zvol snapshot in the iSCSI `GetSnapshot` from its request, the name it asked
 for, `sd.SDS()`, since the reply by name has none (`iscsi_driver.go:454`;
 user decision, [question 42](#decisions)). Fifteen more lines read `Name` of
@@ -884,7 +931,7 @@ Fix the rest of [response content](#response-content-and-defaults), of the [erro
   on the NAS volume create 500, `ZfsCmdError`, errno 4, `cannot create ...: out of space`; and the entries not in
   the spec that [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) lists. The zvol snapshot and clone creates get none ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), [question 59](#decisions)).
 - [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised), REST side only: give a missing pool its own code, so that
-  the controller can report a configuration error instead of Unknown (on the
+  a caller can tell it from an unknown error (on the
   snapshot and clone creates its error cannot be told from a missing
   parent's, [bug_rest_v4_snapshot_and_clone_creates_missing_pool_and_missing_parent_errors_overlap](#bug_rest_v4_snapshot_and_clone_creates_missing_pool_and_missing_parent_errors_overlap),
   so take it there as the parent missing, [question 48](#decisions)); map "name too
@@ -911,7 +958,8 @@ Fix the rest of [response content](#response-content-and-defaults), of the [erro
   function in `pkg/rest`, which every GET the plugin sends passes
   through, take such a reply and send the same GET again after a
   pause, until a reply carries data or the request has been sent `tries`
-  times in all. `tries` is the existing setting of the REST endpoint
+  times in all. Only a GET is sent again: a DELETE answered 204 without a
+  body has succeeded, as it does today, and is never repeated. `tries` is the existing setting of the REST endpoint
   configuration, 3 when it is not set (`rproxy.go:260-262`), which nothing
   reads today ([bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover)):
   3 means the first request and two more, 1 means no second request. Take the
@@ -1082,7 +1130,10 @@ snapshots through the same read, with no token and no limit.
 From this item on, make `make test` also run
 `go test ./pkg/driver/... ./pkg/controller/...`: the paging is the one part
 of the driver and controller code with unit tests in this delivery, since
-csi-sanity resumes no list here ([question 63](#decisions)).
+csi-sanity resumes no list here ([question 63](#decisions)). `go test` vets
+a package before it runs its tests, and both packages pass that vet since
+the first commit
+([impl_plugin_ctrl_no_format_string_from_error_text](#impl_plugin_ctrl_no_format_string_from_error_text)).
 
 What must hold: calls that start with no token and follow `next_token`
 return every entry of a list that does not change, each exactly once and in key order, for
@@ -1140,9 +1191,15 @@ handling errors.
   sent once, it can send. Such an error keeps its entry, marked "not in the
   spec", and is pointed out to the user so that it can be added to the spec
   (user decision). Handled does
-  not always mean a code of its own: where the meaning of an error is
-  known, its entry gives that code; where it is not, its entry says Unknown,
-  on purpose. No error of a call's list is left without an entry (user decision): this is what [rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled) asks for, and, for the errors without an `errno` or a `class`, [rule_rest_error_bodies_handled](#rule_rest_error_bodies_handled). Compile each pattern with Go's `regexp` in a unit test, because the `jdss-rest-api-spec` project states them for Python and JavaScript. The entries "not in the spec" known today: the two patterns of today's code that no recording supports
+  not always mean a code of its own. Take the code that an entry gives, the
+  one `GetCode()` returns, from the current code (user decision,
+  [question 77](#decisions)): it is the code that the call returns today for
+  that reply, Unknown included, and for a call that this document adds, the
+  code that today's mapping in `errors.go` gives the reply. Give an entry
+  another code only where this document decides one: the fixes listed at
+  the head of this stage, and a 404, which is "not found"
+  ([question 40](#decisions)). So a caller is told nothing
+  new about a reply it got before, but for those. No error of a call's list is left without an entry (user decision): this is what [rule_rest_error_statuses_handled](#rule_rest_error_statuses_handled) asks for, and, for the errors without an `errno` or a `class`, [rule_rest_error_bodies_handled](#rule_rest_error_bodies_handled). Compile each pattern with Go's `regexp` in a unit test, because the `jdss-rest-api-spec` project states them for Python and JavaScript. The entries "not in the spec" known today: the two patterns of today's code that no recording supports
   ([evidence gaps](#evidence-gaps): `Resource ... already exists.` with errno 1 or 100,
   and `Zfs resource: ... not found in this collection` without an errno), most likely from an older JovianDSS release;
   out of space on the NAS snapshot create, errno 1000, which no jdss1 v4 scenarios file lists yet;
@@ -1163,6 +1220,36 @@ handling errors.
   missing parent cannot be told from a missing pool ([question 48](#decisions)).
 - **Codes that say what happened, per kind**, as the Proxmox plugin's `jdssc`
   does (`jdssc/jdssc/jovian_common/exception.py`: not found per volume, snapshot, target and pool; already exists per volume, snapshot and dataset; busy; communication failure): give each kind its own code, for example volume not found, snapshot already exists, volume has clones, pool missing, out of space, invalid argument, authentication failed, and make callers decide on the code alone, never on message text.
+- **A code for each kind of error, by layer** (user decision,
+  [question 73](#decisions)). The `class` of an error shows which layer of
+  the appliance raised it. Give each layer a range of 1000 codes, and each
+  kind of error in a call's scenarios file a code inside the range of its
+  layer:
+  - 1000 to 1999: no `class`: login errors and some replies of 400 and 404;
+  - 2000 to 2999: `builtins.*`: Python errors the appliance did not catch;
+  - 3000 to 3999: `zfslib.*`: the ZFS wrapper;
+  - 4000 to 4999: `opene.*`: the product's own logic;
+  - 5000 to 5999: `jsonschema.exceptions.ValidationError`: a request body
+    that fails its schema;
+  - 6000 to 6999: `werkzeug.exceptions.*`: routing and the API's own
+    checks.
+
+  The multiple of 1000 is the code of the layer itself, and the kinds of
+  error of a layer take the numbers after it. The codes below 1000 are the
+  plugin's own, as today.
+- **Two codes on every error** (user decision, [question 74](#decisions)).
+  Keep `GetCode()` as it is: it returns the code that says what the error
+  means for the call, and today's callers compare with it, unchanged. Add a
+  second code beside it, which says which error the appliance sent: the code
+  of its kind for an error that an entry of the call holds, the code of its
+  layer alone for one that no entry holds, and 0 for a failure that is not
+  an error of the appliance, such as a request without a reply. Each entry
+  of the catalogue gives both codes. The kinds of error of the plugin's
+  calls and their numbers are in Table 19 ([Measurements](#measurements);
+  user decision, [question 75](#decisions)). A kind keeps its number, and
+  one that a later reading of the spec adds takes the next free number of
+  its layer. An entry marked "not in the spec" has no kind there: it gives
+  the code of its layer alone until the spec holds it.
 - **One handler for every failed reply**, in `pkg/rest`: make it match the
   reply against the catalogue entries of the call that failed, and turn anything that matches no entry into `RestErrorFailureUnknown`, with the status, `class`, `errno`, message and endpoint kept in the error, unless its status gives the meaning: a 404 (below), and a 401 or 403 without a JSON body (stage 3, above). Nothing else is guessed: an error that matches no entry is never turned into "busy" or "exists".
   A 404 is not a guess: a reply with that status means "not found" whatever
@@ -1175,7 +1262,7 @@ handling errors.
   A call that gets no reply at all, a transport error, goes through the same
   handler and gets its log line there ([impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes)). The handler takes over the work of `ErrorFromErrorT` and of the matching in `getError`: remove `ErrorFromErrorT`, and with it `ErrorT.String()`, which only it calls. A reply without an error object then gets the code its status gives, which closes [crash_plugin_rest_error_from_nil_body](#crash_plugin_rest_error_from_nil_body) (user decision).
 - **One log line per failed call, in one format**, written by that handler:
-  method, path, status, `class`, `errno`, message and the code it was mapped to.
+  method, path, status, `class`, `errno`, message and the two codes it was given.
   The handler cannot know whether a failure was expected (only the caller knows
   that "not found" on a repeated delete is fine), so have it log every error it
   recognises at Debug and every unknown error at Error. An error whose
@@ -1188,15 +1275,21 @@ handling errors.
   operation is their own record, and this document changes it only where it prints a whole CSI request ([impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs); [question 37](#decisions)). Let it replace today's
   scattered Warn lines ([bug_plugin_rest_every_error_logged_at_warn](#bug_plugin_rest_every_error_logged_at_warn)) and the empty message of
   unmatched errors ([bug_plugin_rest_unknown_error_empty_message](#bug_plugin_rest_unknown_error_empty_message)).
-- **Callers pass the meaning on.** Make the driver and controller turn each code into
-  one CSI status, and pass the appliance message on with an unknown error, so the
-  CSI caller sees what really happened. Let no caller map "any error" to one meaning: fix the zvol `DeleteClone` caller that does so today ([bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy](#bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy), `iscsi_driver.go:520`), and, for review [bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children](#bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children), keep `volume has children` on its own code (`RestErrorResourceBusyVolumeHasSnapshots` today) and
+- **Handling a code is the caller's business** (user decision,
+  [question 70](#decisions)). This document implements API v4 in the REST
+  module and gives the modules that use it one code for each failure, with
+  the appliance's message in the error. It does not decide which CSI status
+  the driver and the controller return for a code. A code that no caller
+  handles today, such as a missing pool or a failed authentication, gets
+  the caller's default until the work on those modules decides otherwise
+  ([Relationship](#relationship-to-other-designs)). This stage changes a
+  caller only where an earlier decision says so. Let no caller map "any error" to one meaning: fix the zvol `DeleteClone` caller that does so today ([bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy](#bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy), `iscsi_driver.go:520`), and, for review [bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children](#bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children), keep `volume has children` on its own code (`RestErrorResourceBusyVolumeHasSnapshots` today) and
   make `DeleteVolume` run the intermediate-snapshot cleanup for it too. Do not delete a volume that still has snapshots after the cleanup, on iSCSI and NFS alike (user decision): answer `FailedPrecondition`, naming them, as CSI asks for a volume with snapshots, where today a volume with a CSI snapshot gets `Internal`. The NFS driver has to look first, since the appliance deletes a NAS volume together with its snapshots ([dataloss_plugin_driver_nfs_delete_volume_destroys_its_snapshots](#dataloss_plugin_driver_nfs_delete_volume_destroys_its_snapshots)): make its `DeleteVolume` read the volume's snapshots, through the per-volume list this stage repairs, run the cleanup, and send the delete only when no snapshot is left.
 - **Kept complete by the audit:** [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool) lists every recorded error of a plugin
   call that the catalogue does not cover for that call, so a new error in a hurl run shows up as
   a failed check.
 
-What must hold: every error a call's list holds maps to the code its entry gives for that call; an `errno` that is a number, one that is `null` and one that is missing are three different inputs to the matching; a 404 that matches no entry of
+What must hold: every error a call's list holds maps to the code its entry gives for that call, and that code is the one the same call returned for the reply before stage 3, but where this document decides another; every error `pkg/rest` returns carries two codes: the one `GetCode()` returns, which no caller has to read differently, and beside it the code of its kind or of its layer, inside the layer's range, or 0 for a failure that is not an error of the appliance; an `errno` that is a number, one that is `null` and one that is missing are three different inputs to the matching; a 404 that matches no entry of
 its call gets the general not-found code and is logged at Error; an
 unknown body keeps all its fields and is logged once by `pkg/rest`; a reply without an error body returns a `RestError` ([crash_plugin_rest_error_from_nil_body](#crash_plugin_rest_error_from_nil_body)); no caller
 maps every error of a call to one meaning, the zvol `DeleteClone` caller
@@ -1211,7 +1304,7 @@ the handler of a failed reply.
 
 Fix the REST-layer [crashes](#crashes) ([impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes)),
 escape path segments ([impl_plugin_rest_escape_path_segments](#impl_plugin_rest_escape_path_segments)), and add the security measures [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids), [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile) and [impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit)
-([impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply) is the [first commit](#first-commit-make-go-vet-pass-in-pkgrest), and the two logging items, [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging) and [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs), are commits [before stage 1](#before-stage-1-keep-secrets-out-of-the-logs)). Most of it is
+([impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply) is the [first commit](#first-commit-make-go-vet-pass-in-pkgrest-and-pkgcontroller), and the two logging items, [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging) and [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs), are commits [before stage 1](#before-stage-1-keep-secrets-out-of-the-logs)). Most of it is
 inside `pkg/rest`; [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) also touches the driver and the controller, and [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile)
 and [impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit) add settings to the plugin configuration, after [impl_plugin_config_yaml_tags_and_guide_keys](#impl_plugin_config_yaml_tags_and_guide_keys) has tagged its structs and corrected its guides.
 
@@ -1310,17 +1403,27 @@ can put any string there.
 appliance name of a volume from the CSI name in one of three forms: `vp_` plus
 the CSI name as it is, when its characters are allowed; `vb_` plus its base32
 form, when they are not; and `vs_` plus a SHA-256 hash (67 characters), when the
-name is too long. `NewVolumeDescFromName` (`driver/lunid.go:65-81`) uses the
-first two forms up to 240 characters, so it can build names of up to 243, which
-the appliance refuses. Lower the threshold to 128, so that every generated name is
-at most 131; longer CSI names would fall through to the `vs_` form.
+name is too long. `NewVolumeDescFromName` (`driver/lunid.go:65-81`) checks
+two lengths against 240: the CSI name's, before it takes the `vp_` form
+(`:65`), and its base32 form's, before it takes the `vb_` form (`:69`); so it
+can build names of up to 243, which the appliance refuses. Lower **both**
+thresholds to 125 (user decision, [question 71](#decisions)). The appliance
+name of a volume is also its CSI ID (`driver/lunid.go:167-173`), and CSI
+naming follows the CSI spec, which limits a string field to 128 bytes. With
+the three characters of the prefix, every generated name is then at most 128
+bytes, which is also within the 131 allowed for a name on the appliance
+([question 21](#decisions)). A CSI name,
+or a base32 form, longer than 125 would fall through to the `vs_` form.
+Lowering only the first would leave `vb_` names of up to 243. A share takes
+the name of its NAS volume (`nfs_driver.go:175`, `:279`), so the same limits
+hold for it.
 The appliance's message gives 132 as the limit (129 characters were recorded
-accepted, 150 refused), so no volume with a longer name exists. One of
-exactly 132 may: a volume made from a CSI name of exactly 129 characters
-(`vp_` form), or one whose base32 form has 129 characters (`vb_`), would be
-looked up under its `vs_` name after the change and not be found. Kubernetes
-volume names have 40 characters, so none is expected ([risk 13](#risks);
-[question 21](#decisions)).
+accepted, 150 refused), so no volume with a longer name exists. One of 129
+to 132 characters may: a volume that the current code made from a CSI name
+of 126 to 129 characters (`vp_` form), or from one whose base32 form has 126
+to 129 (`vb_`), would be looked up by its CSI name under its `vs_` name
+after the change and not be found. Kubernetes volume names have 40
+characters, so none is expected ([risk 13](#risks)).
 
 **Target names are built, not received:** `<prefix>:<hash>`
 (`iscsi_driver.go:569`). The hash is lower-case SHA-256 hex; the prefix is the
@@ -1334,7 +1437,8 @@ startup is not decided here ([question 41](#decisions)).
 
 What must hold: an ID that breaks the rules of the table fails with
 `InvalidArgument` at the two parsers, before any REST call; no generated
-volume name is longer than 131 characters; the `pkg/rest` path builders
+volume name, and so no CSI ID of a volume the plugin creates, is longer than
+128 bytes; the `pkg/rest` path builders
 refuse an empty, `.` or `..` segment; and `SetupControllerPlugin` returns an
 error for an `iscsi.iqn` prefix outside the target rule.
 
@@ -1358,7 +1462,9 @@ guide that puts `pool` in the wrong place still gets no pool.
   `logpath` (`:75`); the addresses after the first in `addrs` are not used
   ([bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover)), so mark them as unused; and describe `tries` and
   `retrydelay` as what stage 3 makes of them, the number of requests and the
-  pause for a GET answered without data ([question 39](#decisions)).
+  pause for a GET answered without data, and say that no other request is
+  sent again: not a DELETE answered 204, which is a success, and not a
+  request that failed ([question 39](#decisions)).
 
 What must hold: every key of `RestEndpointCfg` and `ISCSIEndpointCfg` has a
 `yaml` tag with the name the guides give it; both guides put `pool` at the
@@ -1465,7 +1571,7 @@ comes before these tests; and a fake HTTP server
 [crash_plugin_rest_nil_response_on_transport_error](#crash_plugin_rest_nil_response_on_transport_error), which stage 4 makes ([impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes)), and [crash_plugin_rest_error_from_nil_body](#crash_plugin_rest_error_from_nil_body), which stage 3 makes ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)). These would be
 the first unit tests in the repository. Run them with
 `go test ./pkg/rest/...` on the lab machine (`make test`; the target comes with the
-[first commit](#first-commit-make-go-vet-pass-in-pkgrest)), and keep them to the
+[first commit](#first-commit-make-go-vet-pass-in-pkgrest-and-pkgcontroller)), and keep them to the
 standard library: no new module dependency, because the build targets run
 `go mod tidy` and would pick any change up. Decoded with the current
 hand-written types, **before** any fix, the same fixtures show the failures
@@ -1687,14 +1793,17 @@ snapshot lists in stage 3 ([risk 1](#risks), [question 43](#decisions)).
     the CSI deadline passes; it lasts until `idletimeout`, which is used as the
     timeout of the whole request. Guard: none in this delivery; future work
     ([request deadlines](#future-work-request-deadlines)).
-13. **Names of exactly 132 characters ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids)).** A volume with such a name, made
-    from a CSI name of exactly 129 characters or one whose base32 form has 129, would be looked up under its `vs_`
-    name after the change and not be found, and its ID, itself 132 characters
-    long, would be refused with `InvalidArgument` where the ID check runs.
+13. **Volume names of 129 to 132 characters ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids)).** A volume with such a name, which the current code made
+    from a CSI name of 126 to 129 characters or from one whose base32 form has 126 to 129, would be looked up by its CSI name under its `vs_`
+    name after the change and not be found: a CreateVolume repeated for it
+    would make a second volume. Its ID, the name itself, still reaches the
+    volume, but for an ID of 132 characters, which would be refused with
+    `InvalidArgument` where the ID check runs.
     Kubernetes volume names have 40
     characters, so none is expected. Guard: none; the edge is accepted with the
-    limit of 131 (user decision, [question 21](#decisions)), which may
-    change later.
+    limits of 131 for a name on the appliance and of 128 bytes for a
+    generated name (user decisions, [questions 21 and 71](#decisions)), which
+    may change later.
 14. **Replies may be behind the request.** Two cases are recorded. On jdss2, a
     snapshot list read within half a second of a snapshot create or delete still
     shows the old state, while a read by name is current at once (hurl
@@ -1823,7 +1932,8 @@ snapshot lists in stage 3 ([risk 1](#risks), [question 43](#decisions)).
    that matches no entry of its call is logged at Error with its fields
    ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)); and the minimum release is stated
    ([risk 2](#risks)). What these do not cover has no guard in this
-   delivery.
+   delivery; the 404 of a path the appliance does not route is left to
+   another record (kub-testing `ISSUES.md`, F31).
 25. **A missing pool would be reported as a missing parent on the snapshot
    and clone creates
    ([bug_rest_v4_snapshot_and_clone_creates_missing_pool_and_missing_parent_errors_overlap](#bug_rest_v4_snapshot_and_clone_creates_missing_pool_and_missing_parent_errors_overlap)).**
@@ -1832,8 +1942,8 @@ snapshot lists in stage 3 ([risk 1](#risks), [question 43](#decisions)).
    snapshot's message also matches the missing pool's pattern. An error that
    can be either would be taken as the parent missing ([question 48](#decisions)):
    the CSI caller would be told that the source is gone when the pool is, and
-   the configuration error that the controller could report for a missing pool
-   ([Stage 3](#stage-3-behaviour-and-error-mapping)) would not be reported on
+   the code of a missing pool
+   ([Stage 3](#stage-3-behaviour-and-error-mapping)) would not be given on
    these calls. Guard: a `TODO` comment at these entries says that the missing
    parent cannot be told from a missing pool; the handler's log line at Debug
    keeps the message, which names what is missing
@@ -1893,6 +2003,17 @@ snapshot lists in stage 3 ([risk 1](#risks), [question 43](#decisions)).
     the names Kubernetes gives, `pvc-` or `snapshot-` and a UUID, are far
     shorter; the snapshots of a volume with a name of over about 100
     characters are the case. Guard: none.
+30. **`go vet` passes from its cache.** With Go 1.26.0 the go command takes
+    a vet result from its build cache. A package that was vetted before as a
+    dependency of another one gets no report when it is vetted itself: on
+    the lab machine, a plain `go vet ./pkg/rest/...` reported nothing on the
+    current code, which has eight reports there, after `pkg/driver`, which
+    imports `pkg/rest`, had been vetted. A commit that vet should stop would
+    then pass [Testing](#testing) step 1. Guard: `make vet` runs
+    `go vet -a`, which analyses the packages again and reported all eight
+    ([question 76](#decisions)); step 1 is made with `make vet`. The vet
+    that `go test` runs by itself is not forced, so it can miss a report
+    that `make vet` shows.
 
 ## Affected systems and files
 [Affected_systems_and_files](#affected-systems-and-files)
@@ -1904,7 +2025,7 @@ snapshot lists in stage 3 ([risk 1](#risks), [question 43](#decisions)).
 | Plugin REST client, paths | one API prefix, `api/v4`, replaces the 34 hard-coded `api/v3` strings (30 after the dead-code commit); comments that name v3 go | `pkg/rest/*.go` (Table 8) |
 | Plugin REST client, reply types | `types.go` rewritten from `jdss-rest-api-spec`'s observed OpenAPI; the accessors, conversions and required-field checks in a methods file | `pkg/rest/types.go` (transcribed), `pkg/rest/types_methods.go` |
 | Fixtures, tests and audit | fixtures chosen from the recorded jdss1 v4 replies, which the implementing agent's tests decode with the transcribed types and check required field by required field; the audit compares the plugin's calls with the v4 index and the transcribed types with the OpenAPI | `pkg/rest/*_test.go`, `pkg/rest/testdata/`; `kub-testing/tools/rest-type-audit.py` ([impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures), [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool)) |
-| Drivers and controller | the thirteen lines: `Creation` via accessor, `Parent.Name` for list entries, `GetAvailable()` for the pool, the requested name in the iSCSI `GetSnapshot`; the callers of the per-volume snapshot lists ([impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow)); the paging of the CSI lists ([impl_plugin_csi_list_paging_resumes_after_last_name](#impl_plugin_csi_list_paging_resumes_after_last_name)) | `pkg/controller/listers.go:52`, `:54`, `:56`, `:82`, `:124`, `:148`; `pkg/controller/controllerplugin.go:679`, `:802`, `:1017`; `pkg/driver/restwrappers.go:40`; `pkg/driver/iscsi_driver.go:454`, `:456`; `pkg/driver/nfs_driver.go:591`; the other driver and controller changes are rows of Table 8 |
+| Drivers and controller | the thirteen lines: `Creation` via accessor, `Parent.Name` for list entries, `GetAvailable()` for the pool, the requested name in the iSCSI `GetSnapshot`; the callers of the per-volume snapshot lists ([impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow](#impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow)); the paging of the CSI lists ([impl_plugin_csi_list_paging_resumes_after_last_name](#impl_plugin_csi_list_paging_resumes_after_last_name)) | `pkg/controller/listers.go:52`, `:54`, `:56`, `:82`, `:124`, `:148`; `pkg/controller/controllerplugin.go:679`, `:802`, `:1026`; `pkg/driver/restwrappers.go:40`; `pkg/driver/iscsi_driver.go:454`, `:456`; `pkg/driver/nfs_driver.go:591`; the other driver and controller changes are rows of Table 8 |
 | Plugin documentation and release notes | the required JovianDSS release is stated: one that serves API v4, for JovianDSS 1 at least `1.0up33.65410`, or the newer release the live tests ran on ([question 58](#decisions)) | `docs/`, `CHANGELOG.md` |
 | JovianDSS appliances | must serve API v4: JovianDSS 1 at `1.0up33.65410`, or the newer release the live tests ran on ([question 58](#decisions)), or later | the lab appliance and the recorded appliances already do |
 | Test lab | the live cycles become the plugin's first runs on v4; the suite itself does not change | kub-testing `dev_cycle.py` cycles ([Testing](#testing) steps 4 and 5); `ISSUES.md` T9 |
@@ -1926,7 +2047,7 @@ Entries marked *NFS* are NFS-only code: the NFS cycle ([Testing](#testing) step 
 | `pkg/rest/types.go` (rewritten), `types_methods.go` (new) | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec): transcribed reply types; closes [bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_get_encryption_type_mismatch), [bug_rest_v4_pools_pool_get_iostats_type_mismatch](#bug_rest_v4_pools_pool_get_iostats_type_mismatch), [bug_rest_v4_pools_pool_get_disk_led_type_mismatch](#bug_rest_v4_pools_pool_get_disk_led_type_mismatch), [bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch](#bug_rest_v4_pools_pool_volumes_snapshots_get_creation_type_mismatch), [bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch](#bug_rest_v4_pools_pool_volumes_volume_snapshots_snapshot_clones_get_is_clone_type_mismatch), [bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec](#bug_rest_v4_pools_pool_nas_volumes_dataset_get_fail_to_comply_with_api_spec) *NFS* and [bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead); [bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key](#bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key) *NFS* key (stage 3 filters by it); [impl_plugin_rest_return_parse_errors](#impl_plugin_rest_return_parse_errors) | 2, 3 |
 | `pkg/controller/listers.go`, `controllerplugin.go`; `pkg/driver/restwrappers.go`, `iscsi_driver.go`, `nfs_driver.go` | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec): the thirteen lines that read `Creation`, the list entry's `Volume`, the pool's `Available`, a zvol snapshot's `Name` ([question 42](#decisions)) | 2 |
 | `pkg/rest/*_test.go`, `pkg/rest/testdata/` (new) | [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) | 2, 3, 4 |
-| `Makefile` | `vet` (`go vet ./pkg/rest/...`) and `test` targets | first commit |
+| `Makefile` | `vet` (`go vet -a` on `pkg/rest`, `pkg/driver` and `pkg/controller`, [question 76](#decisions)) and `test` targets | first commit |
 | `kub-testing/tools/rest-type-audit.py` (new) | [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool): compliance matrix, request keys, error coverage, the types against the OpenAPI | 2 |
 | `pkg/rest/doc.go` (new) | [impl_plugin_rest_package_documentation](#impl_plugin_rest_package_documentation), package documentation | 2 |
 | `pkg/rest/entrielisters.go` | [bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub) (a new call, `GET pools/<x>/volumes/<x>/snapshots`, in the [compliance matrix](#compliance-matrix)), [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots) *NFS* | 3 |
@@ -1942,10 +2063,11 @@ Entries marked *NFS* are NFS-only code: the NFS cycle ([Testing](#testing) step 
 | `pkg/rest/rproxy.go`, `errors.go`, `rest.go` | [impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes](#impl_plugin_rest_fix_transport_auth_nil_body_setup_and_string_crashes): [crash_plugin_rest_nil_response_on_transport_error](#crash_plugin_rest_nil_response_on_transport_error), [crash_plugin_rest_basic_auth_before_request_check](#crash_plugin_rest_basic_auth_before_request_check), [crash_plugin_rest_setup_endpoint_ignores_error](#crash_plugin_rest_setup_endpoint_ignores_error), [crash_plugin_rest_endpoint_string_empty_addrs](#crash_plugin_rest_endpoint_string_empty_addrs) | 4 |
 | `pkg/rest/rproxy.go` | [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging): no request body or header logged ([security_plugin_secrets_in_logs](#security_plugin_secrets_in_logs), [security_plugin_rest_request_dump_every_call](#security_plugin_rest_request_dump_every_call)) | before 1 |
 | every `pkg/rest/*.go` with a path builder | [impl_plugin_rest_escape_path_segments](#impl_plugin_rest_escape_path_segments): `url.PathEscape` on every path segment ([security_plugin_rest_unescaped_path_segments](#security_plugin_rest_unescaped_path_segments)) | 4 |
-| `pkg/driver/lunid.go` (`NewVolumeDescFromName` threshold 240 → 128), `snapid.go`; `pkg/controller/controllerplugin.go` (`iscsi.iqn` prefix check); `pkg/rest` path builders | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids): ID and name validation, generated names at most 131 characters, target prefix checked | 4 |
+| `pkg/driver/lunid.go` (`NewVolumeDescFromName`: both thresholds, of the CSI name and of its base32 form, 240 → 125), `snapid.go`; `pkg/controller/controllerplugin.go` (`iscsi.iqn` prefix check); `pkg/rest` path builders | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids): ID and name validation, generated volume names at most 128 bytes ([question 71](#decisions)), target prefix checked | 4 |
 | `pkg/common/common.go` (`RestEndpointCfg`, `ISCSIEndpointCfg`: `yaml` tags), `docs/configuration.md`, `docs/configuration-nfs.md` (`pool` and `logfile` corrected; `tries` and `retrydelay` described; extra `addrs` marked unused) | [impl_plugin_config_yaml_tags_and_guide_keys](#impl_plugin_config_yaml_tags_and_guide_keys): the configuration as the code reads it | 4 |
 | `pkg/rest/rproxy.go`, `pkg/common/common.go` (`RestEndpointCfg`: the new keys), `docs/configuration.md` (new keys; `prot` marked no longer needed), `docs/install.md`, `docs/install-nfs.md`, the controller manifests (the CA file in the config Secret) | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile): HTTPS only, certificate checks, `insecure`, `cafile`, TLS 1.2 or higher, no redirects; [impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit): `maxreplysize` | 4 |
 | `pkg/rest/storageapi.go:51`, `:53`, `errors.go:173`, `:265`, `targets.go:45`, `:76`, `:150`, `:184` | [impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply): `"%s"` formats and direct arguments, so `go vet` passes for `pkg/rest` | first commit |
+| `pkg/controller/controllerplugin.go` (the 23 lines the item lists) | [impl_plugin_ctrl_no_format_string_from_error_text](#impl_plugin_ctrl_no_format_string_from_error_text): the text of an error passed as the message, not as the format, so `go vet` passes for `pkg/controller` and `go test` runs its tests ([question 69](#decisions)) | first commit |
 | `pkg/controller/controllerplugin.go`, `pkg/node/publish.go` | [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs): no whole CSI requests in logs | before 1 |
 | `CHANGELOG.md` | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile): certificate checks on by default, `cafile`/`insecure` needed for self-signed certificates | 4 |
 | `pkg/driver/iscsi_driver.go`, `nfs_driver.go`, `pkg/controller/listers.go` | callers of [bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead](#bug_rest_v4_pools_pool_volumes_snapshots_get_no_volume_key_parent_name_instead), [bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub](#bug_plugin_rest_volume_snapshots_lister_is_an_empty_stub), [bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots](#bug_plugin_rest_nas_volume_snapshots_lister_path_lacks_snapshots) *NFS*, [bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone](#bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone), [bug_rest_v4_shares_post_409_already_exists_unrecognised](#bug_rest_v4_shares_post_409_already_exists_unrecognised) *NFS*; the filter by kind ([bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key](#bug_plugin_rest_nas_snapshot_parent_type_read_from_copies_key), [question 7](#decisions)) | 2, 3 |
@@ -1970,8 +2092,9 @@ commands are kept with the tests, in kub-testing
 **Before the live test**
 
 1. **Each commit of the series on its own** ([risk 7](#risks)). It builds,
-   and `go vet` reports nothing for `pkg/rest`, from the
-   [first commit](#first-commit-make-go-vet-pass-in-pkgrest) on, so that
+   and `make vet`, which runs `go vet -a` ([risk 30](#risks)), reports
+   nothing for `pkg/rest`, `pkg/driver` and `pkg/controller`, from the
+   [first commit](#first-commit-make-go-vet-pass-in-pkgrest-and-pkgcontroller) on, so that
    `git bisect` stays usable; the commits [question 43](#decisions) names
    are the exception and do not build. On the last commit of the series the
    unit tests pass, those of `pkg/rest` and those of the paging of the CSI
@@ -2151,7 +2274,7 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
 | 18 | Where does the caller that turns every clone-delete error into Busy go? | this delivery, stage 3, in the error catalogue. | the user | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) |
 | 19 | jdss2 tokens in fixtures? | tokens are secrets: never logged, never in a fixture; no jdss2 reply is a fixture now. | the user | [impl_plugin_rest_recorded_reply_fixtures](#impl_plugin_rest_recorded_reply_fixtures) |
 | 20 | Exact rules for the name check? | the rules of [Table 6](#impl_plugin_driver_validate_names_and_ids): the characters the appliance accepts in the strings tests, `a-z A-Z 0-9 _ -`; at most 131 characters, one below its limit of 132 ([question 21](#decisions)); targets in lower case only, which the appliance does not require. | the user | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) |
-| 21 | Cap generated names at 131 or 132? | 131; a volume of exactly 132 characters is the accepted edge (risk 13). | the user | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) |
+| 21 | Cap generated names at 131 or 132? | 131 for a name on the appliance; a generated name is shorter still, at most 128 bytes, since it is also the volume's CSI ID ([question 71](#decisions)). The volumes whose names the current code made longer are the accepted edge (risk 13). | the user | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) |
 | 22 | Who prepares the NFS live cycle? | not this document: the test suite and the image name are prepared separately, before [Testing](#testing) step 5 can run; who prepares them is still for the user to decide, in the tracker (kub-testing `ISSUES.md`). | the user | [Relationship](#relationship-to-other-designs) |
 | 23 | Is `prot: http` still allowed? | no; HTTPS only, `prot` other than `https` is a configuration error. | the user | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile) |
 | 24 | Where do release notes live? | `CHANGELOG.md` at the repository root. | the user | [Stage 1](#stage-1-move-to-api-v4) |
@@ -2169,7 +2292,7 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
 | 36 | Where in the series do the two logging items go? | at the front, right after the `go vet` commit: no password or CSI secret may reach a log at any level, so no build that is run live may predate them; the log level is set in the configuration. Weighed against: leaving them in stage 4 and tracing a failure on builds at Info, which print no secret, since the Warn lines that could are unreachable (question 45), but show no request log. | the user | [Before stage 1](#before-stage-1-keep-secrets-out-of-the-logs), [risk 7](#risks) |
 | 37 | What does "logged once" cover? | the REST module: the handler writes the one line of `pkg/rest` for a failed call, with the appliance's fields in full. The driver and the controller make their own log records for a failed operation; this document changes them only where they print a whole CSI request ([impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs)) and moves the warning of the name check into the driver with that check ([impl_plugin_csi_list_paging_resumes_after_last_name](#impl_plugin_csi_list_paging_resumes_after_last_name)). | the user | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) |
 | 38 | Generate the reply types, or have an agent transcribe them? | transcribe: an agent reads `jdss-rest-api-spec`'s tracked OpenAPI and writes the Go types and the error catalogue; no generator, mapping file or compiler. Weighed against: generating the types from the tracked OpenAPI, set aside because of the optional fields: how well an automated tool would handle them is not known; compiling the TypeSpec with Node, a tool chain to keep; a `.tsp` parser in the plugin. Price: each new recording is a new reading and a review, and the match with the spec is shown by the audit's comparison, not by regenerating ([risk 17](#risks)). | the user | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
-| 39 | What does the plugin do with a GET answered without data, a 204? | a handler of its own in `pkg/rest` sends the GET again after a configurable pause, `tries` times in all at most; a 204 that a later request makes good is logged at Warn; 204 to the last one is an error naming the status, never an empty result. | the user | [Stage 3](#stage-3-behaviour-and-error-mapping) |
+| 39 | What does the plugin do with a GET answered without data, a 204? | a handler of its own in `pkg/rest` sends the GET again after a configurable pause, `tries` times in all at most; a 204 that a later request makes good is logged at Warn; 204 to the last one is an error naming the status, never an empty result. A DELETE answered 204 without data is a success and is not sent again. | the user | [Stage 3](#stage-3-behaviour-and-error-mapping) |
 | 40 | What does a 404 mean when its body is not JSON, or matches no entry of its call? | "not found": the status decides, whatever the body; the entry a 404 matches says only what is missing. | the user | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), [risk 24](#risks) |
 | 41 | What does the plugin do at startup when controller setup returns an error, as it would for a refused `iscsi.iqn` prefix? | not decided here: today the error ends in a panic, and the question is kept in the issue tracker. | the user | [Relationship](#relationship-to-other-designs) |
 | 42 | Where does the iSCSI `GetSnapshot` take a snapshot's name from, when the zvol snapshot reply by name has none? | from its own request: the name it asked for, `sd.SDS()`, changed on the spot in stage 2; every function that calls `GetVolumeSnapshot` already holds the name. | the user | [impl_plugin_rest_reply_types_transcribed_from_observed_typespec](#impl_plugin_rest_reply_types_transcribed_from_observed_typespec) |
@@ -2177,7 +2300,7 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
 | 44 | Does the plain-text 404 that a name with an escaped slash gets have an entry of its own, instead of the general not-found code? | no: `pkg/rest` takes no logic upon itself and answers a 404 with the error its status gives; question 40 stands, with risk 24 as its price. | the user | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), [risk 24](#risks) |
 | 45 | What happens to a Warn line that could print a REST or CHAP credential? | it is removed, not cut down to fields: the five controller lines that print a whole CSI request when a capability check fails go, though that check cannot fail today. | the user | [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs) |
 | 46 | Should the ID check sit in `NewVolumeDescFromVDS`, where it would also cover the two uncovered entry points and the volume part of a CSI snapshot ID? | outside this document: kept in the issue tracker with `bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser`, for later. | the user | [Relationship](#relationship-to-other-designs) |
-| 47 | Where is the series compiled, as the analysis machine has no Go? | on another machine, by the user: the implementing agent writes the code and its unit tests without a compiler, and the build, vet and tests run there. | the user | [What changes](#what-changes) |
+| 47 | Where is the series compiled, as the analysis machine has no Go? | on the lab machine: the implementing agent writes the code and its unit tests on the analysis machine and builds, vets and runs the unit tests on the lab machine, commit by commit. Weighed against: the agent writing the whole series without a compiler, and the user building it afterwards. | the user | [What changes](#what-changes) |
 | 48 | On the snapshot and clone creates, how does the catalogue tell a missing pool from a missing parent? | it cannot for now: `pkg/rest` takes an error that can be either as the parent missing, the volume on the snapshot creates and the snapshot on the clone creates, never as the pool missing, and its entry carries a `TODO` comment saying that the missing parent cannot be told from a missing pool. The two ways were an entry that also compares the names in the message with the request's path, and one code for "pool or parent missing". | the user | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), [risk 25](#risks) |
 | 49 | Does the appliance serve 100 entries to a page? | yes for the volume list of jdss1 v4, with no cap (hurl Finding 24); the five other lists, and v3, are taken to do the same and are read with `per_page=100` without a run of their own. | the user | [Before stage 1](#before-stage-1-send-per_page-on-every-list), [risk 28](#risks) |
 | 50 | Which TLS versions do the lab appliance and jdss1 offer? | not TLS 1.3, as the user checked: the plugin takes TLS 1.2 or higher. | the user | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile), [risk 10](#risks) |
@@ -2198,6 +2321,15 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
 | 66 | What does `max_entries` count? | only the entries the controller sends back in its reply: names the plugin did not make, and the other driver's snapshots, are dropped in the driver before the list is cut. Weighed against: the cut before those checks, today's order. | the user | [impl_plugin_csi_list_paging_resumes_after_last_name](#impl_plugin_csi_list_paging_resumes_after_last_name) |
 | 67 | What do the certificates of the lab appliance and jdss1 name? | this document does not need them: the CA file that verifies an appliance's certificate is given in the configuration file (`cafile`); kub-testing T12 reads the current certificates for its connection tests. | the user | [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile), [risk 11](#risks) |
 | 68 | How does the list token stay within CSI's limit of 128 bytes for a string? | it holds a bound instead of the last key: the shortest string that sorts after the key of the last entry returned, or equals it, and before the next one; a hash stands for the volume of a per-volume list; where the bound does not fit, its first bytes and a hash of each of the two keys ([risk 29](#risks)). Weighed against: the last key in full, which a name of 131 characters already makes too long. | the user; the form proposed by the agent | [impl_plugin_csi_list_paging_resumes_after_last_name](#impl_plugin_csi_list_paging_resumes_after_last_name), [Code segments](#code-segments) |
+| 69 | Do the unit tests of `pkg/controller` run under the vet of `go test`, which the 23 format strings of that package fail? | yes: the 23 are fixed in the first commit, with those of `pkg/rest`, so that `make test` runs `go test` on the package as it is; the node's three stay for later. Weighed against: `-vet=off` for that package in `make test`, which leaves the controller's format strings for later and its tests without vet. | the user; proposed by the agent | [impl_plugin_ctrl_no_format_string_from_error_text](#impl_plugin_ctrl_no_format_string_from_error_text) |
+| 70 | Which `RestError` code does each kind of error get in the catalogue, and which CSI status does each code get from the controller? | the CSI status is out of scope. This document implements API v4 in the REST module and gives the modules that use it one code for each failure. How those modules handle a code, including what they reply to Kubernetes, is not decided here. The caller changes that stage 3 makes by earlier decisions stay. Which code each kind of error gets is [question 73](#decisions). | the user | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), [Relationship](#relationship-to-other-designs) |
+| 71 | Does the CSI ID of a volume have to stay within CSI's limit of 128 bytes for a string, as the list token does? | yes. CSI naming follows the CSI spec, so a generated volume name, which is also the volume's CSI ID, is at most 128 bytes: both thresholds of `NewVolumeDescFromName` become 125. Volume and share names on the appliance stay within 131 ([question 21](#decisions)). Weighed against: thresholds of 128, which allow IDs of up to 131 bytes. | the user | [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids), [risk 13](#risks) |
+| 72 | Can this document still be edited after it is accepted? | it stays Proposed while the series is implemented and tested, and is accepted with the tested series; until then, what the implementation changes in it is written into its text. Weighed against: amendments to an accepted record, listed in Advice; the accepted text left alone, with the changes kept in the tracker and the commit messages. | the user | [What changes](#what-changes) |
+| 73 | Which `RestError` code does each kind of error get? | a code inside the range of its layer, which the `class` of the error shows. Each layer has 1000 codes: 1000 to 1999 without a class, 2000 to 2999 for `builtins.*`, 3000 to 3999 for `zfslib.*`, 4000 to 4999 for `opene.*`, 5000 to 5999 for `jsonschema.*` and 6000 to 6999 for `werkzeug.exceptions.*`. The multiple of 1000 is the code of the layer itself, and the codes below 1000 stay the plugin's own. What today's callers compare with is [question 74](#decisions). | the user; the four ranges after the first two assigned by the agent, in the order of the study's table | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) |
+| 74 | What do today's callers compare with, once an appliance error has a code of its layer? | with the code of today. An error carries two codes: the one that says what it means for the call, which the callers keep reading unchanged, and beside it the code of its kind in the range of its layer, or of the layer alone when no entry of the call holds the error. Weighed against: the code of the layer only, with every caller changed to compare with it. | the user; proposed by the agent | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), [Code segments](#code-segments) |
+| 75 | Who numbers the kinds of error inside the range of a layer, and when? | they are numbered in this document, before the series is started: Table 19 gives each kind of error of the plugin's calls its code, in the order of the names inside each layer. A kind keeps its number, and one that the spec gains later takes the next free number of its layer. Weighed against: the implementing agent numbering the kinds as it transcribes the catalogue. | the user | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), [Measurements](#measurements) |
+| 76 | How does `make vet` give a true result when the build cache holds an older one? | it runs `go vet -a`, which analyses the packages again: with Go 1.26.0 a package vetted before as a dependency of another one gets no report from a plain `go vet`. Weighed against: an empty build cache for every vet run; a Go release that does not have the fault, which has not been looked for. | the user; proposed by the agent | [impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply), [risk 30](#risks) |
+| 77 | Which code does a catalogue entry give for `GetCode()`, the code today's callers read? | the code that the call returns today for that reply, Unknown included; another code only where this document decides one: the fixes of stage 3, and a 404, which is "not found" ([question 40](#decisions)). Weighed against: the implementing agent choosing a code wherever it takes the meaning of an error as known. | the user; proposed by the agent | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) |
 
 ## Relationship to other designs
 [Relationship_to_other_designs](#relationship-to-other-designs)
@@ -2234,8 +2366,8 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
   Design 0003 leaves the paging of the lists out; the crash in the parse of the
   list token, [crash_plugin_driver_list_token_parse_writes_through_nil_pointer](#crash_plugin_driver_list_token_parse_writes_through_nil_pointer),
   is fixed here with the paging ([question 60](#decisions)).
-  Design 0003's D3 (the GetCapacity logger fix, `crash_plugin_ctrl_get_capacity_no_logger`) has to be committed on `master` before this series, because the cycle before the series,
-  which [Testing](#testing) step 4 compares with, was built with it.
+  Design 0003's D3 (the GetCapacity logger fix, `crash_plugin_ctrl_get_capacity_no_logger`) is in the current code: the series is built on it, as was the cycle before the series,
+  which [Testing](#testing) step 4 compares with.
 - Four crashes in the ID and name code next to the parsers that
   [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) changes: `crash_plugin_ctrl_create_snapshot_empty_name`,
   `crash_plugin_driver_snapshot_name_empty`,
@@ -2271,7 +2403,12 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
 - Format strings outside `pkg/rest`: the controller and the node pass error
   text to `status.Errorf` as the format, 26 of the 34 `go vet` reports
   (`bug_plugin_error_text_as_grpc_status_format_string`, kub-testing
-  `issues/data-loss.md`). Not fixed here; fixed later with those modules.
+  `issues/data-loss.md`). The controller's 23 are fixed here, in the first
+  commit, because `go test` does not run the tests of a package that vet
+  reports on
+  ([impl_plugin_ctrl_no_format_string_from_error_text](#impl_plugin_ctrl_no_format_string_from_error_text),
+  [question 69](#decisions)); the node's three are not, and are fixed later
+  with that module.
 - NFS snapshot deletes that destroy clones
   (`dataloss_plugin_driver_nfs_delete_snapshot_destroys_volumes_cloned_from_it`,
   `dataloss_plugin_driver_nfs_intermediate_snapshot_delete_destroys_clone_volume`):
@@ -2280,6 +2417,13 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
   document only keeps its own commits from opening the second one
   ([risk 23](#risks), [question 34](#decisions)); the first exists today
   and stays.
+- The CSI status of a REST error: out of scope (user decision,
+  [question 70](#decisions)). This document implements API v4 in the REST
+  module and gives the modules that use it one code for each failure. Which
+  CSI status the driver and the controller return for a code, including the
+  new codes, is left to the work on those modules (kub-testing `ISSUES.md`,
+  F32). The caller changes made here are the ones
+  [Stage 3](#stage-3-behaviour-and-error-mapping) lists.
 - REST client behaviour: not a compliance matter. Of its catalogue
   ([REST client behaviour](#rest-client-behaviour)) this delivery leaves
   [bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover](#bug_plugin_rest_proxy_tries_and_extra_addrs_unused_no_retry_no_failover) and
@@ -2289,8 +2433,8 @@ Open: none. The numbers are kept, gaps included, so that "question 27" means the
   ([question 39](#decisions)); a request that fails in transport is still
   not sent again, and the other addresses are still not used.
 - Security: every [security finding](#security-findings) is assigned to this delivery, to [impl_plugin_rest_escape_path_segments](#impl_plugin_rest_escape_path_segments) and [impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile](#impl_plugin_rest_tls_verification_on_by_default_with_insecure_and_cafile) in [stage 4](#stage-4-robustness-and-security) and to [impl_plugin_rest_no_request_logging](#impl_plugin_rest_no_request_logging) and [impl_plugin_no_secrets_in_logs](#impl_plugin_no_secrets_in_logs) [before stage 1](#before-stage-1-keep-secrets-out-of-the-logs); stage 4 also adds [impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) and [impl_plugin_rest_reply_size_limit](#impl_plugin_rest_reply_size_limit), and [impl_plugin_rest_no_format_string_from_reply](#impl_plugin_rest_no_format_string_from_reply) is the
-  [first commit](#first-commit-make-go-vet-pass-in-pkgrest).
-- Before any of this can be built, the plugin checkout on the lab machine has to be a clean clone of `master` (kub-testing `ISSUES.md`, INF8).
+  [first commit](#first-commit-make-go-vet-pass-in-pkgrest-and-pkgcontroller).
+- A build of the series is made on the lab machine from the tree the series is written in: the plugin checkout there has to be in step with that tree before each build (kub-testing `ISSUES.md`, INF8).
 - JovianDSS 2 is outside this document and left to a later design ([Future work: JovianDSS 2 support](#future-work-joviandss-2-support)).
 - The old letter-and-number IDs of the reviews and the tracker are mapped to the names used here in `kub-testing/issues/`.
 
@@ -2347,6 +2491,12 @@ reply to a name that is too long is already in this delivery:
 catalogue takes it from the scenarios files of the two snapshot creates,
 which list it as 500, `ZfsCmdError`, errno 201, `cannot create snapshot '...':
 name is too long`.
+
+The CSI ID of a snapshot is built from the snapshot's name and its volume's
+(`driver/snapid.go:57-59`), so it can be longer than the 128 bytes the CSI
+spec allows for a string. CSI naming follows the CSI spec
+([question 71](#decisions)); that work would bring the snapshot's ID within
+the limit too.
 
 ### Future work: missing fields in replies
 [Future_work_missing_fields_in_replies](#future-work-missing-fields-in-replies)
@@ -2660,6 +2810,103 @@ list already rests on the recordings, through the OpenAPI, but for `is_clone`, o
   the Decision names it. The one option here, until then "Option A: v4
   only, the only option considered", is
   [aopt_rest_api_version_v4_only](#aopt_rest_api_version_v4_only).
+- User decisions (2026-11-23): only a GET answered 204 is sent again, and
+  a DELETE answered 204 without data is a success, as it is today ("for
+  DELETE 204 and no data is a success"; question 39); both thresholds of
+  `NewVolumeDescFromName`, the CSI name's and its base32 form's, go down to
+  128 ("please mark that length should be reduced"); a 404 for a path the
+  appliance does not route, which risk 24 describes, is left to another
+  record (kub-testing `ISSUES.md`, F31).
+- User decisions (2026-11-23, the second round that day): the GetCapacity
+  logger fix, design 0003's D3, is committed on the branch the series is
+  built on, as commit `a3800e4`, which becomes the current code in place of
+  `11ffbfd` and moves two line numbers of `controllerplugin.go`; the
+  implementing agent writes the code on the analysis machine and builds on
+  the lab machine ("you can use local repo for editing and build
+  remotely"), which changes question 47; the lab machine's checkout is kept
+  in step with the tree the code is written in, in place of the clean clone
+  of `master` asked for before.
+- Review of this document (2026-11-23): one reader, the whole text against
+  the README, the current code and `jdss-rest-api-spec` at commit
+  `434c9cd`. Found: `go test` runs vet's printf check before the tests of a
+  package, so the unit tests that stage 3 gives `pkg/controller` would not
+  run with its 23 format strings left in (tried on the lab machine with Go
+  1.26.0: a failed build, and a pass with `-vet=off`); the catalogue says
+  neither which code a kind of error gets nor which CSI status a new code
+  gets; a volume's CSI ID can have 131 bytes, over the limit that question
+  68 keeps the token within; the README freezes an accepted record, which
+  this document expects to change with the implementation.
+- User decision (2026-11-23, the third round that day): the changes
+  proposed with that review are applied ("please apply changes"). The 23
+  format strings of `pkg/controller` are fixed in the first commit, with
+  those of `pkg/rest`, which changes the decision of 2026-11-14 for the
+  controller (question 69,
+  [impl_plugin_ctrl_no_format_string_from_error_text](#impl_plugin_ctrl_no_format_string_from_error_text));
+  the three other findings are open questions 70 to 72.
+- User decision (2026-11-23, the fourth round that day, question 70):
+  "providing mapping of rest error codes to replies to kubernetes cluster
+  is not within scope of current adr". This document implements the
+  JovianDSS REST API v4 in the REST module and provides its errors to the
+  modules that use it; how those modules handle them is out of scope. The
+  rest of the question, which code each kind of error gets, stays open as
+  question 73; the caller changes decided before that day are kept.
+- User decision (2026-11-23, the fourth round that day, question 71):
+  "volume and share names should be less then 131 bytes, csi naming should
+  be decided on the basis of csi spec". Names on the appliance keep the
+  limit of 131 that question 21 set; a generated volume name, which is also
+  the volume's CSI ID, is at most 128 bytes, the CSI spec's limit for a
+  string, so both thresholds of `NewVolumeDescFromName` go down from 128 to
+  125. The CSI ID of a snapshot is left to the work on snapshot names.
+- User decision (2026-11-23, the fifth round that day, question 72): "keep
+  proposed". This document stays Proposed while the series is implemented
+  and tested, and is accepted with the tested series; what the
+  implementation changes in it is written into its text until then.
+- User decision (2026-11-23, the sixth round that day, question 73): each
+  layer of the appliance's errors gets a range of 1000 codes ("please give
+  each layer code multiple of 1000 so that no class errors will be 1000 to
+  1999, python errors 2000 to 2999 and so forth"). The layers are those of a
+  study of the REST errors that the user brought: routing and the API's own
+  checks (`werkzeug.exceptions.*`), the request body checked against a
+  schema (`jsonschema`), product logic (`opene.*`), the ZFS wrapper
+  (`zfslib.*`), uncaught Python errors (`builtins.*`) and errors without a
+  class. The four layers the user did not number take 3000 to 6000 in the
+  order of the study's table, upwards. Every class in the scenarios files of
+  the plugin's calls on jdss1 v4, at `jdss-rest-api-spec` commit `434c9cd`,
+  falls into one of the six. What today's callers compare with is open, as
+  question 74.
+- User decisions (2026-11-23, the seventh round that day, questions 73 and
+  74): the order of the four layers and the codes below 1000 staying the
+  plugin's own are confirmed ("your intuition looks good to me"), and an
+  error carries two codes, so that today's callers keep working ("lets have
+  2 codes to be compatible"): the code of today, and the code of its kind
+  in the range of its layer. Who numbers the kinds inside a range is open,
+  as question 75.
+- User decision (2026-11-23, the eighth round that day, question 75):
+  "generate the table for the 96 kinds now". Table 19 numbers the kinds of
+  error of the plugin's calls, read from their scenarios files on jdss1 v4
+  at `jdss-rest-api-spec` commit `434c9cd`. It holds 95 kinds, not 96: the
+  count given with the review took the plain-text replies of those files,
+  401 and 404 without an error object, as one more kind, and they have none.
+  No question is open.
+- User decision (2026-11-23, the ninth round that day, question 70): "keep
+  the caller changes in stage 3". With the callers' handling out of scope,
+  the changes that earlier decisions made in the driver and the controller
+  stay in this document: the zvol `DeleteClone` caller (question 18), the
+  cleanup on `volume has children` (question 17), `FailedPrecondition` for a
+  volume that has snapshots, the target delete after a LUN is reported as
+  not attached, and the check of an existing share (question 57).
+- Check on the lab machine (2026-11-23): a plain `go vet ./pkg/rest/...`
+  reported nothing on the current code, and `go vet ./...` 26 reports where
+  the run of 2026-11-14 had 34. With an empty build cache, and with `-a`,
+  the eight reports of `pkg/rest` came back. On an empty cache,
+  `go vet ./pkg/driver/` followed by `go vet ./pkg/rest/` reported nothing:
+  Go 1.26.0 takes over the result of a package that was vetted as a
+  dependency. Whether a later Go release has the fault was not looked for.
+- User decisions (2026-11-23, the tenth round that day, questions 76 and
+  77): `make vet` runs `go vet -a`; and a catalogue entry gives, as the code
+  today's callers read, the code that the call returns today for the reply,
+  another one only where this document decides it ("yes, change make vet to
+  go vet -a and add the rule").
 
 
 
@@ -2831,7 +3078,7 @@ patterns the code expects that no recording has ever shown.
 | The plugin sends | names up to 243 characters (`vp_`/`vb_` + 240) |
 | hurl sent | longest name about 59 characters |
 | Why it matters | the length limit and its error were unknown before the gap runs |
-| Result of the gap runs | Zvol and clone names: 129 characters accepted, 150 refused; the appliance's own message gives the limit, 132. Snapshots: the limit is on the full name `pool/volume@snapshot`, at most 255; with the tested pool and volume names a 216-character snapshot name was accepted and 217 refused ([snapshot name limits](#future-work-snapshot-name-limits)). Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised); the plugin caps names at 131 and keeps its generated names within it ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids)). Zvol and clone names give the same on jdss1 v4 |
+| Result of the gap runs | Zvol and clone names: 129 characters accepted, 150 refused; the appliance's own message gives the limit, 132. Snapshots: the limit is on the full name `pool/volume@snapshot`, at most 255; with the tested pool and volume names a 216-character snapshot name was accepted and 217 refused ([snapshot name limits](#future-work-snapshot-name-limits)). Finding: [bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised](#bug_rest_v4_missing_pool_missing_parent_and_name_too_long_errors_unrecognised); the plugin caps names at 131 and keeps its generated names within 128 bytes ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids)). Zvol and clone names give the same on jdss1 v4 |
 
 
 #### gap_jdss_rest_out_of_space_messages
@@ -3385,7 +3632,7 @@ message takes the wrong path.
 | | |
 |---|---|
 | Call | several |
-| Recorded reply | missing pool: 500, errno 1, `ZpoolError Given zpool '<p>' doesn't exists.`, and for targets 404 `Target partition: <p> not exists.`; name too long: 400, errno 1, `ZvolValidationError Zvol name too long ... 132` ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) keeps generated names within 131); v4 snapshot list of a missing parent: 404 `ItemNotFoundError Resource <p>/<v> not found.` |
+| Recorded reply | missing pool: 500, errno 1, `ZpoolError Given zpool '<p>' doesn't exists.`, and for targets 404 `Target partition: <p> not exists.`; name too long: 400, errno 1, `ZvolValidationError Zvol name too long ... 132` ([impl_plugin_driver_validate_names_and_ids](#impl_plugin_driver_validate_names_and_ids) keeps generated names within 128 bytes); v4 snapshot list of a missing parent: 404 `ItemNotFoundError Resource <p>/<v> not found.` |
 | Plugin expects | nothing |
 | Effect | Unknown (results [gap_jdss_rest_name_length_limit](#gap_jdss_rest_name_length_limit), [gap_jdss_rest_clones_of_missing_parent](#gap_jdss_rest_clones_of_missing_parent), [gap_jdss_rest_missing_pool_replies](#gap_jdss_rest_missing_pool_replies)) |
 | Assigned to | [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue), stage 3 |
@@ -3841,6 +4088,121 @@ Fields of the same replies that nothing reads: volume `available`, `used`,
 `reservation` and `refreservation` strings; `clones` and `quota` `null` in
 every recording. Pool `size`, `name` and `health` strings; `status` `int64`.
 
+**The kinds of error of the plugin's calls, and their codes**, from the
+scenarios files of the calls on jdss1 v4 at `jdss-rest-api-spec` commit
+`434c9cd`
+([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue),
+[question 75](#decisions)). A kind is an error model of the spec, under the
+model's name, and each has one class, which gives its layer. Inside the
+range of a layer the kinds are numbered here in the order of their names. A
+kind keeps its number: one that a later reading of the spec adds takes the
+next free number of its layer, and no number is used again. The plain-text
+replies that the scenarios files list, 401 and 404 without an error object,
+have no kind; they carry the code of the layer without a class, 1000. The
+Message column gives one message of the kind as the spec writes it, cut
+where it is long; the patterns that the entries match on are in the
+scenarios files.
+
+**Table 19 — Kinds of error and their codes** · `tbl_error_kind_codes`
+
+| Code | Kind of error | Class | Status | Message |
+|---|---|---|---|---|
+| 1001 | `Unclassed1PathPoolsDoesnTPointTo` | none | 400 | `Path /Pools/{{pool}}/{{name}} doesn't point to NAS volume.` |
+| 1002 | `Unclassed1ShareAlreadyExists` | none | 409 | `Share {{body.name}} already exists.` |
+| 1003 | `Unclassed2PathPoolsIsAlreadyUsedIn` | none | 409 | `Path /Pools/{{pool}}/{{name}} is already used in a different share.` |
+| 1004 | `Unclassed4ValueContainsInvalidCharactersOnlyA` | none | 400 | `Value {{body.name}} contains invalid characters. Only a-z, A-Z, 0-9 . : $ _ and - are allo …` |
+| 1005 | `Unclassed4ValueHasInvalidLengthMaximumOf` | none | 400 | `Value has invalid length. Maximum of 255 characters are allowed.` |
+| 1006 | `Unclassed4ValueHasInvalidLengthMinimumCharacter` | none | 400 | `Value has invalid length. Minimum 1 character required.` |
+| 1007 | `Unclassed6NotValidCharactersInARecycle` | none | 400 | `Not valid characters in a recycle bin name. A name cannot contain any of the following cha …` |
+| 2001 | `KeyError_004371` | `builtins.KeyError` | 500 | `'{{query.search_by}}'` |
+| 2002 | `KeyError_40bcba` | `builtins.KeyError` | 500 | `'{{path.poolname}}/{{path.volumename}}@{{path.snapshotname}}'` |
+| 2003 | `OSError36ErrnoFileNameTooLongNfs` | `builtins.OSError` | 500 | `[Errno 36] File name too long: '/NFS/{{body.name}}'` |
+| 2004 | `TypeErrorNotSupportedBetweenInstancesOfNonetype_a38cd7` | `builtins.TypeError` | 500 | `'<' not supported between instances of 'NoneType' and 'NoneType'` |
+| 2005 | `TypeErrorNotSupportedBetweenInstancesOfNonetype_b1b8e2` | `builtins.TypeError` | 500 | `'<' not supported between instances of 'NoneType' and 'str'` |
+| 2006 | `UnicodeDecodeErrorUtfCodecCanTDecodeByte` | `builtins.UnicodeDecodeError` | 500 | `'utf-8' codec can't decode byte {{echo.byte}} in position {{echo.position}}: invalid conti …` |
+| 2007 | `ValueErrorDoesNotAppearToBeAn` | `builtins.ValueError` | 500 | `'{{body.allow_ip}}' does not appear to be an IPv4 or IPv6 network` |
+| 2008 | `ValueErrorInvalidLiteralForIntWithBase` | `builtins.ValueError` | 500 | `invalid literal for int() with base 10: '{{query.page}}'` |
+| 2009 | `ValueErrorSizeSuffixGbIsIncorrect` | `builtins.ValueError` | 500 | `Size suffix GB is incorrect.` |
+| 2010 | `ValueErrorSizeUnitHasIncorrectValue` | `builtins.ValueError` | 500 | `Size unit {{body.blocksize}} has incorrect value.` |
+| 3001 | `PropertyError2CannotSetPropertyNosuchpropertyItNot` | `zfslib.zfsapi.properties.PropertyError` | 500 | `Cannot set property nosuchproperty it not exists.` |
+| 3002 | `ZfsCmdError0CannotOpenDatasetDoesNotExist_96e556` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}': dataset does not exist` |
+| 3003 | `ZfsCmdError0CannotOpenDatasetDoesNotExist_a33d60` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{path.poolname}}@{{path.poolname}}': dataset does not exis …` |
+| 3004 | `ZfsCmdError1000CannotCreateInvalidNumericSuffix` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create '{{path.poolname}}/{{body.name}}': invalid numeric suffix '{{echo.suffix}}'` |
+| 3005 | `ZfsCmdError1000CannotCreateSnapshotBookmarkDelimiterIs` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create snapshot '{{path.poolname}}/{{path.datasetname}}@{{body.name}}': bookmark de …` |
+| 3006 | `ZfsCmdError1000CannotCreateSnapshotEmptyComponentOr` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create snapshot '{{path.poolname}}/{{path.datasetname}}@': empty component or mispl …` |
+| 3007 | `ZfsCmdError1000CannotCreateSnapshotInvalidCharacterIn_8fa47d` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create snapshot '{{path.poolname}}/{{path.datasetname}}@{{body.name}}': invalid cha …` |
+| 3008 | `ZfsCmdError1000CannotCreateSnapshotInvalidCharacterIn_cee0b6` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create snapshot '{{path.poolname}}/{{path.datasetname}}@{{body.name}}': invalid cha …` |
+| 3009 | `ZfsCmdError1000CannotCreateSnapshotMultipleAndOr` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create snapshot '{{path.poolname}}/{{path.datasetname}}@{{body.name}}': multiple '@ …` |
+| 3010 | `ZfsCmdError1000CannotCreateSnapshotTrailingSlashIn` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create snapshot '{{path.poolname}}/{{path.datasetname}}@{{body.name}}': trailing sl …` |
+| 3011 | `ZfsCmdError1000CannotCreateSnapshotsThisPropertyCan` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create snapshots : this property can not be modified for snapshots` |
+| 3012 | `ZfsCmdError1000CannotCreateUseNoneToDisable` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create '{{path.poolname}}/{{body.name}}': use 'none' to disable quota/refquota` |
+| 3013 | `ZfsCmdError1000CannotCreateVolumeSizeCannotBe` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create '{{path.poolname}}/{{body.name}}': volume size cannot be zero` |
+| 3014 | `ZfsCmdError1000CannotDestroySnapshotHasDependentClones` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot destroy '{{path.poolname}}/{{path.volumename}}@{{path.snapshotname}}': snapshot has …` |
+| 3015 | `ZfsCmdError1000CannotDestroyVolumeHasChildren` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot destroy '{{path.poolname}}/{{path.clonename}}': volume has children\nuse '-r' to des …` |
+| 3016 | `ZfsCmdError1000CannotOpenBookmarkDelimiterIsNot_214e41` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{path.datasetname}}': bookmark delimiter '#' is not expect …` |
+| 3017 | `ZfsCmdError1000CannotOpenBookmarkDelimiterIsNot_c9f5d6` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{path.datasetname}}@{{path.snapshotname}}': bookmark delim …` |
+| 3018 | `ZfsCmdError1000CannotOpenInvalidCharacterInName_61dfda` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{path.datasetname}}@{{path.snapshotname}}': invalid charac …` |
+| 3019 | `ZfsCmdError1000CannotOpenInvalidCharacterInName_6d342b` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{path.datasetname}}': invalid character '{{echo.char}}' in …` |
+| 3020 | `ZfsCmdError1000CannotOpenMultipleAndOrDelimiters` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{path.datasetname}}@{{path.snapshotname}}': multiple '@' a …` |
+| 3021 | `ZfsCmdError1000CannotOpenNameIsTooLong_37e45d` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{name}}: name is too long` |
+| 3022 | `ZfsCmdError1000CannotOpenNameIsTooLong_671b8f` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{path.datasetname}}@{{name}}: name is too long` |
+| 3023 | `ZfsCmdError1000CannotOpenNameIsTooLong_a68ac4` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{path.datasetname}}@{{path.snapshotname}}': name is too lo …` |
+| 3024 | `ZfsCmdError1000CannotOpenNameIsTooLong_d50fea` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot open '{{path.poolname}}/{{path.datasetname}}': name is too long` |
+| 3025 | `ZfsCmdError1000WarningVolblocksizeIsLessThanTheVolumeSizeCannotBe` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `Warning: volblocksize ({{echo.blocksize}}) is less than the default minimum block size (16 …` |
+| 3026 | `ZfsCmdError100CannotCreateDatasetAlreadyExists` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create '{{path.poolname}}/{{body.name}}': dataset already exists` |
+| 3027 | `ZfsCmdError201CannotCreateSnapshotNameIsToo_abcab7` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create snapshot '{{path.poolname}}/{{path.datasetname}}@{{name}}: name is too long` |
+| 3028 | `ZfsCmdError201CannotCreateSnapshotNameIsToo_d5a47e` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create snapshot '{{path.poolname}}/{{path.datasetname}}@{{body.name}}': name is too …` |
+| 3029 | `ZfsCmdError4CannotCreateOutOfSpace` | `zfslib.wrap.zfs.ZfsCmdError` | 500 | `cannot create '{{path.poolname}}/{{body.name}}': out of space` |
+| 3030 | `ZfsResourceError1ZfsResourceNotFoundInThis_3b952d` | `zfslib.zfsapi.resources.ZfsResourceError` | 500 | `Zfs resource: {{path.poolname}}/{{path.clonename}} not found in this collection.` |
+| 3031 | `ZfsResourceError1ZfsResourceNotFoundInThis_597b56` | `zfslib.zfsapi.resources.ZfsResourceError` | 500 | `Zfs resource: {{path.poolname}}@{{path.poolname}} not found in this collection.` |
+| 3032 | `ZfsResourceError1ZfsResourceNotFoundInThis_8f51ec` | `zfslib.zfsapi.resources.ZfsResourceError` | 500 | `Zfs resource: {{path.poolname}}/{{path.datasetname}}@{{path.datasetname}} not found in thi …` |
+| 3033 | `ZfsResourceError1ZfsResourceNotFoundInThis_a720ee` | `zfslib.zfsapi.resources.ZfsResourceError` | 500 | `Zfs resource: {{path.poolname}}/{{name}} not found in this collection.` |
+| 3034 | `ZfsResourceError4DatasetCanTContainCharacterIn` | `zfslib.zfsapi.resources.ZfsResourceError` | 500 | `Dataset can't contain '@' character in int's full name.` |
+| 3035 | `ZfsResourceError4ZvolCanTContainCharacterIn` | `zfslib.zfsapi.resources.ZfsResourceError` | 500 | `Zvol can't contain '@' character in int's full name.` |
+| 3036 | `ZfsResourceError5ResourceAlreadyExists` | `zfslib.zfsapi.resources.ZfsResourceError` | 500 | `Resource {{path.poolname}}/{{body.name}} already exists.` |
+| 3037 | `ZfsResourceError5SnapshotAlreadyExists` | `zfslib.zfsapi.resources.ZfsResourceError` | 500 | `Snapshot {{path.poolname}}/{{path.datasetname}}@{{body.name}} already exists.` |
+| 3038 | `ZpoolError1GivenZpoolDoesnTExists` | `zfslib.zfsapi.zpool.ZpoolError` | 500 | `Given zpool '{{path.poolname}}' doesn't exists.` |
+| 4001 | `AddressValueError` | `opene.lib.ipaddr.AddressValueError` | 500 | `{{body.nfs.allow_access_ip}}` |
+| 4002 | `CalculationZvolSizeErrorVolumeSizeItsBlockSizeAnd` | `opene.tools.zreservation.CalculationZvolSizeError` | 500 | `volume size, its block size and amount of copies must be greater than 0` |
+| 4003 | `DatasetValidationError1DatasetNameTooLongDatasetName` | `opene.storage.zfs.exceptions.DatasetValidationError` | 400 | `Dataset name too long. Dataset name cannot exceed 132 characters.` |
+| 4004 | `DatasetValidationError2DatasetNameIsInvalidAllowedCharacters` | `opene.storage.zfs.exceptions.DatasetValidationError` | 400 | `Dataset name is invalid. Allowed characters in dataset name: a-z, A-Z, 0-9, _, - ` |
+| 4005 | `ItemConflictErrorLunIsAlreadyUsedIn` | `opene.exceptions.ItemConflictError` | 409 | `LUN 0 is already used in {{path.targetname}}.` |
+| 4006 | `ItemConflictErrorVolumeDevIsAlreadyUsed` | `opene.exceptions.ItemConflictError` | 409 | `Volume /dev/{{path.poolname}}/{{body.name}} is already used.` |
+| 4007 | `ItemNotFoundErrorPoolDoesNotExist` | `opene.exceptions.ItemNotFoundError` | 404 | `Pool {{path.poolname}} does not exist.` |
+| 4008 | `ItemNotFoundErrorPoolNotFound` | `opene.exceptions.ItemNotFoundError` | 404 | `Pool {{path.poolname}} not found.` |
+| 4009 | `ItemNotFoundErrorResourceNotFound` | `opene.exceptions.ItemNotFoundError` | 404 | `Resource {{path.poolname}}/{{path.datasetname}} not found.` |
+| 4010 | `ItemNotFoundErrorTargetNotExists` | `opene.exceptions.ItemNotFoundError` | 404 | `Target {{path.targetname}} not exists.` |
+| 4011 | `ItemNotFoundErrorTargetPartitionNotExists` | `opene.exceptions.ItemNotFoundError` | 404 | `Target partition: {{path.poolname}} not exists.` |
+| 4012 | `ItemNotFoundErrorVolumeNameIsNotAttachedTo` | `opene.exceptions.ItemNotFoundError` | 404 | `Volume name {{path.zvol}} is not attached to target {{path.targetname}}` |
+| 4013 | `ItemNotFoundErrorVolumeNotFoundInPool` | `opene.exceptions.ItemNotFoundError` | 404 | `Volume {{body.name}} not found in pool {{path.poolname}}.` |
+| 4014 | `TargetNameConflictErrorTargetAlreadyExistsInScst` | `opene.san.target.base.iscsi.target.TargetNameConflictError` | 409 | `Target already exists in SCST.` |
+| 4015 | `TargetNameConflictErrorTargetWithNameIqnOrgHurltest` | `opene.san.target.base.iscsi.target.TargetNameConflictError` | 409 | `Target with name iqn.2026-11.org.hurltest:{{name}} is already present on {{path.poolname}} …` |
+| 4016 | `TargetNameConflictErrorTargetWithNameIsAlreadyPresent_7a89c4` | `opene.san.target.base.iscsi.target.TargetNameConflictError` | 409 | `Target with name {{body.name}} is already present on {{path.poolname}}.` |
+| 4017 | `TargetNameConflictErrorTargetWithNameIsAlreadyPresent_cfbcb7` | `opene.san.target.base.iscsi.target.TargetNameConflictError` | 409 | `Target with name {{name}} is already present on {{path.poolname}}.` |
+| 4018 | `ValidationError_7d2ccd` | `opene.exceptions.ValidationError` | 400 | `Block size have to be greater than or equal 512.` |
+| 4019 | `ZfsOeErrorInOrderToDeleteADataset` | `opene.storage.zfs.zfs.ZfsOeError` | 500 | `In order to delete a dataset, you must delete all of its clones first.` |
+| 4020 | `ZfsOeErrorInOrderToDeleteAZvol` | `opene.storage.zfs.zfs.ZfsOeError` | 500 | `In order to delete a zvol, you must delete all of its clones first.` |
+| 4021 | `ZfsOeErrorResourceIsNotADatasetType` | `opene.storage.zfs.zfs.ZfsOeError` | 500 | `Resource {{path.datasetname}} is not a dataset type.` |
+| 4022 | `ZfsOeErrorResourceIsNotAZvolType` | `opene.storage.zfs.zfs.ZfsOeError` | 500 | `Resource {{path.volumename}} is not a zvol type.` |
+| 4023 | `ZvolValidationError1ZvolNameTooLongZvolName` | `opene.storage.zfs.exceptions.ZvolValidationError` | 400 | `Zvol name too long. Zvol name cannot exceed 132 characters.` |
+| 4024 | `ZvolValidationError2ZvolNameIsInvalidAllowedCharacters` | `opene.storage.zfs.exceptions.ZvolValidationError` | 400 | `Zvol name is invalid. Allowed characters in zvol name: a-z, A-Z, 0-9, _, - ` |
+| 5001 | `ValidationError_6317af` | `jsonschema.exceptions.ValidationError` | 400 | `'' does not match '^(?P<size_value>\\d+([.,]\\d+)?(e\\+\\d+)?)\\s*(?P<size_suffix>[BKMGT]i …` |
+| 6001 | `BadRequestAllowedValuesForBlocksizeAre` | `werkzeug.exceptions.BadRequest` | 400 | `Allowed values for blocksize are: 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, …` |
+| 6002 | `BadRequestAllowedValuesForCompressionAreOff` | `werkzeug.exceptions.BadRequest` | 400 | `Allowed values for compression are: off, on, lzjb, gzip, gzip-1, gzip-2, gzip-3, gzip-4, g …` |
+| 6003 | `BadRequestAllowedValuesForCopiesAre` | `werkzeug.exceptions.BadRequest` | 400 | `Allowed values for copies are: 1, 2, 3` |
+| 6004 | `BadRequestAllowedValuesForDedupAreOff` | `werkzeug.exceptions.BadRequest` | 400 | `Allowed values for dedup are: off, on, verify, sha256, sha256,verify` |
+| 6005 | `BadRequestAllowedValuesForLogbiasAreLatency` | `werkzeug.exceptions.BadRequest` | 400 | `Allowed values for logbias are: latency, throughput` |
+| 6006 | `BadRequestAllowedValuesForPrimarycacheAreAll` | `werkzeug.exceptions.BadRequest` | 400 | `Allowed values for primarycache are: all, none, metadata` |
+| 6007 | `BadRequestAllowedValuesForSecondarycacheAreAll` | `werkzeug.exceptions.BadRequest` | 400 | `Allowed values for secondarycache are: all, none, metadata` |
+| 6008 | `BadRequestAllowedValuesForSyncAreAlways` | `werkzeug.exceptions.BadRequest` | 400 | `Allowed values for sync are: always, standard, disabled` |
+| 6009 | `BadRequestNewZvolSizeExceedsAvailableSpace` | `werkzeug.exceptions.BadRequest` | 400 | `New zvol size({{echo.size}}) exceeds available space on pool {{path.poolname}}({{echo.avai …` |
+| 6010 | `NotFound` | `werkzeug.exceptions.NotFound` | 404 | `"{{path.clonename}}"` |
+| 6011 | `NotFoundB_2e360f` | `werkzeug.exceptions.NotFound` | 404 | `'{{name}}\\b'` |
+| 6012 | `NotFoundB_699120` | `werkzeug.exceptions.NotFound` | 404 | `'{{name}}\nb'` |
+| 6013 | `NotFoundCloneNotExists_0d481d` | `werkzeug.exceptions.NotFound` | 404 | `Clone {{path.clonename}} not exists` |
+| 6014 | `NotFoundShareNotExists` | `werkzeug.exceptions.NotFound` | 404 | `Share {{path.sharename}} not exists.` |
+| 6015 | `NotFoundTb` | `werkzeug.exceptions.NotFound` | 404 | `'{{name}}\tb'` |
+
 ### Code segments
 [Code_segments](#code-segments)
 
@@ -4144,10 +4506,83 @@ matches none is Unknown, or "not found" for a 404. The catalogue shown is
 that of the LUN detach as its scenarios file holds it at `jdss-rest-api-spec`
 commit `434c9cd`: replies of one status and one class, without `errno`, that
 only the message tells apart; the pool's entry comes first, since its message
-matches the target's pattern too.
+matches the target's pattern too. Each entry gives two codes
+([question 74](#decisions)): what the error means for the call, and the code
+of its kind in the range of its layer, with its number from Table 19
+([Measurements](#measurements)).
 
 ```go
 // In errors.go.
+
+// A RestError carries two codes. GetCode says what the error means for the
+// call, and is what the callers compare with, as today. GetKindCode says
+// which error the appliance sent: the code of its kind inside the range of
+// its layer, the code of the layer alone for an error that no entry of the
+// call holds, and 0 for a failure that is not an error of the appliance.
+type RestError interface {
+	Error() (out string)
+	GetCode() int
+	GetKindCode() int
+}
+
+type restError struct {
+	code int
+	kind int
+	msg  string
+}
+
+func (err *restError) GetKindCode() int { return err.kind }
+
+// GetError makes the error of a failure that is not an error of the
+// appliance: its second code is 0. Every `&restError{code, msg}` of today
+// becomes a call of it.
+func GetError(c int, m string) RestError { return &restError{code: c, msg: m} }
+
+// applianceError makes the error of a reply of the appliance.
+func applianceError(c int, kind int, m string) RestError {
+	return &restError{code: c, kind: kind, msg: m}
+}
+
+// The layers of the appliance's errors, each with a range of 1000 codes.
+// The code of a layer is the first of its range; its kinds of error take
+// the numbers after it.
+const (
+	LayerNoClass = 1000 // no class: login errors and some 400 and 404
+	LayerPython  = 2000 // builtins.*: errors the appliance did not catch
+	LayerZfs     = 3000 // zfslib.*: the ZFS wrapper
+	LayerProduct = 4000 // opene.*: the product's own logic
+	LayerSchema  = 5000 // jsonschema.*: a request body that fails its schema
+	LayerRouting = 6000 // werkzeug.exceptions.*: routing and the API's own checks
+)
+
+// layerOf gives the code of the layer that the class of an error shows, and
+// 0 for a class of no layer known.
+func layerOf(class string) int {
+	switch {
+	case class == "":
+		return LayerNoClass
+	case strings.HasPrefix(class, "builtins."):
+		return LayerPython
+	case strings.HasPrefix(class, "zfslib."):
+		return LayerZfs
+	case strings.HasPrefix(class, "opene."):
+		return LayerProduct
+	case strings.HasPrefix(class, "jsonschema."):
+		return LayerSchema
+	case strings.HasPrefix(class, "werkzeug.exceptions."):
+		return LayerRouting
+	}
+	return 0
+}
+
+// The kinds of error: one constant for each error model of the spec, under
+// the model's name, numbered once inside the range of its layer and never
+// renumbered. Table 19 lists them all; these three are those of this call.
+const (
+	KindItemNotFoundErrorTargetNotExists           = LayerProduct + 10 // 4010
+	KindItemNotFoundErrorTargetPartitionNotExists  = LayerProduct + 11 // 4011
+	KindItemNotFoundErrorVolumeNameIsNotAttachedTo = LayerProduct + 12 // 4012
+)
 
 // errorEntry is one error a call can get, transcribed from the call's
 // -scenarios.json file. A reply matches it on the status, the class, the
@@ -4158,6 +4593,7 @@ type errorEntry struct {
 	errno   errnoField
 	message *regexp.Regexp // the file's pattern; a unit test compiles each
 	code    int            // what the error means for this call
+	kind    int            // which error the appliance sent
 }
 
 func (en errorEntry) matches(status int, e *ErrorT) bool {
@@ -4171,13 +4607,16 @@ var dettachVolumeFromTargetErrors = []errorEntry{
 	// the pool's entry first: its message matches the target's pattern too
 	{404, "opene.exceptions.ItemNotFoundError", errnoMissing,
 		regexp.MustCompile(`^Target partition: [\s\S]* not exists\.$`),
-		RestErrorResourceDNEPool}, // new code: the pool is missing
+		RestErrorResourceDNEPool, // new code: the pool is missing
+		KindItemNotFoundErrorTargetPartitionNotExists},
 	{404, "opene.exceptions.ItemNotFoundError", errnoMissing,
 		regexp.MustCompile(`^Target [\s\S]* not exists\.$`),
-		RestErrorResourceDNETarget}, // nothing is left to do
+		RestErrorResourceDNETarget, // nothing is left to do
+		KindItemNotFoundErrorTargetNotExists},
 	{404, "opene.exceptions.ItemNotFoundError", errnoMissing,
 		regexp.MustCompile(`^Volume name [\s\S]* is not attached to target [\s\S]*$`),
-		RestErrorResourceDNELun}, // new code: the LUN is gone; the caller deletes the target next
+		RestErrorResourceDNELun, // new code: the LUN is gone; the caller deletes the target next
+		KindItemNotFoundErrorVolumeNameIsNotAttachedTo},
 }
 
 // DettachVolumeFromTarget ends as every call ends: in its success, or in
@@ -4205,8 +4644,12 @@ func (s *RestEndpoint) DettachVolumeFromTarget(ctx context.Context, pool string,
 func (s *RestEndpoint) failedReply(ctx context.Context, method, path string, entries []errorEntry,
 	status int, body []byte, err RestError) RestError {
 	l := jcom.LFC(ctx).WithFields(logrus.Fields{"section": "rest", "method": method, "path": path, "status": status})
+	// the log line of a failure holds both of its codes
+	withCodes := func(re RestError) *logrus.Entry {
+		return l.WithFields(logrus.Fields{"code": re.GetCode(), "kind": re.GetKindCode()})
+	}
 	if err != nil {
-		l.WithField("code", err.GetCode()).Error(err.Error())
+		withCodes(err).Error(err.Error())
 		return err
 	}
 
@@ -4216,7 +4659,7 @@ func (s *RestEndpoint) failedReply(ctx context.Context, method, path string, ent
 	if json.Unmarshal(body, &reply) != nil || reply.Error == nil {
 		// not a JSON error body: the status alone gives the code
 		err = statusError(method, path, status, body)
-		l.WithField("code", err.GetCode()).Error(err.Error())
+		withCodes(err).Error(err.Error())
 		return err
 	}
 
@@ -4224,37 +4667,42 @@ func (s *RestEndpoint) failedReply(ctx context.Context, method, path string, ent
 	l = l.WithFields(logrus.Fields{"class": e.class(), "errno": e.Errno.String(), "message": e.message()})
 	for _, en := range entries { // the first entry that matches decides
 		if en.matches(status, e) {
+			err = applianceError(en.code, en.kind, e.message())
 			if en.code == RestErrorFailureUnknown {
-				l.WithField("code", en.code).Error("error of the catalogue, unknown on purpose")
+				withCodes(err).Error("error of the catalogue, unknown on purpose")
 			} else {
-				l.WithField("code", en.code).Debug("error of the catalogue")
+				withCodes(err).Debug("error of the catalogue")
 			}
-			return GetError(en.code, e.message())
+			return err
 		}
 	}
 	code := RestErrorFailureUnknown
 	if status == 404 {
 		code = RestErrorResourceDNE // a 404 means not found, whatever its body
 	}
-	l.WithField("code", code).Error("error not in the catalogue of the call")
-	return GetError(code, fmt.Sprintf("%s %s: status %d, class %q, errno %s, message %q",
+	// no entry of the call holds it: its second code is that of its layer alone
+	err = applianceError(code, layerOf(e.class()), fmt.Sprintf("%s %s: status %d, class %q, errno %s, message %q",
 		method, path, status, e.class(), e.Errno, e.message()))
+	withCodes(err).Error("error not in the catalogue of the call")
+	return err
 }
 
 // statusError maps a reply without a JSON error body by its status alone,
-// and keeps the first bytes of the body in the message.
+// and keeps the first bytes of the body in the message. Such a reply has no
+// class, so its second code is that of the layer without a class.
 func statusError(method, path string, status int, body []byte) RestError {
 	if len(body) > 200 {
 		body = body[:200]
 	}
 	switch status {
 	case 401, 403:
-		return GetError(RestErrorAuthFailed, // new code
+		return applianceError(RestErrorAuthFailed, LayerNoClass, // new code
 			fmt.Sprintf("%s %s: authentication failed, status %d: %q", method, path, status, body))
 	case 404:
-		return GetError(RestErrorResourceDNE, fmt.Sprintf("%s %s: not found, status 404: %q", method, path, body))
+		return applianceError(RestErrorResourceDNE, LayerNoClass,
+			fmt.Sprintf("%s %s: not found, status 404: %q", method, path, body))
 	default:
-		return GetError(RestErrorFailureUnknown,
+		return applianceError(RestErrorFailureUnknown, LayerNoClass,
 			fmt.Sprintf("%s %s: status %d without an error body: %q", method, path, status, body))
 	}
 }
@@ -4744,7 +5192,7 @@ func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool stri
 ### ID sources
 [ID_sources](#id-sources)
 
-**Table 19 — Where the names and IDs come from** · `tbl_id_sources`
+**Table 20 — Where the names and IDs come from** · `tbl_id_sources`
 
 | Names and IDs | Meaning | Source |
 |---|---|---|
@@ -4759,7 +5207,7 @@ func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool stri
 ### Terms
 [Terms](#terms)
 
-**Table 20 — Terms** · `tbl_terms`
+**Table 21 — Terms** · `tbl_terms`
 
 | Term | Meaning |
 |---|---|
@@ -4781,7 +5229,8 @@ func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool stri
 | zvol | a ZFS block volume; the plugin uses it for iSCSI volumes |
 | NAS volume | a ZFS file system (dataset); the plugin uses it for NFS volumes |
 | errno, class, message | three of the four fields of a JovianDSS error reply, `url` being the fourth: `{"error": {"errno": …, "class": …, "message": …, "url": …}}` |
-| `RestError` code | the plugin's own code for a REST failure (`errors.go`), e.g. `RestErrorResourceDNE` ("does not exist"); the controller turns it into a CSI status. Unknown, written without code font, is the code of an error the plugin does not recognise (`RestErrorFailureUnknown` today); `Unknown` in code font is the CSI status |
+| layer | the part of the appliance that raised an error, which the beginning of the error's `class` shows: no class, `builtins`, `zfslib`, `opene`, `jsonschema` or `werkzeug`; each layer has a range of 1000 `RestError` codes ([impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue)) |
+| `RestError` code | the plugin's own code for a REST failure (`errors.go`), e.g. `RestErrorResourceDNE` ("does not exist"); the controller turns it into a CSI status. It says what a failure means for the call; an error of the appliance carries a second code beside it, of its kind in the range of its layer. Unknown, written without code font, is the code of an error the plugin does not recognise (`RestErrorFailureUnknown` today); `Unknown` in code font is the CSI status |
 | `Internal`, `Unknown`, `AlreadyExists`, `ResourceExhausted`, … | CSI (gRPC) status codes the plugin returns to Kubernetes |
 | repeated request | CSI may send the same create or delete again; the plugin must treat "already exists" on a create, when what exists is what the request asks for, and "not found" on a delete, as success |
 | page, `per_page`, `results` | the appliance's paging of a list: a request with `page` and `per_page` gets at most `per_page` entries, from entry `page × per_page` on, of the whole list; `results` is the length of the whole list ([How lists are paged](#how-lists-are-paged)) |
