@@ -1,0 +1,1 @@
+{"data":null,"error":{"errno":4,"message":"Value hurltest-20261107-010938-v4-zha&b contains invalid characters. Only a-z, A-Z, 0-9 . : $ _ and - are allowed.","url":"http://127.0.0.1:81/api/v4/shares"}}

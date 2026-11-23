@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.exceptions.ItemNotFoundError","message":"Target iqn.2026-11.org.hurltest:hurltest-20261103-211531-v4-dttgt not exists.","url":"http://127.0.0.1:81/api/v4/pools/Pool-1/san/iscsi/targets/iqn.2026-11.org.hurltest:hurltest-20261103-211531-v4-dttgt"}}

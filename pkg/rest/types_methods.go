@@ -41,12 +41,6 @@ var (
 // creationLayout is how a snapshot read by name gives its creation time.
 const creationLayout = "2006-01-02 15:04:05"
 
-// GeneralResponse is the envelope of every reply: data, or an error.
-type GeneralResponse struct {
-	Data  interface{} `json:"data,omitempty"`
-	Error *ErrorT     `json:"error,ommitempty"`
-}
-
 // ResultEntries is the data of a list reply: the length of the whole list
 // and the entries of one page.
 type ResultEntries struct {

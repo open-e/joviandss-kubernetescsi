@@ -670,9 +670,12 @@ func (d *CSIISCSiDriver) UnpublishVolume(ctx context.Context, pool string, prefi
 		switch code {
 		case jrest.RestErrorOk:
 			l.Debugf("Volume %s was detached from target %s", ld.Name(), *iqn)
-		case jrest.RestErrorResourceDNEVolume, jrest.RestErrorResourceDNE:
+		case jrest.RestErrorResourceDNELun, jrest.RestErrorResourceDNEVolume, jrest.RestErrorResourceDNE:
+			// The volume is not attached, but the target can still be
+			// there: go on and delete it.
 			l.Debugf("Volume %s is not attached from target %s", ld.Name(), *iqn)
 		case jrest.RestErrorResourceDNETarget:
+			// The target is gone: nothing is left to do.
 			return nil
 		default:
 			return rErr

@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.exceptions.ItemNotFoundError","message":"Pool Size does not exist.","url":"http://127.0.0.1:81/api/v4/pools/Size"}}

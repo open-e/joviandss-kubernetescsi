@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.storage.zfs.exceptions.DatasetValidationError","errno":1,"message":"Dataset name too long. Dataset name cannot exceed 132 characters.","url":"http://127.0.0.1:81/api/v4/pools/Pool-3/nas-volumes/hurltest-20261107-010938-v4-zpd/snapshots/hurltest-20261107-010938-v4-zpe/clones"}}

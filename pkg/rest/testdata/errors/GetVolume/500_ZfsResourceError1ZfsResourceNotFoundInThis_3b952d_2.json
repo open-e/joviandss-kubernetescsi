@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"zfslib.zfsapi.resources.ZfsResourceError","errno":1,"message":"Zfs resource: Pool-1/hurltest-20261104-211002-v4-kvc not found in this collection.","url":"http://127.0.0.1:81/api/v4/pools/Pool-1/volumes/hurltest-20261104-211002-v4-kvc"}}

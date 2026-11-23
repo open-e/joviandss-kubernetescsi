@@ -1,0 +1,1 @@
+{"data":null,"error":{"errno":6,"message":"Not valid characters in a recycle bin name. A name cannot contain any of the following characters & * / \\ : ; < > ? ` | \"","url":"http://127.0.0.1:81/api/v4/shares"}}

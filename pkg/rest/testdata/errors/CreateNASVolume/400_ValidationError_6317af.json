@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"jsonschema.exceptions.ValidationError","message":"'' does not match '^(?P<size_value>\\\\d+([.,]\\\\d+)?(e\\\\+\\\\d+)?)\\\\s*(?P<size_suffix>[BKMGT]i?B?)?$'","url":"http://127.0.0.1:81/api/v4/pools/Pool-3/nas-volumes"}}

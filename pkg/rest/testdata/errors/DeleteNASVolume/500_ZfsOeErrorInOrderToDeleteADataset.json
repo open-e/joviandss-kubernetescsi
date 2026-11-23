@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.storage.zfs.zfs.ZfsOeError","message":"In order to delete a dataset, you must delete all of its clones first.","url":"http://127.0.0.1:81/api/v4/pools/Pool-1/nas-volumes/hurltest-20261103-211531-v4-dov"}}

@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.storage.zfs.zfs.ZfsOeError","message":"Resource hurltest-20261107-010938-v4-dm1av is not a dataset type.","url":"http://127.0.0.1:81/api/v4/pools/Pool-3/nas-volumes/hurltest-20261107-010938-v4-dm1av/snapshots/hurltest-20261107-010938-v4-dm1as"}}

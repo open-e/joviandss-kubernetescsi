@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"zfslib.wrap.zfs.ZfsCmdError","errno":100,"message":"cannot create 'Pool-1/hurltest-20261103-211531-v4-ncc': dataset already exists","url":"http://127.0.0.1:81/api/v4/pools/Pool-1/nas-volumes/hurltest-20261103-211531-v4-ncv/snapshots/hurltest-20261103-211531-v4-ncs/clones"}}

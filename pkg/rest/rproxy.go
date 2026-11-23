@@ -83,7 +83,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	} else {
 		jdata, err := json.Marshal(data)
 		if err != nil {
-			return 0, nil, &restError{RestErrorRequestMalfunction, err.Error()}
+			return 0, nil, GetError(RestErrorRequestMalfunction, err.Error())
 		}
 		reader = strings.NewReader(string(jdata))
 	}
@@ -92,7 +92,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	req.SetBasicAuth(rp.user, rp.pass)
 	if err != nil {
 		// rp.l.Warnf("Unable to create req: %s", err)
-		return 0, nil, &restError{RestErrorRequestMalfunction, err.Error()}
+		return 0, nil, GetError(RestErrorRequestMalfunction, err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Kubernetes CSI Plugin")
@@ -102,26 +102,26 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 			if opErr, ok := urlErr.Err.(*net.OpError); ok {
 				if dnsErr, ok := opErr.Err.(*net.DNSError); ok {
 					l.Errorln("DNS error:", dnsErr)
-					return res.StatusCode, nil, &restError{RestErrorUnableToConnect, dnsErr.Error()}
+					return res.StatusCode, nil, GetError(RestErrorUnableToConnect, dnsErr.Error())
 				} else if opErr.Op == "dial" {
 					l.Errorln("Connection error:", opErr)
-					return res.StatusCode, nil, &restError{RestErrorUnableToConnect, opErr.Error()}
+					return res.StatusCode, nil, GetError(RestErrorUnableToConnect, opErr.Error())
 				} else if netErr, ok := err.(net.Error); ok {
 					if netErr.Timeout() {
 						l.Errorln("Network error (timeout):", netErr.Error())
-						return res.StatusCode, nil, &restError{RestErrorRequestTimeout, opErr.Error()}
+						return res.StatusCode, nil, GetError(RestErrorRequestTimeout, opErr.Error())
 					} else {
 						l.Errorln("Network error:", netErr)
-						return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, opErr.Error()}
+						return res.StatusCode, nil, GetError(RestErrorRequestMalfunction, opErr.Error())
 					}
 				}
 			} else {
 				fmt.Println("Network error:", opErr)
-				return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, urlErr.Error()}
+				return res.StatusCode, nil, GetError(RestErrorRequestMalfunction, urlErr.Error())
 			}
 		} else {
 			fmt.Println("Unknown error:", err.Error())
-			return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, err.Error()}
+			return res.StatusCode, nil, GetError(RestErrorRequestMalfunction, err.Error())
 		}
 	}
 
@@ -135,7 +135,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		l.Errorf("reading response failed: %s", err.Error())
-		return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, "Unable to process response"}
+		return res.StatusCode, nil, GetError(RestErrorRequestMalfunction, "Unable to process response")
 	}
 	return res.StatusCode, bodyBytes, nil
 }

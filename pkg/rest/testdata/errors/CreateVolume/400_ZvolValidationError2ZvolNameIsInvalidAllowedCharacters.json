@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.storage.zfs.exceptions.ZvolValidationError","errno":2,"message":"Zvol name is invalid. Allowed characters in zvol name: a-z, A-Z, 0-9, _, - ","url":"http://127.0.0.1:81/api/v4/pools/Pool-3/volumes"}}
