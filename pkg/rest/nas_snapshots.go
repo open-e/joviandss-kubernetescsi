@@ -2,7 +2,6 @@ package rest
 
 import (
 	"context"
-	"fmt"
 )
 
 // # Create Snapshot from existing NAS Volume
@@ -14,7 +13,7 @@ import (
 //   - *vid* physical nas volume id as it used by JovianDSS
 //   - *desc* data, including snapahot name, that would be transfered to create snapshot
 func (s *RestEndpoint) CreateNASSnapshot(ctx context.Context, pool string, nvid string, desc *CreateNASSnapshotDescriptor) RestError {
-	path := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots", pool, nvid)
+	path := apiPath("/pools/%s/nas-volumes/%s/snapshots", pool, nvid)
 	return s.request(ctx, "POST", path, desc, createNASSnapshotErrors, CodeCreated, CodeOK)
 }
 
@@ -22,6 +21,6 @@ func (s *RestEndpoint) CreateNASSnapshot(ctx context.Context, pool string, nvid 
 // not refuse the delete of a NAS snapshot that has a clone: it deletes the
 // clone with it. A caller reads the clones first.
 func (s *RestEndpoint) DeleteNASSnapshot(ctx context.Context, pool string, nvid string, sname string) (err RestError) {
-	path := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots/%s", pool, nvid, sname)
+	path := apiPath("/pools/%s/nas-volumes/%s/snapshots/%s", pool, nvid, sname)
 	return s.request(ctx, "DELETE", path, nil, deleteNASSnapshotErrors, CodeNoContent)
 }

@@ -222,3 +222,84 @@ func TestRequestLogHoldsNoSecret(t *testing.T) {
 		}
 	}
 }
+
+// A name put into a path stays one path segment: "/", "?", "#", "%" and a
+// space reach the appliance escaped, and can add no segment, cut the path
+// short or start a query. The query of a list request is not escaped.
+func TestNamesAreEscapedIntoOnePathSegment(t *testing.T) {
+	app := newFakeAppliance(t)
+	app.answer(500, "application/json", nil)
+	name := "a/b?c#d%e f"
+	escaped := "a%2Fb%3Fc%23d%25e%20f"
+	for _, c := range []struct {
+		call func()
+		want string
+	}{
+		{func() { app.ep.GetVolume(app.ctx, "Pool-0", name) }, "GET /api/v4/pools/Pool-0/volumes/" + escaped},
+		{func() { app.ep.GetVolume(app.ctx, name, "v") }, "GET /api/v4/pools/" + escaped + "/volumes/v"},
+		{func() { app.ep.DeleteSnapshot(app.ctx, "Pool-0", "v", name, DeleteSnapshotDescriptor{}) },
+			"DELETE /api/v4/pools/Pool-0/volumes/v/snapshots/" + escaped},
+		{func() { app.ep.DeleteNASClone(app.ctx, "Pool-0", "d", "s", name) },
+			"DELETE /api/v4/pools/Pool-0/nas-volumes/d/snapshots/s/clones/" + escaped},
+		{func() { app.ep.DettachVolumeFromTarget(app.ctx, "Pool-0", name, "v") },
+			"DELETE /api/v4/pools/Pool-0/san/iscsi/targets/" + escaped + "/luns/v"},
+		{func() { app.ep.GetShare(app.ctx, name) }, "GET /api/v4/shares/" + escaped},
+		{func() { app.ep.GetVolumeSnapshotsEntries(app.ctx, "Pool-0", name, 2, 100) },
+			"GET /api/v4/pools/Pool-0/volumes/" + escaped + "/snapshots?page=2&per_page=100"},
+		{func() { app.ep.GetNASVolumesEntries(app.ctx, name, 0, 100) },
+			"GET /api/v4/pools/" + escaped + "/nas-volumes?page=0&per_page=100"},
+		// the name of a target keeps its colon and its dots
+		{func() { app.ep.DeleteTarget(app.ctx, "Pool-0", "iqn.2026-11.com.example:t") },
+			"DELETE /api/v4/pools/Pool-0/san/iscsi/targets/iqn.2026-11.com.example:t"},
+	} {
+		app.seen()
+		c.call()
+		reqs := app.seen()
+		if len(reqs) != 1 {
+			t.Errorf("%s: %d requests", c.want, len(reqs))
+			continue
+		}
+		if got := reqs[0].Method + " " + reqs[0].Path; got != c.want {
+			t.Errorf("the request %q, want %q", got, c.want)
+		}
+	}
+}
+
+// Escaping does not change an empty name, "." or "..", which would address
+// the collection or the parent. No request is sent for such a name.
+func TestPathRefusesAnEmptyNameAndDots(t *testing.T) {
+	app := newFakeAppliance(t)
+	app.seen()
+	for _, bad := range []string{"", ".", ".."} {
+		for what, call := range map[string]func() RestError{
+			"the pool of a volume read":   func() RestError { _, e := app.ep.GetVolume(app.ctx, bad, "v"); return e },
+			"the volume of a volume read": func() RestError { _, e := app.ep.GetVolume(app.ctx, "Pool-0", bad); return e },
+			"the volume of a delete":      func() RestError { return app.ep.DeleteVolume(app.ctx, "Pool-0", bad, DeleteVolumeDescriptor{}) },
+			"the NAS volume of a delete":  func() RestError { return app.ep.DeleteNASVolume(app.ctx, "Pool-0", bad) },
+			"the snapshot of a delete":    func() RestError { return app.ep.DeleteNASSnapshot(app.ctx, "Pool-0", "d", bad) },
+			"the clone of a delete": func() RestError {
+				return app.ep.DeleteClone(app.ctx, "Pool-0", "v", "s", bad, DeleteVolumeDescriptor{})
+			},
+			"the target of a delete":        func() RestError { return app.ep.DeleteTarget(app.ctx, "Pool-0", bad) },
+			"the volume of a LUN detach":    func() RestError { return app.ep.DettachVolumeFromTarget(app.ctx, "Pool-0", "t", bad) },
+			"the pool of a create":          func() RestError { return app.ep.CreateVolume(app.ctx, bad, CreateVolumeDescriptor{Name: "v"}) },
+			"the volume of a snapshot list": func() RestError { _, e := app.ep.GetVolumeSnapshotsEntries(app.ctx, "Pool-0", bad, 0, 100); return e },
+			"the snapshot of a clones read": func() RestError { _, e := app.ep.GetNASVolumeSnapshotClones(app.ctx, "Pool-0", "d", bad); return e },
+			"the share of a share read":     func() RestError { _, e := app.ep.GetShare(app.ctx, bad); return e },
+		} {
+			err := call()
+			if err == nil || err.GetCode() != RestErrorArgumentIncorrect || err.GetKindCode() != 0 {
+				t.Errorf("%q as %s: error %v, want the code %d", bad, what, err, RestErrorArgumentIncorrect)
+			}
+		}
+	}
+	if n := len(app.seen()); n != 0 {
+		t.Errorf("%d requests reached the appliance", n)
+	}
+	// a name that only starts with a dot, or holds dots, is a name
+	for _, name := range []string{"...", ".a", "a.", "a..b"} {
+		if p := apiPath("/pools/%s", name); p.err != nil || p.path != "api/v4/pools/"+name {
+			t.Errorf("the name %q: path %q, error %v", name, p.path, p.err)
+		}
+	}
+}

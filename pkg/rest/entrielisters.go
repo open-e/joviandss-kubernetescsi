@@ -36,12 +36,12 @@ func pageQuery(path string, page, perPage int) string {
 // GetVolumeSnapshotsEntries returns one page of the snapshots of one volume.
 // On API v4 the entries are short entries, as in the list of all snapshots.
 func (s *RestEndpoint) GetVolumeSnapshotsEntries(ctx context.Context, pool string, vname string, page, perPage int) ([]ResourceSnapshotShort, RestError) {
-	path := pageQuery(fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s/snapshots", pool, vname), page, perPage)
+	path := apiPath("/pools/%s/volumes/%s/snapshots", pool, vname).page(page, perPage)
 	return readEntries[ResourceSnapshotShort](ctx, s, path, getVolumeSnapshotsEntriesErrors)
 }
 
 func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page, perPage int) ([]ResourceVolume, RestError) {
-	path := pageQuery(fmt.Sprintf(apiPrefix+"/pools/%s/volumes", pool), page, perPage)
+	path := apiPath("/pools/%s/volumes", pool).page(page, perPage)
 	return readEntries[ResourceVolume](ctx, s, path, getVolumesEntriesErrors)
 }
 
@@ -49,12 +49,12 @@ func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page,
 // list holds the snapshots of zvols and of NAS volumes together: parent.type
 // tells them apart.
 func (s *RestEndpoint) GetSnapshotsEntries(ctx context.Context, pool string, page, perPage int) ([]ResourceSnapshotShort, RestError) {
-	path := pageQuery(fmt.Sprintf(apiPrefix+"/pools/%s/volumes/snapshots", pool), page, perPage)
+	path := apiPath("/pools/%s/volumes/snapshots", pool).page(page, perPage)
 	return readEntries[ResourceSnapshotShort](ctx, s, path, getSnapshotsEntriesErrors)
 }
 
 func (s *RestEndpoint) GetNASVolumesEntries(ctx context.Context, pool string, page, perPage int) ([]ResourceNASVolume, RestError) {
-	path := pageQuery(fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes", pool), page, perPage)
+	path := apiPath("/pools/%s/nas-volumes", pool).page(page, perPage)
 	return readEntries[ResourceNASVolume](ctx, s, path, getNASVolumesEntriesErrors)
 }
 
@@ -62,13 +62,13 @@ func (s *RestEndpoint) GetNASVolumesEntries(ctx context.Context, pool string, pa
 // volume. On API v4 the entries are short entries, as in the list of all NAS
 // snapshots.
 func (s *RestEndpoint) GetNASVolumeSnapshotsEntries(ctx context.Context, pool string, nvds string, page, perPage int) ([]ResourceNASSnapshotShort, RestError) {
-	path := pageQuery(fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots", pool, nvds), page, perPage)
+	path := apiPath("/pools/%s/nas-volumes/%s/snapshots", pool, nvds).page(page, perPage)
 	return readEntries[ResourceNASSnapshotShort](ctx, s, path, getNASVolumeSnapshotsEntriesErrors)
 }
 
 // GetNASSnapshotsEntries returns one page of the NAS snapshots of the pool.
 // This list too holds the snapshots of both kinds.
 func (s *RestEndpoint) GetNASSnapshotsEntries(ctx context.Context, pool string, page, perPage int) ([]ResourceNASSnapshotShort, RestError) {
-	path := pageQuery(fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/snapshots", pool), page, perPage)
+	path := apiPath("/pools/%s/nas-volumes/snapshots", pool).page(page, perPage)
 	return readEntries[ResourceNASSnapshotShort](ctx, s, path, getNASSnapshotsEntriesErrors)
 }
