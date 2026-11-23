@@ -950,7 +950,7 @@ Fix the rest of [response content](#response-content-and-defaults), of the [erro
   parent's, [bug_rest_v4_snapshot_and_clone_creates_missing_pool_and_missing_parent_errors_overlap](#bug_rest_v4_snapshot_and_clone_creates_missing_pool_and_missing_parent_errors_overlap),
   so take it there as the parent missing, [question 48](#decisions)); map "name too
   long" to `RestErrorArgumentIncorrect`, a code the drivers return
-  today but the mapping in `errors.go` never produces; and on v4 map the snapshot list of a missing parent to "not found".
+  today but the mapping in `errors.go` never produces; and on v4 map the snapshot list of a missing parent to "not found". Make the controller answer that code from the list of one volume's snapshots with an empty list: CSI asks for one when the source volume does not exist, and the iSCSI driver returned one while its list was a stub.
   The caller that turns every zvol `DeleteClone` error into `Busy`
   (`iscsi_driver.go:520`) is a finding of its own, [bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy](#bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy),
   fixed by [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) below.
@@ -1051,7 +1051,18 @@ commits:
   `GetNASVolumeSnapshotClones`: the calls both drivers already make when a
   snapshot delete is refused), and delete the snapshot only when that reply
   lists no clone. When the call fails, nothing is deleted and the cleanup
-  returns the error ([question 34](#decisions)). It costs one more request
+  returns the error ([question 34](#decisions)), but for one failure: when
+  the appliance answers that the snapshot itself is gone, to the read of its
+  clones or to its delete, go on to the next snapshot. That snapshot is in
+  the way no longer, and only "not found" for the list says that the volume
+  is gone: passed on, the code would make the NFS driver delete a volume
+  whose other snapshots it has not looked at, and the iSCSI driver report a
+  volume deleted that is still there. Take a snapshot for an intermediate
+  one only when its name reads as the name of a volume of the plugin
+  (`NewVolumeDescFromVDS`), since it carries the name of the volume cloned
+  through it; the first letter alone, which the code tested, also fits a
+  snapshot made by hand, and the cleanup deletes what it takes for
+  intermediate. It costs one more request
   per intermediate snapshot. Have the cleanup hand back, with each snapshot it keeps, the clones it read, so that `deleteLUN` names them in its message as it does today.
 
 What must hold: a fixture of each per-volume list decodes into its short
@@ -1443,6 +1454,17 @@ not offer such a role (confirmed by the user), so the plugin keeps using the adm
   return the string it builds and not read `Addrs[0]` when the list is
   empty. Go calls `String()` whenever the endpoint is formatted with `%v` or
   `%s`, so today a log line alone can panic.
+
+One guard stands outside `pkg/rest`. `VolumeComply`
+(`controllerplugin.go:404-412`), the first step of CreateVolume, returns
+only for "not found" when the read of the volume fails, and then reads the
+size of a volume it does not have. The certificate check of this stage
+makes that crash likely on an upgrade: an appliance with its self-signed
+certificate, and neither `cafile` nor `insecure` set, would end the
+controller on every CreateVolume. Make it return `Internal` with the cause
+for every failure of the read that is not "not found". The other crashes
+of the controller stay with the work on that module
+([Relationship](#relationship-to-other-designs)).
 
 What must hold, one condition per crash: a refused or timed-out connection returns a
 `RestError` that names its kind ([crash_plugin_rest_nil_response_on_transport_error](#crash_plugin_rest_nil_response_on_transport_error)); a
