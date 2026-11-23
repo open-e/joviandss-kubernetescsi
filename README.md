@@ -8,6 +8,12 @@ This repo provide plugin source code along side with the resource deffinitions a
 
 JovianDSS CSI plugin been tested on following platforms: Talos OS 1.6
 
+## Supported JovianDSS releases
+
+The plugin talks to JovianDSS through REST API v4 only, so it needs a JovianDSS release that serves API v4.
+The oldest supported JovianDSS 1 release is `1.0up33.65410`.
+The appliance still serves API v3, but the plugin no longer calls it.
+
 
 ## Plugin installation
 

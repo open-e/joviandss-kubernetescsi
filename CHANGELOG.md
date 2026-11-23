@@ -41,6 +41,11 @@ Everything on `master` after v1.1.0, including the `nfs-support` branch
 
 ### Changed
 
+- The plugin uses JovianDSS REST API v4 only, with no setting and no fallback:
+  API v3 is abandoned. The appliance still serves v3, but the plugin no longer
+  calls it. The oldest supported JovianDSS 1 release is `1.0up33.65410`; an
+  older release, or one that serves a different API v4, stops working after
+  the upgrade.
 - Node plugin reworked: new stage and publish code on `k8s.io/mount-utils`, and
   a different error code when a volume cannot be attached.
 - Container images are built from CentOS Stream 9 instead of Ubuntu.
