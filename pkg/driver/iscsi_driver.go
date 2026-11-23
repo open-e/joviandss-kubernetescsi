@@ -99,7 +99,9 @@ func (d *CSIISCSiDriver) deleteIntermediateSnapshot(ctx context.Context, pool st
 		"proto":   "iSCSI",
 		"section": "driver",
 	})
-	forceUmount := true
+	// force_umount false: a delete never detaches a zvol from its target;
+	// only DettachVolumeFromTarget does that.
+	forceUmount := false
 	snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 	// Just in case lets delete this snapshot and do everything from groud up
 	if err = d.re.DeleteSnapshot(ctx, pool, vds, sds, snapdeldata); err != nil {
@@ -218,7 +220,9 @@ func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool st
 					return d.re.GetVolumeSnapshotClones(ctx, pool, vd.VDS(), sname)
 				},
 				func(ctx context.Context) jrest.RestError {
-					forceUmount := true
+					// force_umount false: a delete never detaches a zvol from its target;
+					// only DettachVolumeFromTarget does that.
+					forceUmount := false
 					snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 					return d.re.DeleteSnapshot(ctx, pool, vd.VDS(), sname, snapdeldata)
 				})
@@ -244,7 +248,11 @@ func (d *CSIISCSiDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeD
 		"section": "driver",
 	})
 
-	forceUmount := true
+	// force_umount false: a delete never detaches a zvol from its target;
+
+	// only DettachVolumeFromTarget does that.
+
+	forceUmount := false
 	deldata := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
 	err = d.re.DeleteVolume(ctx, pool, vd.VDS(), deldata)
 
@@ -492,7 +500,11 @@ func (d *CSIISCSiDriver) DeleteSnapshot(ctx context.Context, pool string, ld Lun
 
 	l.Debugf("Delete snapshot %s for volume %s", sd.SDS(), ld.VDS())
 
-	forceUmount := true
+	// force_umount false: a delete never detaches a zvol from its target;
+
+	// only DettachVolumeFromTarget does that.
+
+	forceUmount := false
 	deldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 
 	err := d.re.DeleteSnapshot(ctx, pool, ld.VDS(), sd.SDS(), deldata)
@@ -521,7 +533,9 @@ func (d *CSIISCSiDriver) DeleteSnapshot(ctx context.Context, pool string, ld Lun
 	}
 
 	if len(dsnaps) > 0 {
-		forceUmount := true
+		// force_umount false: a delete never detaches a zvol from its target;
+		// only DettachVolumeFromTarget does that.
+		forceUmount := false
 		delclone := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
 
 		for _, snapclone := range dsnaps {
