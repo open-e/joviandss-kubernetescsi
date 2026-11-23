@@ -40,7 +40,7 @@ func (np *NodePlugin) PublishVolume(ctx context.Context, req *csi.NodePublishVol
 		"section": "node",
 	})
 
-	l.Debugf("Publish Volume request %+v", *req)
+	l.Debugf("Publish volume %s: target path %s, staging path %s, read only %t", req.GetVolumeId(), req.GetTargetPath(), req.GetStagingTargetPath(), req.GetReadonly())
 
 	vcap := req.GetVolumeCapability()
 	block := vcap.GetBlock() != nil
@@ -65,7 +65,7 @@ func (np *NodePlugin) UnpublishVolume(ctx context.Context, req *csi.NodeUnpublis
 		"proto":   "NFS",
 		"section": "node",
 	})
-	l.Debugf("Unpublish volume request %+v", *req)
+	l.Debugf("Unpublish volume %s: target path %s", req.GetVolumeId(), req.GetTargetPath())
 
 	if mounter, ok := np.mounter.(mount.MounterForceUnmounter); ok {
 		return UmountVolume(ctx, mounter, req.GetTargetPath())

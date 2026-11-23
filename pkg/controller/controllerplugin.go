@@ -476,7 +476,6 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	/// Check capability
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME) {
 		err = status.Errorf(codes.Internal, "Capability is not supported.")
-		l.Warnf("Unable to create volume req: %v", req)
 		return nil, err
 	}
 	// vName := req.GetName()
@@ -543,7 +542,6 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME) {
 		err := status.Errorf(codes.Internal, "Capability is not supported.")
-		cp.l.Warnf("Unable to delete volume req: %v", req)
 		return nil, err
 	}
 
@@ -584,7 +582,7 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("Request: %+v", req)
+	l.Debugf("ListVolumes: max entries %d, starting token %q", req.GetMaxEntries(), req.GetStartingToken())
 
 	maxEnt := int64(req.GetMaxEntries())
 	startingToken := req.GetStartingToken()
@@ -623,7 +621,7 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("request: %+v", *req)
+	l.Debugf("CreateSnapshot: name %s, source volume %s", req.GetName(), req.GetSourceVolumeId())
 	var err error
 
 	//////////////////////////////////////////////////////////////////////////////
@@ -631,7 +629,6 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT) {
 		err = status.Errorf(codes.Internal, "Capability is not supported.")
-		l.Warnf("Unable to create volume req: %v", req)
 		return nil, err
 	}
 
@@ -700,14 +697,13 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("request: %+v", *req)
+	l.Debugf("DeleteSnapshot: snapshot %s", req.GetSnapshotId())
 	var err error
 
 	//////////////////////////////////////////////////////////////////////////////
 	/// Checks
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT) {
 		err = status.Errorf(codes.Internal, "Capability is not supported.")
-		l.Warnf("Unable to create volume req: %v", req)
 		return nil, err
 	}
 	//////////////////////////////////////////////////////////////////////////////
@@ -747,7 +743,7 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("Request: %+v", req)
+	l.Debugf("ListSnapshots: source volume %s, snapshot %s, max entries %d, starting token %q", req.GetSourceVolumeId(), req.GetSnapshotId(), req.GetMaxEntries(), req.GetStartingToken())
 
 	maxEnt := int64(req.GetMaxEntries())
 	sourceVolumeId := req.GetSourceVolumeId()
@@ -834,7 +830,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("Publish volume request %+v", req)
+	l.Debugf("ControllerPublishVolume: volume %s, node %s, read only %t, capability %+v", req.GetVolumeId(), req.GetNodeId(), req.GetReadonly(), req.GetVolumeCapability())
 	var err error
 
 	vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId())
@@ -854,7 +850,6 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME) {
 		err = status.Errorf(codes.Internal, "Capability is not supported.")
-		l.Warnf("Unable to publish volume req: %v", req)
 		return nil, err
 	}
 
@@ -911,7 +906,7 @@ func (cp *ControllerPlugin) ControllerUnpublishVolume(ctx context.Context, req *
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("UnpublishVolume req: %+v", req)
+	l.Debugf("ControllerUnpublishVolume: volume %s, node %s", req.GetVolumeId(), req.GetNodeId())
 
 	if vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId()); err != nil {
 		return nil, err
@@ -1075,7 +1070,7 @@ func (cp *ControllerPlugin) ControllerGetCapabilities(ctx context.Context, req *
 	*csi.ControllerGetCapabilitiesResponse,
 	error,
 ) {
-	cp.l.WithField("func", "ControllerGetCapabilities()").Infof("request: '%+v'", req)
+	cp.l.WithField("func", "ControllerGetCapabilities()").Info("request")
 
 	var capabilities []*csi.ControllerServiceCapability
 	for _, c := range supportedControllerCapabilities {
