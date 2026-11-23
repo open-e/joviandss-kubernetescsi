@@ -11,7 +11,7 @@ Installation of this components is pretty straightforward on most of linux distr
 Due to architecture and security policies [additional actions have to be take prior to following instructions provided below](talos.md).
 
 `Plugin` talks to JovianDSS through REST API v4 only.
-It needs a JovianDSS release that serves API v4: for JovianDSS 1 that is `1.0up33.65410` or newer.
+It supports JovianDSS 1 from release `1.0up33.65410` on. JovianDSS 2 is not supported: it takes another login than the plugin sends.
 The appliance still serves API v3, but `plugin` no longer calls it.
 
 

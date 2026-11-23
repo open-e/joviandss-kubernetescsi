@@ -10,7 +10,7 @@ JovianDSS CSI plugin been tested on following platforms: Talos OS 1.6
 
 ## Supported JovianDSS releases
 
-The plugin talks to JovianDSS through REST API v4 only, so it needs a JovianDSS release that serves API v4.
+The plugin talks to JovianDSS through REST API v4 only, and supports JovianDSS 1 from release `1.0up33.65410` on. JovianDSS 2 is not supported: it takes another login than the plugin sends.
 The oldest supported JovianDSS 1 release is `1.0up33.65410`.
 The appliance still serves API v3, but the plugin no longer calls it.
 
