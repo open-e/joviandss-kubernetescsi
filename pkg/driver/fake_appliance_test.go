@@ -189,7 +189,9 @@ func pages(entries func() []object) func(r fakeRequest) (int, interface{}) {
 		if to > len(all) {
 			to = len(all)
 		}
-		return 200, data(object{"results": len(all), "entries": all[from:to]})
+		// an appliance sends an empty page as an empty list, never as null
+		entries := append([]object{}, all[from:to]...)
+		return 200, data(object{"results": len(all), "entries": entries})
 	}
 }
 

@@ -264,7 +264,7 @@ func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool stri
 	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
 
 	for _, snap := range snaps {
-		if IsVDS(snap.Name) {
+		if isIntermediate(snap.Name) {
 			// An intermediate snapshot. The appliance deletes a NAS snapshot
 			// that has a clone, and the clone with it, and a list entry does
 			// not say whether the snapshot has clones. So the appliance is
@@ -284,7 +284,8 @@ func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool stri
 			if !deleted {
 				out = append(out, keptSnapshot{Name: sname, Clones: clonesNames(clones)})
 			}
-		} else if IsSDS(snap.Name) {
+		} else {
+			// a CSI snapshot, or a snapshot the plugin did not make: it stays
 			out = append(out, keptSnapshot{Name: snap.Name})
 		}
 	}
@@ -328,6 +329,16 @@ func (d *CSINFSDriver) deleteNASVolAndShare(ctx context.Context, pool string, vd
 	return nil
 }
 
+// deleteLUN deletes a NAS volume. The appliance does not refuse the delete
+// of a NAS volume that has a snapshot: it deletes the snapshots with it. So
+// the driver looks first: it reads the snapshots of the volume, runs the
+// cleanup of the intermediate ones, and sends the delete only when no
+// snapshot is left. A volume that still has snapshots is not deleted: the
+// error names them, and its code is the one the controller answers
+// FailedPrecondition.
+//
+// A snapshot made between the read and the delete is not seen, and goes
+// with the volume: the appliance has no delete that spares snapshots.
 func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) (err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
@@ -335,66 +346,37 @@ func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDes
 		"section": "driver",
 	})
 
+	snaps, gserr := d.cleanIntermediateSnapshots(ctx, pool, vd)
+	switch jrest.ErrCode(gserr) {
+	case jrest.RestErrorOk:
+		if len(snaps) > 0 {
+			// the volume has snapshots, and stays
+			l.Debugf("Snapshots after cleaning intermediate one %+v", snaps)
+			return volumeHasSnapshots(vd.Name(), snaps)
+		}
+	case jrest.RestErrorResourceDNE:
+		// The volume is not there, so it has no snapshot to lose. The delete
+		// is sent all the same, and answers for itself.
+		l.Debugf("NAS volume %s has no snapshot list: %s", vd.Name(), gserr.Error())
+	default:
+		// the snapshots could not be read: nothing is deleted
+		return gserr
+	}
+
 	err = d.deleteNASVolAndShare(ctx, pool, vd)
 
 	switch jrest.ErrCode(err) {
-	case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusyVolumeHasSnapshots:
-		break
 	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNEVolume:
 		l.Debugf("NAS volume %s do not exists. Do nothing.", vd.Name())
 		return nil
 	case jrest.RestErrorOk:
 		return nil
 	default:
+		// RestErrorResourceBusy among them: a volume whose snapshot has a
+		// clone outside the plugin's names
 		l.Debugf("Unable to delete lun %s, error had happaned %+v", vd.Name(), err.Error())
 		return err
 	}
-	l.Debugf("Volume %s is busy, indentifying relaying resources", vd.Name())
-
-	if err.GetCode() == jrest.RestErrorResourceBusy {
-		snaps, gserr := d.cleanIntermediateSnapshots(ctx, pool, vd)
-
-		if gserr != nil {
-			switch gserr.GetCode() {
-			case jrest.RestErrorResourceDNE:
-				return gserr
-			default:
-				// TODO: think about providing better error information for cases
-				// when we are not able to provide proper list of dependent snapshots
-				return err
-			}
-		}
-		l.Debugf("Snapshots after cleaning intermediate one %+v", snaps)
-		// Looks like this volume is busy and we are not able to delete it
-
-		var dvols []string
-		var dsnaps []string
-		var ncsi []string
-		msg := fmt.Sprintf("Volume %s is dependent upon by", vd.Name())
-
-		for _, snap := range snaps {
-			if IsSDS(snap.Name) {
-				dsnaps = append(dsnaps, snap.Name)
-			} else if IsVDS(snap.Name) {
-				dvols = append(dvols, snap.Clones...)
-			} else {
-				msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(dsnaps[:], ","))
-			}
-		}
-
-		if len(dvols) > 0 {
-			msg += fmt.Sprintf(" volumes: %s", strings.Join(dvols[:], ","))
-		}
-		if len(dsnaps) > 0 {
-			msg += fmt.Sprintf(" snapshots: %s", strings.Join(dsnaps[:], ","))
-		}
-		if len(ncsi) > 0 {
-			msg += fmt.Sprintf(" not CSI related snapshots: %s", strings.Join(ncsi[:], ","))
-		}
-		err = jrest.GetError(jrest.RestErrorResourceBusy, msg)
-	}
-
-	return err
 }
 
 func (d *CSINFSDriver) DeleteVolume(ctx context.Context, pool string, vid *VolumeDesc) jrest.RestError {
