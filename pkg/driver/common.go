@@ -43,28 +43,29 @@ func getResourcesList[RestResource any](ctx context.Context, maxret int, token C
 	for {
 		// l.Debugf("lres at start len %d lres %+v", len(lres), lres)
 
-		if ent, err := grf(ctx, token); err != nil {
+		// ent is one page as the appliance sent it: both conditions of the
+		// stop rule count it before any entry is dropped from it.
+		ent, err := grf(ctx, token)
+		if err != nil {
 			return nil, nil, err
+		}
+
+		// No new entries, return what we have so far
+		if len(ent) == 0 {
+			return lres, nil, nil
+		}
+
+		if len(token.BasedID()) == 0 {
+			lres = append(lres, (ent)...)
+		} else if token.BasedID() <= BasedID(ent[0]) {
+			lres = append(lres, (ent)...)
+			token.DropBasedID()
 		} else {
-			// No new snapshots, return what we have so far
-			// data, ok := ent.Entries.()
-
-			if len(ent) == 0 {
-				return lres, nil, nil
-			}
-
-			if len(token.BasedID()) == 0 {
-				lres = append(lres, (ent)...)
-			} else if token.BasedID() <= BasedID(ent[0]) {
-				lres = append(lres, (ent)...)
-				token.DropBasedID()
-			} else {
-				for i, e := range ent {
-					if BasedID(e) == token.BasedID() {
-						lres = append(lres, ent[i:]...)
-						token.BasedID()
-						break
-					}
+			for i, e := range ent {
+				if BasedID(e) == token.BasedID() {
+					lres = append(lres, ent[i:]...)
+					token.BasedID()
+					break
 				}
 			}
 		}
@@ -80,6 +81,12 @@ func getResourcesList[RestResource any](ctx context.Context, maxret int, token C
 					return lres, &newToken, nil
 				}
 			}
+		}
+
+		// A page that holds fewer entries than were asked for is the last
+		// one: the page after it is not requested.
+		if len(ent) < jrest.ListPerPage {
+			return lres, nil, nil
 		}
 		token.PageUp()
 	}
