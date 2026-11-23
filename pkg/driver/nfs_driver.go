@@ -181,50 +181,32 @@ func (d *CSINFSDriver) CreateVolumeFromSnapshot(ctx context.Context, pool string
 	return d.re.CreateShare(ctx, &shareDesc)
 }
 
-func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool string, vds string, sds string) (err jrest.RestError) {
-	l := jcom.LFC(ctx)
-	l = l.WithFields(logrus.Fields{
-		"func":    "deleteIntermediateSnapshot",
-		"section": "driver",
-	})
-	// forceUmount := true
-	// snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
-	// Just in case lets delete this snapshot and do everything from groud up
-	if err = d.re.DeleteNASSnapshot(ctx, pool, vds, sds); err != nil {
-		code := err.GetCode()
-		// Removing this snapshot is not possible
-
-		// May be somebody is using this snapshot already to make volumes from it
-		if code == jrest.RestErrorResourceBusySnapshotHasClones {
-			// We gona check if volume name is exactly volume that we have to create before returning success
-			if snap, errGS := d.re.GetNASVolumeSnapshot(ctx, pool, vds, sds); errGS != nil {
-				// That is a weird, previously we failed because snapshot existed and now it is gone
-				// looks like some king of race condition
-				if errGS.GetCode() == jrest.RestErrorResourceDNE {
-					return jrest.GetError(jrest.RestErrorStorageFailureUnknown,
-						fmt.Sprintf("It looks like there is a race condition"))
-				}
-				return jrest.GetError(jrest.RestErrorStorageFailureUnknown,
-					fmt.Sprintf("Unable to delete intermediate snapshot %s for volume %s as clean up operation because of %s",
-						vds, sds, errGS.Error()))
-			} else {
-				// Target volume already created
-				if clones := snap.ClonesNames(); len(clones) == 1 {
-					if clones[0] == sds {
-						return jrest.GetError(jrest.RestErrorResourceExists, fmt.Sprintf("NAS Volume %s created from volume %s already exists", sds, vds))
-					}
-				} else {
-					return jrest.GetError(jrest.RestErrorStorageFailureUnknown, fmt.Sprintf("Intermediate snapshot have multiple clones: %+v, that should never happen", clones))
-				}
-			}
-		} else {
-			// some unexpected error
-			return jrest.GetError(
-				jrest.RestErrorStorageFailureUnknown,
-				fmt.Sprintf("Unablet to clear intermediate snapshot %s, please delete it manualy for volume %s. Error %+v ", sds, vds, err.Error()))
-		}
+func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool string, vds string, sds string) jrest.RestError {
+	// The appliance does not refuse the delete of a NAS snapshot that has a
+	// clone: it deletes the snapshot and the clone with it. So the clones
+	// are read first, and the snapshot is deleted only when the appliance
+	// answers that it has none.
+	deleted, clones, err := deleteSnapshotWithoutClones(ctx,
+		func(ctx context.Context) ([]jrest.ResourceVolumeSnapshotClones, jrest.RestError) {
+			return d.re.GetNASVolumeSnapshotClones(ctx, pool, vds, sds)
+		},
+		func(ctx context.Context) jrest.RestError {
+			return d.re.DeleteNASSnapshot(ctx, pool, vds, sds)
+		})
+	switch {
+	case err != nil || deleted:
+		return err
+	case len(clones) == 1 && clones[0].Name == sds:
+		// the volume this snapshot was made for exists already
+		return jrest.GetError(jrest.RestErrorResourceExists,
+			fmt.Sprintf("NAS volume %s made from volume %s already exists", sds, vds))
+	case len(clones) == 1:
+		return jrest.GetError(jrest.RestErrorResourceBusySnapshotHasClones,
+			fmt.Sprintf("intermediate snapshot %s of volume %s has the clone %s", sds, vds, clones[0].Name))
+	default:
+		return jrest.GetError(jrest.RestErrorStorageFailureUnknown,
+			fmt.Sprintf("intermediate snapshot %s of volume %s has %d clones", sds, vds, len(clones)))
 	}
-	return err
 }
 
 // CreateVolumeFromVolume creates volume from another volume
@@ -288,7 +270,7 @@ func (d *CSINFSDriver) CreateVolumeFromVolume(ctx context.Context, pool string, 
 // cleanIntermediateSnapshots request list of snapshots related to particular volume and check if there are intermediate one that can be deleted
 //
 //	return list of snapshots that does not contain 'handing' one or error
-func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (out []jrest.ResourceSnapshot, err jrest.RestError) {
+func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (out []keptSnapshot, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "cleanIntermediateSnapshots",
@@ -297,37 +279,43 @@ func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool stri
 	token := NewCSIListingToken()
 	isnaps, _, gserr := d.ListVolumeSnapshots(ctx, pool, vd, 0, token)
 
-	var snaps []jrest.ResourceSnapshot
-
-	if val, ok := isnaps.([]jrest.ResourceSnapshot); ok == true {
-		snaps = val
-	} else {
-		err = jrest.GetError(jrest.RestErrorFailureUnknown, "Unable to typecast snapshot data")
-		return nil, err
-	}
-	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
+	// The error of the listing comes first: a real error, such as "not
+	// found", must not turn into a failed typecast.
 	if gserr != nil {
 		l.Debugf("Unable to get list of snapshots for volume %s", vd.Name())
 		return nil, gserr
 	}
 
+	snaps, ok := isnaps.([]jrest.ResourceNASSnapshotShort)
+	if !ok {
+		err = jrest.GetError(jrest.RestErrorFailureUnknown, "Unable to typecast snapshot data")
+		return nil, err
+	}
+	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
+
 	for _, snap := range snaps {
 		if IsVDS(snap.Name) {
-			clones := snap.ClonesNames()
-			if len(clones) == 0 {
-				// TODO: think about arguments for deletion command
-				// forceUmount := true
-				// snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
-
-				err = d.re.DeleteNASSnapshot(ctx, pool, vd.VDS(), snap.Name)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				out = append(out, snap)
+			// An intermediate snapshot. The appliance deletes a NAS snapshot
+			// that has a clone, and the clone with it, and a list entry does
+			// not say whether the snapshot has clones. So the appliance is
+			// asked, and the snapshot is deleted only when it answers that
+			// there is none.
+			sname := snap.Name
+			deleted, clones, derr := deleteSnapshotWithoutClones(ctx,
+				func(ctx context.Context) ([]jrest.ResourceVolumeSnapshotClones, jrest.RestError) {
+					return d.re.GetNASVolumeSnapshotClones(ctx, pool, vd.VDS(), sname)
+				},
+				func(ctx context.Context) jrest.RestError {
+					return d.re.DeleteNASSnapshot(ctx, pool, vd.VDS(), sname)
+				})
+			if derr != nil {
+				return nil, derr
+			}
+			if !deleted {
+				out = append(out, keptSnapshot{Name: sname, Clones: clonesNames(clones)})
 			}
 		} else if IsSDS(snap.Name) {
-			out = append(out, snap)
+			out = append(out, keptSnapshot{Name: snap.Name})
 		}
 	}
 
@@ -418,8 +406,7 @@ func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDes
 			if IsSDS(snap.Name) {
 				dsnaps = append(dsnaps, snap.Name)
 			} else if IsVDS(snap.Name) {
-				clones := snap.ClonesNames()
-				dvols = append(dvols, clones...)
+				dvols = append(dvols, snap.Clones...)
 			} else {
 				msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(dsnaps[:], ","))
 			}
@@ -520,14 +507,14 @@ func (d *CSINFSDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceNASVolumeSnapshot, err jrest.RestError) {
+	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceNASSnapshotShort, err jrest.RestError) {
 		l.Debugln("Getting Volume Snapshots entries")
 		entr, err := d.re.GetNASVolumeSnapshotsEntries(ctx, pool, vid.VDS(), token.Page(), token.DC())
 		if err != nil {
 			return nil, err
 		}
 
-		if entries, ok := entr.Entries.(*[]jrest.ResourceNASVolumeSnapshot); ok == true {
+		if entries, ok := entr.Entries.(*[]jrest.ResourceNASSnapshotShort); ok == true {
 			return *entries, nil
 		}
 		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)

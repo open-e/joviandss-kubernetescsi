@@ -182,7 +182,7 @@ func (d *CSIISCSiDriver) CreateVolumeFromVolume(ctx context.Context, pool string
 // cleanIntermediateSnapshots request list of snapshots related to particular volume and check if there are intermediate one that can be deleted
 //
 //	return list of snapshots that does not contain 'handing' one or error
-func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (out []jrest.ResourceSnapshot, err jrest.RestError) {
+func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool string, vd *VolumeDesc) (out []keptSnapshot, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "cleanIntermediateSnapshots",
@@ -192,37 +192,44 @@ func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool st
 	token := NewCSIListingToken()
 	isnaps, _, gserr := d.ListVolumeSnapshots(ctx, pool, vd, 0, token)
 
-	var snaps []jrest.ResourceSnapshot
-
-	if val, ok := isnaps.([]jrest.ResourceSnapshot); ok == true {
-		snaps = val
-	} else {
-		err = jrest.GetError(jrest.RestErrorFailureUnknown, "Unable to typecast snapshot data")
-		return nil, err
-	}
-
-	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
+	// The error of the listing comes first: a real error, such as "not
+	// found", must not turn into a failed typecast.
 	if gserr != nil {
 		l.Debugf("Unable to get list of snapshots for volume %s", vd.Name())
 		return nil, gserr
 	}
 
+	snaps, ok := isnaps.([]jrest.ResourceSnapshotShort)
+	if !ok {
+		err = jrest.GetError(jrest.RestErrorFailureUnknown, "Unable to typecast snapshot data")
+		return nil, err
+	}
+
+	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
+
 	for _, snap := range snaps {
 		if IsVDS(snap.Name) {
-			clones := snap.ClonesNames()
-			if len(clones) == 0 {
-				forceUmount := true
-				snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
-
-				err = d.re.DeleteSnapshot(ctx, pool, vd.VDS(), snap.Name, snapdeldata)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				out = append(out, snap)
+			// An intermediate snapshot. A list entry does not say whether
+			// the snapshot has clones, so the appliance is asked, and the
+			// snapshot is deleted only when it answers that there is none.
+			sname := snap.Name
+			deleted, clones, derr := deleteSnapshotWithoutClones(ctx,
+				func(ctx context.Context) ([]jrest.ResourceVolumeSnapshotClones, jrest.RestError) {
+					return d.re.GetVolumeSnapshotClones(ctx, pool, vd.VDS(), sname)
+				},
+				func(ctx context.Context) jrest.RestError {
+					forceUmount := true
+					snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
+					return d.re.DeleteSnapshot(ctx, pool, vd.VDS(), sname, snapdeldata)
+				})
+			if derr != nil {
+				return nil, derr
+			}
+			if !deleted {
+				out = append(out, keptSnapshot{Name: sname, Clones: clonesNames(clones)})
 			}
 		} else if IsSDS(snap.Name) {
-			out = append(out, snap)
+			out = append(out, keptSnapshot{Name: snap.Name})
 		}
 	}
 
@@ -279,8 +286,7 @@ func (d *CSIISCSiDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeD
 			if IsSDS(snap.Name) {
 				dsnaps = append(dsnaps, snap.Name)
 			} else if IsVDS(snap.Name) {
-				clones := snap.ClonesNames()
-				dvols = append(dvols, clones...)
+				dvols = append(dvols, snap.Clones...)
 			} else {
 				msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(dsnaps[:], ","))
 			}
@@ -382,14 +388,14 @@ func (d *CSIISCSiDriver) ListVolumeSnapshots(ctx context.Context, pool string, v
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceSnapshot, err jrest.RestError) {
+	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceSnapshotShort, err jrest.RestError) {
 		l.Debugln("Getting Volume Snapshots entries")
 		entr, err := d.re.GetVolumeSnapshotsEntries(ctx, pool, vid.VDS(), token.Page(), token.DC())
 		if err != nil {
 			return nil, err
 		}
 
-		if entries, ok := entr.Entries.(*[]jrest.ResourceSnapshot); ok == true {
+		if entries, ok := entr.Entries.(*[]jrest.ResourceSnapshotShort); ok == true {
 			return *entries, nil
 		}
 		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)

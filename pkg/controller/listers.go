@@ -117,11 +117,11 @@ func completeListResponseFromVolumeSnapshots(ctx context.Context, lsr *csi.ListS
 	i := 0
 
 	switch snaps := gsnaps.(type) {
-	case []jrest.ResourceSnapshot:
+	case []jrest.ResourceSnapshotShort:
 		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
 		lsr.Entries = entries
 		for _, s := range snaps {
-			ts := timestamppb.New(s.GetCreation())
+			ts := timestamppb.New(s.Properties.GetCreation())
 
 			sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
 			if err != nil {
@@ -140,12 +140,12 @@ func completeListResponseFromVolumeSnapshots(ctx context.Context, lsr *csi.ListS
 			i += 1
 		}
 		lsr.Entries = entries[:i]
-	case []jrest.ResourceNASVolumeSnapshot:
+	case []jrest.ResourceNASSnapshotShort:
 		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
 		lsr.Entries = entries
 
 		for _, s := range snaps {
-			ts := timestamppb.New(s.GetCreation())
+			ts := timestamppb.New(s.Properties.GetCreation())
 
 			sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
 			if err != nil {
