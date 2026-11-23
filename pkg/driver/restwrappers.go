@@ -33,8 +33,17 @@ type keptSnapshot struct {
 }
 
 // isIntermediate reports whether a snapshot is one the plugin made to clone
-// a volume from a volume: it carries the name of the new volume.
-func isIntermediate(name string) bool { return name != "" && IsVDS(name) }
+// a volume from a volume: it carries the name of the new volume, so its
+// name reads as the name of a volume of the plugin. The first letter is not
+// enough: the cleanup deletes an intermediate snapshot that has no clones,
+// and a snapshot made by hand can start with "v" too.
+func isIntermediate(name string) bool {
+	if name == "" {
+		return false
+	}
+	_, err := NewVolumeDescFromVDS(name)
+	return err == nil
+}
 
 // isCSISnapshot reports whether a snapshot has a name the plugin gives to a
 // CSI snapshot.

@@ -217,6 +217,15 @@ func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool st
 					return d.re.DeleteSnapshot(ctx, pool, vd.VDS(), sname, snapdeldata)
 				})
 			if derr != nil {
+				if derr.GetCode() == jrest.RestErrorResourceDNE {
+					// The snapshot went away after the list was read: it is
+					// in the way no longer. Only "not found" for the list
+					// itself says that the volume is gone; passed on from
+					// here, it would let the volume go with the snapshots
+					// that are still to be looked at.
+					l.Debugf("Intermediate snapshot %s of volume %s is gone: %s", sname, vd.Name(), derr.Error())
+					continue
+				}
 				return nil, derr
 			}
 			if !deleted {

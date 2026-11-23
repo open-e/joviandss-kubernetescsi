@@ -383,3 +383,136 @@ func TestNFSCreateVolumeWithAnExistingShare(t *testing.T) {
 		t.Errorf("a share that cannot be read: error %v", rerr)
 	}
 }
+
+// An intermediate snapshot is one whose name reads as the name of a volume
+// of the plugin. A name that only starts with "v" is not one.
+func TestIsIntermediate(t *testing.T) {
+	for name, want := range map[string]bool{
+		"vp_pvc-1":          true,
+		"vb_ORSXG5A-":       true,
+		"vs_9F86D081884C7D": true,
+		"v_legacy":          true,
+		"v2-before-upgrade": false,
+		"vault":             false,
+		"v":                 false,
+		"vx_1":              false,
+		"vb_!!!":            false,
+		"sp_1":              false,
+		"auto-0001":         false,
+		"":                  false,
+	} {
+		if got := isIntermediate(name); got != want {
+			t.Errorf("isIntermediate(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+// The cleanup deletes no snapshot that the plugin did not make, whatever
+// its first letter: such a snapshot is not asked for its clones, stays, and
+// keeps its volume.
+func TestCleanupLeavesSnapshotsThePluginDidNotMake(t *testing.T) {
+	byHand := []string{"v2-before-upgrade", "vault"}
+
+	app := newFakeAppliance(t)
+	app.on("DELETE", volA, hasChildren)
+	app.on("GET", volASnaps, pages(func() []object {
+		return []object{
+			snapshotObject("vp_a", byHand[0], jrest.SnapshotParentVolume),
+			snapshotObject("vp_a", byHand[1], jrest.SnapshotParentVolume),
+		}
+	}))
+	err := app.iscsi().DeleteVolume(app.ctx, "Pool-0", volumeA(t))
+	if err == nil || err.GetCode() != jrest.RestErrorResourceBusy {
+		t.Fatalf("iSCSI: error %v, want the code %d", err, jrest.RestErrorResourceBusy)
+	}
+	for _, name := range byHand {
+		if !strings.Contains(err.Error(), name) {
+			t.Errorf("iSCSI: the error %q does not name %s", err.Error(), name)
+		}
+	}
+	want := []string{"DELETE " + volA, "GET " + volASnaps + firstPage}
+	if got := app.seen(); !reflect.DeepEqual(got, want) {
+		t.Errorf("iSCSI: the requests %q, want %q: no snapshot asked for its clones, none deleted", got, want)
+	}
+
+	app = newFakeAppliance(t)
+	app.on("GET", nasASnaps, pages(func() []object {
+		return []object{
+			snapshotObject("vp_a", byHand[0], jrest.SnapshotParentNASVolume),
+			snapshotObject("vp_a", "sp_1", jrest.SnapshotParentNASVolume),
+		}
+	}))
+	err = app.nfs().DeleteVolume(app.ctx, "Pool-0", volumeA(t))
+	if err == nil || err.GetCode() != jrest.RestErrorResourceBusy ||
+		!strings.Contains(err.Error(), byHand[0]) || !strings.Contains(err.Error(), "sp_1") {
+		t.Errorf("NFS: error %v, want one of the code %d that names both snapshots", err, jrest.RestErrorResourceBusy)
+	}
+	if got := app.seen(); !reflect.DeepEqual(got, []string{"GET " + nasASnaps + firstPage}) {
+		t.Errorf("NFS: the requests %q, want the read of the snapshots alone", got)
+	}
+}
+
+// snapshotGone is the reply to a request for a snapshot that is not there.
+var snapshotGone = func(fakeRequest) (int, interface{}) {
+	return 500, appError("zfslib.zfsapi.resources.ZfsResourceError", 1,
+		"Zfs resource: Pool-0/vp_a@vp_clone not found in this collection.")
+}
+
+// An intermediate snapshot that goes away while the cleanup runs is in the
+// way no longer, and that is all it says: the volume is not gone. A NAS
+// volume that still has a snapshot gets no delete, and a zvol is not
+// reported deleted.
+func TestCleanupWhenASnapshotGoesAwayMeanwhile(t *testing.T) {
+	both := func(kind int) func() []object {
+		return func() []object {
+			return []object{snapshotObject("vp_a", "vp_clone", kind), snapshotObject("vp_a", "sp_1", kind)}
+		}
+	}
+	noClones := func(fakeRequest) (int, interface{}) { return 200, data([]object{}) }
+
+	for what, replies := range map[string][2]func(fakeRequest) (int, interface{}){
+		"gone before its clones are read": {snapshotGone, noContent},
+		"gone before it is deleted":       {noClones, snapshotGone},
+	} {
+		// NFS: the volume has a CSI snapshot left, so no delete of the volume
+		app := newFakeAppliance(t)
+		app.on("GET", nasASnaps, pages(both(jrest.SnapshotParentNASVolume)))
+		app.on("GET", nasASnaps+"/vp_clone/clones", replies[0])
+		app.on("DELETE", nasASnaps+"/vp_clone", replies[1])
+		err := app.nfs().DeleteVolume(app.ctx, "Pool-0", volumeA(t))
+		if err == nil || err.GetCode() != jrest.RestErrorResourceBusy || !strings.Contains(err.Error(), "sp_1") {
+			t.Errorf("NFS, %s: error %v, want one of the code %d that names sp_1", what, err, jrest.RestErrorResourceBusy)
+		}
+		for _, line := range app.seen() {
+			if line == "DELETE "+nasA {
+				t.Errorf("NFS, %s: the volume got a delete while it has a snapshot", what)
+			}
+		}
+
+		// iSCSI: the volume is still there, with its CSI snapshot
+		app = newFakeAppliance(t)
+		app.on("DELETE", volA, hasChildren)
+		app.on("GET", volASnaps, pages(both(jrest.SnapshotParentVolume)))
+		app.on("GET", volASnaps+"/vp_clone/clones", replies[0])
+		app.on("DELETE", volASnaps+"/vp_clone", replies[1])
+		err = app.iscsi().DeleteVolume(app.ctx, "Pool-0", volumeA(t))
+		if err == nil || err.GetCode() != jrest.RestErrorResourceBusy || !strings.Contains(err.Error(), "sp_1") {
+			t.Errorf("iSCSI, %s: error %v, want one of the code %d that names sp_1", what, err, jrest.RestErrorResourceBusy)
+		}
+	}
+
+	// the snapshot that went away was the only one: the volume is deleted
+	app := newFakeAppliance(t)
+	app.on("GET", nasASnaps, pages(func() []object {
+		return []object{snapshotObject("vp_a", "vp_clone", jrest.SnapshotParentNASVolume)}
+	}))
+	app.on("GET", nasASnaps+"/vp_clone/clones", snapshotGone)
+	app.on("DELETE", nasA, noContent)
+	if err := app.nfs().DeleteVolume(app.ctx, "Pool-0", volumeA(t)); err != nil {
+		t.Errorf("NFS, the only snapshot gone meanwhile: %s", err.Error())
+	}
+	want := []string{"GET " + nasASnaps + firstPage, "GET " + nasASnaps + "/vp_clone/clones", "DELETE " + nasA}
+	if got := app.seen(); !reflect.DeepEqual(got, want) {
+		t.Errorf("NFS, the only snapshot gone meanwhile: the requests %q, want %q", got, want)
+	}
+}
