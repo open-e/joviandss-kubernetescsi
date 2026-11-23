@@ -1,0 +1,1 @@
+{"data":null,"error":{"errno":1,"message":"Path /Pools/Pool-1/hurltest-20261103-211531-v4-nodataset doesn't point to NAS volume.","url":"http://127.0.0.1:81/api/v4/shares"}}

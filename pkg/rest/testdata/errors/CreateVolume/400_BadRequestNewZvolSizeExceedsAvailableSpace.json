@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"werkzeug.exceptions.BadRequest","message":"New zvol size(317396923392) exceeds available space on pool Pool-3(301675277424).","url":"http://127.0.0.1:81/api/v4/pools/Pool-3/volumes"}}

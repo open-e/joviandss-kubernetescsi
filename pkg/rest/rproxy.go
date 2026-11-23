@@ -38,6 +38,12 @@ import (
 
 const sessionTimeout = 30 * time.Second
 
+// The settings a configuration may leave out.
+const (
+	defaultTries      = 3 // the first request and two more
+	defaultRetryDelay = time.Second
+)
+
 // RestProxy - request client for any REST API
 type RestProxy struct {
 	addrs         []string
@@ -49,7 +55,8 @@ type RestProxy struct {
 	prot          string
 	user          string
 	pass          string
-	tries         int
+	tries         int           // how many times a GET answered 204 is sent in all
+	retryDelay    time.Duration // the pause before it is sent again
 
 	mu        sync.Mutex
 	requestID int64
@@ -83,7 +90,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	} else {
 		jdata, err := json.Marshal(data)
 		if err != nil {
-			return 0, nil, &restError{RestErrorRequestMalfunction, err.Error()}
+			return 0, nil, GetError(RestErrorRequestMalfunction, err.Error())
 		}
 		reader = strings.NewReader(string(jdata))
 	}
@@ -92,7 +99,7 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	req.SetBasicAuth(rp.user, rp.pass)
 	if err != nil {
 		// rp.l.Warnf("Unable to create req: %s", err)
-		return 0, nil, &restError{RestErrorRequestMalfunction, err.Error()}
+		return 0, nil, GetError(RestErrorRequestMalfunction, err.Error())
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Kubernetes CSI Plugin")
@@ -102,26 +109,26 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 			if opErr, ok := urlErr.Err.(*net.OpError); ok {
 				if dnsErr, ok := opErr.Err.(*net.DNSError); ok {
 					l.Errorln("DNS error:", dnsErr)
-					return res.StatusCode, nil, &restError{RestErrorUnableToConnect, dnsErr.Error()}
+					return res.StatusCode, nil, GetError(RestErrorUnableToConnect, dnsErr.Error())
 				} else if opErr.Op == "dial" {
 					l.Errorln("Connection error:", opErr)
-					return res.StatusCode, nil, &restError{RestErrorUnableToConnect, opErr.Error()}
+					return res.StatusCode, nil, GetError(RestErrorUnableToConnect, opErr.Error())
 				} else if netErr, ok := err.(net.Error); ok {
 					if netErr.Timeout() {
 						l.Errorln("Network error (timeout):", netErr.Error())
-						return res.StatusCode, nil, &restError{RestErrorRequestTimeout, opErr.Error()}
+						return res.StatusCode, nil, GetError(RestErrorRequestTimeout, opErr.Error())
 					} else {
 						l.Errorln("Network error:", netErr)
-						return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, opErr.Error()}
+						return res.StatusCode, nil, GetError(RestErrorRequestMalfunction, opErr.Error())
 					}
 				}
 			} else {
 				fmt.Println("Network error:", opErr)
-				return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, urlErr.Error()}
+				return res.StatusCode, nil, GetError(RestErrorRequestMalfunction, urlErr.Error())
 			}
 		} else {
 			fmt.Println("Unknown error:", err.Error())
-			return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, err.Error()}
+			return res.StatusCode, nil, GetError(RestErrorRequestMalfunction, err.Error())
 		}
 	}
 
@@ -135,9 +142,33 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		l.Errorf("reading response failed: %s", err.Error())
-		return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, "Unable to process response"}
+		return res.StatusCode, nil, GetError(RestErrorRequestMalfunction, "Unable to process response")
 	}
 	return res.StatusCode, bodyBytes, nil
+}
+
+// getWithData sends a GET of the plugin. A reply of 204 carries no data,
+// so the same GET is sent again after retrydelay, tries times in all. A
+// 204 is never turned into an empty object or an empty list: a caller
+// would read those as a volume of size 0, a full pool or a snapshot
+// without clones. Only a GET is sent again: a DELETE answered 204 has
+// succeeded.
+func (rp *RestProxy) getWithData(ctx context.Context, path string) (int, []byte, RestError) {
+	for sent := 1; ; sent++ {
+		status, body, err := rp.Send(ctx, "GET", path, nil, CodeOK)
+		if err != nil || status != CodeNoContent {
+			if err == nil && status == CodeOK && sent > 1 {
+				// no recording shows a 204 on a GET: one made good leaves a trace
+				jcom.LFC(ctx).Warnf("GET %s: status %d after %d replies of 204", path, status, sent-1)
+			}
+			return status, body, err
+		}
+		if sent >= rp.tries {
+			return status, nil, GetError(RestErrorRPM,
+				fmt.Sprintf("GET %s: status 204, no data, to all %d requests", path, sent))
+		}
+		time.Sleep(rp.retryDelay)
+	}
 }
 
 // TODO: implement sessions
@@ -215,8 +246,11 @@ func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) (
 		Timeout:   timeoutDuration,
 	}
 
-	if cfg.Tries == 0 {
-		cfg.Tries = 3
+	retryDelay := defaultRetryDelay
+	if cfg.RetryDelay != "" {
+		if retryDelay, err = time.ParseDuration(cfg.RetryDelay); err != nil {
+			return fmt.Errorf("retrydelay: %w", err)
+		}
 	}
 	//*rp = RestProxy{
 	//	active_addr:	0,
@@ -237,6 +271,10 @@ func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) (
 	rp.user = cfg.User
 	rp.pass = cfg.Pass
 	rp.tries = cfg.Tries
+	if rp.tries <= 0 {
+		rp.tries = defaultTries
+	}
+	rp.retryDelay = retryDelay
 
 	return nil
 }

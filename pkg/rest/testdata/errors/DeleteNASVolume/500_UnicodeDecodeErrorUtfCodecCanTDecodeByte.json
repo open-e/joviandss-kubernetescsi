@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"builtins.UnicodeDecodeError","message":"'utf-8' codec can't decode byte 0xf0 in position 78: invalid continuation byte","url":"http://127.0.0.1:81/api/v4/pools/Pool-3/nas-volumes/hurltest-20261107-010938-v4-zda\ud83d\ude00b"}}

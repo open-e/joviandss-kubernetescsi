@@ -20,6 +20,7 @@ package driver
 import (
 	//"fmt"
 	//"strings"
+	"context"
 	"encoding/base64"
 	"fmt"
 
@@ -31,13 +32,13 @@ func RestVolumeEntryBasedID(entry jrest.ResourceVolume) string {
 	return basedid
 }
 
-func RestSnapshotEntryBasedID(entry jrest.ResourceSnapshot) string {
+func RestSnapshotEntryBasedID(entry jrest.ResourceSnapshotShort) string {
 	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
 	return basedid
 }
 
 func RestSnapshotShortEntryBasedID(entry jrest.ResourceSnapshotShort) string {
-	basedid := fmt.Sprintf("%s_%s", base64.StdEncoding.EncodeToString([]byte(entry.Volume)), base64.StdEncoding.EncodeToString([]byte(entry.Volume)))
+	basedid := fmt.Sprintf("%s_%s", base64.StdEncoding.EncodeToString([]byte(entry.Parent.Name)), base64.StdEncoding.EncodeToString([]byte(entry.Parent.Name)))
 	return basedid
 }
 
@@ -46,7 +47,7 @@ func RestNASVolumeEntryBasedID(entry jrest.ResourceNASVolume) string {
 	return basedid
 }
 
-func RestNASVolumeSnapshotEntryBasedID(entry jrest.ResourceNASVolumeSnapshot) string {
+func RestNASVolumeSnapshotEntryBasedID(entry jrest.ResourceNASSnapshotShort) string {
 	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
 	return basedid
 }
@@ -54,4 +55,39 @@ func RestNASVolumeSnapshotEntryBasedID(entry jrest.ResourceNASVolumeSnapshot) st
 func RestNASSnapshotShortEntryBasedID(entry jrest.ResourceNASSnapshotShort) string {
 	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
 	return basedid
+}
+
+// keptSnapshot is a snapshot that the cleanup of intermediate snapshots left
+// on a volume, with the clones that were read for it.
+type keptSnapshot struct {
+	Name   string
+	Clones []string
+}
+
+// deleteSnapshotWithoutClones deletes a snapshot only after the appliance
+// has answered that it has no clones, since the appliance deletes a NAS
+// snapshot that has a clone, and the clone with it. When the clones cannot
+// be read, nothing is deleted and the error is returned.
+func deleteSnapshotWithoutClones(ctx context.Context,
+	clonesOf func(context.Context) ([]jrest.ResourceVolumeSnapshotClones, jrest.RestError),
+	deleteSnapshot func(context.Context) jrest.RestError,
+) (deleted bool, clones []jrest.ResourceVolumeSnapshotClones, err jrest.RestError) {
+	if clones, err = clonesOf(ctx); err != nil {
+		return false, nil, err
+	}
+	if len(clones) > 0 {
+		return false, clones, nil
+	}
+	if err = deleteSnapshot(ctx); err != nil {
+		return false, nil, err
+	}
+	return true, nil, nil
+}
+
+// clonesNames returns the names of the clones of a clones reply.
+func clonesNames(clones []jrest.ResourceVolumeSnapshotClones) (names []string) {
+	for _, c := range clones {
+		names = append(names, c.Name)
+	}
+	return names
 }

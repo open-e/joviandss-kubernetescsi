@@ -49,11 +49,11 @@ func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSna
 
 		lsr.Entries = entries
 		for _, s := range snaps {
-			ts := timestamppb.New(s.Properties.Creation)
+			ts := timestamppb.New(s.Properties.GetCreation())
 
-			vd, err := jdrvr.NewVolumeDescFromVDS(s.Volume)
+			vd, err := jdrvr.NewVolumeDescFromVDS(s.Parent.Name)
 			if err != nil {
-				l.Warnf("Volume name has incompatible format %s", s.Volume)
+				l.Warnf("Volume name has incompatible format %s", s.Parent.Name)
 				continue
 			}
 			sd, err := jdrvr.NewSnapshotDescFromSDS(vd, s.Name)
@@ -79,7 +79,7 @@ func completeListResponseFromSnapshotShort(ctx context.Context, lsr *csi.ListSna
 
 		lsr.Entries = entries
 		for _, s := range snaps {
-			ts := timestamppb.New(s.Properties.Creation)
+			ts := timestamppb.New(s.Properties.GetCreation())
 
 			vd, err := jdrvr.NewVolumeDescFromVDS(s.Parent.Name)
 			if err != nil {
@@ -117,11 +117,11 @@ func completeListResponseFromVolumeSnapshots(ctx context.Context, lsr *csi.ListS
 	i := 0
 
 	switch snaps := gsnaps.(type) {
-	case []jrest.ResourceSnapshot:
+	case []jrest.ResourceSnapshotShort:
 		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
 		lsr.Entries = entries
 		for _, s := range snaps {
-			ts := timestamppb.New(s.Creation)
+			ts := timestamppb.New(s.Properties.GetCreation())
 
 			sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
 			if err != nil {
@@ -140,12 +140,12 @@ func completeListResponseFromVolumeSnapshots(ctx context.Context, lsr *csi.ListS
 			i += 1
 		}
 		lsr.Entries = entries[:i]
-	case []jrest.ResourceNASVolumeSnapshot:
+	case []jrest.ResourceNASSnapshotShort:
 		entries := make([]*csi.ListSnapshotsResponse_Entry, len(snaps))
 		lsr.Entries = entries
 
 		for _, s := range snaps {
-			ts := timestamppb.New(s.Creation)
+			ts := timestamppb.New(s.Properties.GetCreation())
 
 			sd, err := jdrvr.NewSnapshotDescFromSDS(ld, s.Name)
 			if err != nil {

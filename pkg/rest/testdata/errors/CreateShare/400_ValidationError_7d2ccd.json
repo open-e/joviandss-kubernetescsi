@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.exceptions.ValidationError","message":"Invalid smb IP restriction type: AlLoW","url":"http://127.0.0.1:81/api/v4/shares"}}

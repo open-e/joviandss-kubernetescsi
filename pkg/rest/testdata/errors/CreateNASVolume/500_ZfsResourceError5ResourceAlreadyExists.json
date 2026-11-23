@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"zfslib.zfsapi.resources.ZfsResourceError","errno":5,"message":"Resource Pool-1/hurltest-20261103-211531-v4-nv already exists.","url":"http://127.0.0.1:81/api/v4/pools/Pool-1/nas-volumes"}}

@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.exceptions.ValidationError","message":"Virtual IP with name hurltest-20261104-141126-v4-novip not exists in pool Pool-1","url":"http://127.0.0.1:81/api/v4/pools/Pool-1/san/iscsi/targets"}}

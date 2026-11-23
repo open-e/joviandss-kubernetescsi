@@ -18,7 +18,8 @@ under the License.
 package rest
 
 import (
-	"fmt"
+	"encoding/json"
+	"strconv"
 )
 
 // Operation completedGetPoolsRCode success response code
@@ -30,35 +31,64 @@ const CodeNoContent = 204
 ///////////////////////////////////////////////////////////////////////////////
 /// Error message
 
-// ErrorT error message returned by server
+// errnoField is the errno of an error body: a number, null, or no key at
+// all. Go's decoder reads a missing key as it reads null, so the field is
+// decoded from its raw JSON, and present says whether the key came.
+type errnoField struct {
+	present bool
+	null    bool
+	value   int
+}
+
+// UnmarshalJSON runs only for a key that is in the body, null included.
+func (e *errnoField) UnmarshalJSON(raw []byte) error {
+	*e = errnoField{present: true}
+	if string(raw) == "null" {
+		e.null = true
+		return nil
+	}
+	return json.Unmarshal(raw, &e.value)
+}
+
+func (e errnoField) String() string {
+	switch {
+	case !e.present:
+		return "missing"
+	case e.null:
+		return "null"
+	default:
+		return strconv.Itoa(e.value)
+	}
+}
+
+// The three cases, as a catalogue entry writes them.
+var (
+	errnoMissing = errnoField{}
+	errnoNull    = errnoField{present: true, null: true}
+)
+
+func errnoIs(n int) errnoField { return errnoField{present: true, value: n} }
+
+// ErrorT is the error object of a failed reply.
 type ErrorT struct {
-	Class   *string `json:"class,omitempty"`
-	Errno   *int    `json:"errno,omitempty"`
-	Message *string `json:"message,omitempty"`
-	Url     *string `json:"url,omitempty"`
+	Class   *string    `json:"class"`
+	Errno   errnoField `json:"errno"`
+	Message *string    `json:"message"`
+	Url     *string    `json:"url"`
 }
 
-func (err *ErrorT) String() string {
-	var ret string = "Rest Error: "
-	if err.Errno != nil {
-		ret += fmt.Sprintf("Errno: %d, ", *err.Errno)
+func (e *ErrorT) class() string {
+	if e.Class == nil {
+		return ""
 	}
-	if err.Class != nil {
-		ret += fmt.Sprintf("Class: %s, ", *err.Class)
-	}
-	if err.Message != nil {
-		ret += fmt.Sprintf("Message: %s, ", *err.Message)
-	}
-	if err.Url != nil {
-		ret += fmt.Sprintf("Url: %s, ", *err.Url)
-	}
-	return ret
+	return *e.Class
 }
 
-// ErrorData response mask
-type ErrorData struct {
-	Data  interface{}
-	Error ErrorT
+func (e *ErrorT) message() string {
+	if e.Message == nil {
+		return ""
+	}
+	return *e.Message
 }
 
 ///////////////////////////////////////////////////////////////////////////////

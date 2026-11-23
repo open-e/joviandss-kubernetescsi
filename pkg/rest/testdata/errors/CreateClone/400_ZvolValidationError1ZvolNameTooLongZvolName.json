@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.storage.zfs.exceptions.ZvolValidationError","errno":1,"message":"Zvol name too long. Zvol name cannot exceed 132 characters.","url":"http://127.0.0.1:81/api/v4/pools/Pool-3/volumes/hurltest-20261107-010938-v4-zpv/clone"}}

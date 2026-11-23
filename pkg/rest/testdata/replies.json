@@ -1,0 +1,352 @@
+[
+ {
+  "call": "GetPool",
+  "type": "ResourcePool",
+  "shape": "object",
+  "file": "replies/GetPool/01.json",
+  "recorded": "20261105-221223 auth/basic.hurl: valid",
+  "shows": [
+   "available:set"
+  ],
+  "note": "trimmed to one disk of each vdev; the identifiers of the pool and of the disks are replaced by zeros"
+ },
+ {
+  "call": "GetVolume",
+  "type": "ResourceVolume",
+  "shape": "object",
+  "file": "replies/GetVolume/01.json",
+  "recorded": "20261107-010938 crude/volume-clone-strings.hurl: length-0001-read",
+  "shows": [
+   "default_scsi_id:set",
+   "guid:set",
+   "is_clone:true",
+   "name:set",
+   "origin:set",
+   "volsize:set"
+  ]
+ },
+ {
+  "call": "GetVolume",
+  "type": "ResourceVolume",
+  "shape": "object",
+  "file": "replies/GetVolume/02.json",
+  "recorded": "20261107-010938 crude/volume-strings.hurl: length-0001-read",
+  "shows": [
+   "is_clone:false",
+   "origin:null"
+  ]
+ },
+ {
+  "call": "GetVolumesEntries",
+  "type": "ResourceVolume",
+  "shape": "entries",
+  "file": "replies/GetVolumesEntries/01.json",
+  "recorded": "20261105-144233 crude/volume-visibility.hurl: r2-clone-as-clone-create-read-list-volumes",
+  "shows": [
+   "default_scsi_id:set",
+   "entries:some",
+   "guid:set",
+   "is_clone:false",
+   "is_clone:true",
+   "name:set",
+   "origin:null",
+   "origin:set",
+   "volsize:set"
+  ]
+ },
+ {
+  "call": "GetVolumesEntries",
+  "type": "ResourceVolume",
+  "shape": "entries",
+  "file": "replies/GetVolumesEntries/02.json",
+  "recorded": "20261104-200231 list/volume-kinds.hurl: emptied-list-volumes",
+  "shows": [
+   "entries:none"
+  ]
+ },
+ {
+  "call": "GetVolumeSnapshot",
+  "type": "ResourceSnapshot",
+  "shape": "object",
+  "file": "replies/GetVolumeSnapshot/01.json",
+  "recorded": "20261104-224548 crude/volume-snapshot-delete-flags.hurl: noclone-badtype-after-read-snapshot",
+  "shows": [
+   "clones:missing",
+   "creation:set",
+   "volsize:set"
+  ]
+ },
+ {
+  "call": "GetVolumeSnapshot",
+  "type": "ResourceSnapshot",
+  "shape": "object",
+  "file": "replies/GetVolumeSnapshot/02.json",
+  "recorded": "20261107-010938 list/volume-kinds.hurl: mixed-read-zvol-snapshot-on-clone",
+  "shows": [
+   "clones:set"
+  ]
+ },
+ {
+  "call": "GetSnapshotsEntries",
+  "type": "ResourceSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetSnapshotsEntries/01.json",
+  "recorded": "20261104-224548 crude/volume-snapshot.hurl: list-all-snapshots",
+  "shows": [
+   "entries:some",
+   "name:set",
+   "parent.name:set",
+   "parent.type:1",
+   "parent.type:4",
+   "properties.creation:set",
+   "properties.guid:set"
+  ]
+ },
+ {
+  "call": "GetSnapshotsEntries",
+  "type": "ResourceSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetSnapshotsEntries/02.json",
+  "recorded": "20261103-194136 v4/read/listing.hurl: None",
+  "shows": [
+   "entries:none"
+  ]
+ },
+ {
+  "call": "GetVolumeSnapshotsEntries",
+  "type": "ResourceSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetVolumeSnapshotsEntries/01.json",
+  "recorded": "20261107-010938 crude/volume-snapshot.hurl: list-snapshots-until-visible",
+  "shows": [
+   "entries:some",
+   "name:set",
+   "parent.name:set",
+   "parent.type:4",
+   "properties.creation:set",
+   "properties.guid:set"
+  ]
+ },
+ {
+  "call": "GetVolumeSnapshotsEntries",
+  "type": "ResourceSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetVolumeSnapshotsEntries/02.json",
+  "recorded": "20261104-200231 list/volume-kinds.hurl: mixed-list-zvol-snapshots-none",
+  "shows": [
+   "entries:none"
+  ]
+ },
+ {
+  "call": "GetVolumeSnapshotsEntries",
+  "type": "ResourceSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetVolumeSnapshotsEntries/03.json",
+  "recorded": "20261107-010938 crude/resource-list-missing-parent.hurl: r1-wrong-kind-dataset-as-zvol-page-dc",
+  "shows": [
+   "parent.type:1"
+  ]
+ },
+ {
+  "call": "GetVolumeSnapshotClones",
+  "type": "ResourceVolumeSnapshotClones",
+  "shape": "items",
+  "file": "replies/GetVolumeSnapshotClones/01.json",
+  "recorded": "20261105-144233 crude/volume-visibility.hurl: r1-clone-as-clone-create-read-list-clones",
+  "shows": [
+   "items:some",
+   "name:set"
+  ]
+ },
+ {
+  "call": "GetVolumeSnapshotClones",
+  "type": "ResourceVolumeSnapshotClones",
+  "shape": "items",
+  "file": "replies/GetVolumeSnapshotClones/02.json",
+  "recorded": "20261104-200231 list/volume-kinds.hurl: mixed-list-zvol-clones-of-snapshot-no-clones",
+  "shows": [
+   "items:none"
+  ]
+ },
+ {
+  "call": "GetTarget",
+  "type": "ResourceTarget",
+  "shape": "object",
+  "file": "replies/GetTarget/01.json",
+  "recorded": "20261107-010938 crude/iscsi-target-strings.hurl: length-0001-read",
+  "shows": [
+   "active:true"
+  ]
+ },
+ {
+  "call": "GetNASVolume",
+  "type": "ResourceNASVolume",
+  "shape": "object",
+  "file": "replies/GetNASVolume/01.json",
+  "recorded": "20261107-010938 crude/nas-volume-strings.hurl: length-0001-read",
+  "shows": [
+   "name:set",
+   "origin:null",
+   "quota:null"
+  ]
+ },
+ {
+  "call": "GetNASVolume",
+  "type": "ResourceNASVolume",
+  "shape": "object",
+  "file": "replies/GetNASVolume/02.json",
+  "recorded": "20261107-010938 crude/nas-volume-enum-values.hurl: post-quota-text-1M-read",
+  "shows": [
+   "quota:set"
+  ]
+ },
+ {
+  "call": "GetNASVolume",
+  "type": "ResourceNASVolume",
+  "shape": "object",
+  "file": "replies/GetNASVolume/03.json",
+  "recorded": "20261107-010938 crude/nas-clone-strings.hurl: length-0001-read",
+  "shows": [
+   "origin:set"
+  ]
+ },
+ {
+  "call": "GetNASVolumesEntries",
+  "type": "ResourceNASVolume",
+  "shape": "entries",
+  "file": "replies/GetNASVolumesEntries/01.json",
+  "recorded": "20261104-211002 crude/nas-volume.hurl: list",
+  "shows": [
+   "entries:some",
+   "name:set",
+   "origin:null",
+   "origin:set",
+   "quota:null",
+   "quota:set"
+  ]
+ },
+ {
+  "call": "GetNASVolumesEntries",
+  "type": "ResourceNASVolume",
+  "shape": "entries",
+  "file": "replies/GetNASVolumesEntries/02.json",
+  "recorded": "20261103-194136 v4/read/listing.hurl: None",
+  "shows": [
+   "entries:none"
+  ]
+ },
+ {
+  "call": "GetNASVolumeSnapshot",
+  "type": "ResourceNASVolumeSnapshot",
+  "shape": "object",
+  "file": "replies/GetNASVolumeSnapshot/01.json",
+  "recorded": "20261107-010938 crude/nas-snapshot-strings.hurl: start-upper-read",
+  "shows": [
+   "clones:missing",
+   "creation:set",
+   "name:set"
+  ]
+ },
+ {
+  "call": "GetNASVolumeSnapshot",
+  "type": "ResourceNASVolumeSnapshot",
+  "shape": "object",
+  "file": "replies/GetNASVolumeSnapshot/02.json",
+  "recorded": "20261103-205325 v4/crude/nas-clone-delete-origin.hurl: None",
+  "shows": [
+   "clones:set"
+  ]
+ },
+ {
+  "call": "GetNASSnapshotsEntries",
+  "type": "ResourceNASSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetNASSnapshotsEntries/01.json",
+  "recorded": "20261107-010938 crude/request-empty-body.hurl: r2-get-all-nas-snapshots-empty",
+  "shows": [
+   "entries:some",
+   "name:set",
+   "parent.name:set",
+   "parent.type:1",
+   "parent.type:4",
+   "properties.creation:set",
+   "properties.guid:set"
+  ]
+ },
+ {
+  "call": "GetNASSnapshotsEntries",
+  "type": "ResourceNASSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetNASSnapshotsEntries/02.json",
+  "recorded": "20261103-194136 v4/read/listing.hurl: None",
+  "shows": [
+   "entries:none"
+  ]
+ },
+ {
+  "call": "GetNASVolumeSnapshotsEntries",
+  "type": "ResourceNASSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetNASVolumeSnapshotsEntries/01.json",
+  "recorded": "20261104-224548 crude/nas-snapshot.hurl: list-nas-volume-snapshots",
+  "shows": [
+   "entries:some",
+   "name:set",
+   "parent.name:set",
+   "parent.type:1",
+   "properties.creation:set",
+   "properties.guid:set"
+  ]
+ },
+ {
+  "call": "GetNASVolumeSnapshotsEntries",
+  "type": "ResourceNASSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetNASVolumeSnapshotsEntries/02.json",
+  "recorded": "20261103-200052 v4/crude/nas-snapshot.hurl: None",
+  "shows": [
+   "entries:none"
+  ]
+ },
+ {
+  "call": "GetNASVolumeSnapshotsEntries",
+  "type": "ResourceNASSnapshotShort",
+  "shape": "entries",
+  "file": "replies/GetNASVolumeSnapshotsEntries/03.json",
+  "recorded": "20261107-010938 crude/resource-list-missing-parent.hurl: r1-wrong-kind-zvol-as-dataset-page-dc",
+  "shows": [
+   "parent.type:4"
+  ]
+ },
+ {
+  "call": "GetNASVolumeSnapshotClones",
+  "type": "ResourceVolumeSnapshotClones",
+  "shape": "items",
+  "file": "replies/GetNASVolumeSnapshotClones/01.json",
+  "recorded": "20261103-194136 v4/crude/nas-clone.hurl: None",
+  "shows": [
+   "items:some",
+   "name:set"
+  ]
+ },
+ {
+  "call": "GetNASVolumeSnapshotClones",
+  "type": "ResourceVolumeSnapshotClones",
+  "shape": "items",
+  "file": "replies/GetNASVolumeSnapshotClones/02.json",
+  "recorded": "20261104-200231 list/volume-kinds.hurl: mixed-list-nas-clones-of-snapshot-no-clone",
+  "shows": [
+   "items:none"
+  ]
+ },
+ {
+  "call": "GetShare",
+  "type": "ResourceShare",
+  "shape": "object",
+  "file": "replies/GetShare/01.json",
+  "recorded": "20261107-010938 crude/share-strings.hurl: length-0001-read",
+  "shows": [
+   "path:set"
+  ]
+ }
+]

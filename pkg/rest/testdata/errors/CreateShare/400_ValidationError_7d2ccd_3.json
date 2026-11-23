@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"opene.exceptions.ValidationError","message":"List with IP addresses for smb restrictions cannot be empty when restrictions are enabled.","url":"http://127.0.0.1:81/api/v4/shares"}}

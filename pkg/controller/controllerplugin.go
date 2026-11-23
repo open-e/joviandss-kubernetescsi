@@ -1017,7 +1017,7 @@ func (cp *ControllerPlugin) GetCapacity(ctx context.Context, req *csi.GetCapacit
 	}
 	var rsp csi.GetCapacityResponse
 
-	rsp.AvailableCapacity = pool.Available
+	rsp.AvailableCapacity = pool.GetAvailable()
 	rsp.MinimumVolumeSize = wrapperspb.Int64(minSupportedVolumeSize)
 	return &rsp, nil
 }

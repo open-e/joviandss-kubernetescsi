@@ -1,0 +1,1 @@
+{"data": {"name": "z", "active": true, "conflicted": false, "incoming_users_active": false, "outgoing_user": null, "allow_ip": [], "deny_ip": [], "vip_allowed_portals": {"enabled": false, "assigned_vips": []}, "encryption_locked": false, "active_flag": true}, "error": null}

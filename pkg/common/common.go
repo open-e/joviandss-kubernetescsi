@@ -54,7 +54,12 @@ type RestEndpointCfg struct {
 	User        string   `json:"user,omitempty"`
 	Pass        string   `json:"pass,omitempty"`
 	IdleTimeOut string   `json:"idletimeout,omitempty"`
-	Tries       int      `json:"tries,omitempty"`
+	// Tries is how many times a GET answered 204, without data, is sent in
+	// all: 3 when it is not set, 1 for no second request.
+	Tries int `json:"tries,omitempty"`
+	// RetryDelay is the pause before such a GET is sent again, a duration
+	// written like idletimeout: 1s when it is not set.
+	RetryDelay string `json:"retrydelay,omitempty"`
 }
 
 type ISCSIEndpointCfg struct {

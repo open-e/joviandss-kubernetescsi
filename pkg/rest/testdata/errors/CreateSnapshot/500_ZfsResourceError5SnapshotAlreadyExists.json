@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"zfslib.zfsapi.resources.ZfsResourceError","errno":5,"message":"Snapshot Pool-3/hurltest-20261107-010938-v4-ntzv@hurltest-20261107-010938-v4-ntzs already exists.","url":"http://127.0.0.1:81/api/v4/pools/Pool-3/volumes/hurltest-20261107-010938-v4-ntzv/snapshots"}}

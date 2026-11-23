@@ -1,0 +1,1 @@
+{"data":null,"error":{"errno":4,"message":"Value   contains invalid characters. Only a-z, A-Z, 0-9 . : $ _ and - are allowed.","url":"http://127.0.0.1:81/api/v4/shares"}}

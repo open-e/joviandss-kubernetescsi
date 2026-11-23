@@ -1,0 +1,1 @@
+{"data":null,"error":{"class":"werkzeug.exceptions.BadRequest","message":"Allowed values for dedup are: off, on, verify, sha256, sha256,verify","url":"http://127.0.0.1:81/api/v4/pools/Pool-3/volumes"}}

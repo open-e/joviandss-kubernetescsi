@@ -20,13 +20,6 @@ package rest
 import (
 	"context"
 	"fmt"
-	// "strings"
-	// "regexp"
-	// "runtime/debug"
-
-	log "github.com/sirupsen/logrus"
-
-	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
 // ListPerPage is the page size sent with every list request. Without
@@ -53,242 +46,37 @@ func pagedcSuffix(addr string, page *int64, dc *int64) (out string) {
 	return addr
 }
 
-func (s *RestEndpoint) GetVolumeSnapshotsEntries(ctx context.Context, pool string, vname string, page int64, dc int64) (ent ResultEntries, err RestError) {
-	return ent, nil
+// GetVolumeSnapshotsEntries returns one page of the snapshots of one volume.
+// On API v4 the entries are short entries, as in the list of all snapshots.
+func (s *RestEndpoint) GetVolumeSnapshotsEntries(ctx context.Context, pool string, vname string, page int64, dc int64) (ent *ResultEntries, err RestError) {
+	path := pagedcSuffix(fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s/snapshots", pool, vname), &page, &dc)
+	return readEntries[ResourceSnapshotShort](ctx, s, path, getVolumeSnapshotsEntriesErrors)
 }
 
 func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes", pool)
-
-	l := jcom.LFC(ctx)
-
-	l = l.WithFields(log.Fields{
-		"func":    "GetVolumeEntries",
-		"addr":    addr,
-		"section": "rest",
-	})
-
-	addr = pagedcSuffix(addr, &page, &dc)
-
-	l.Debugln("Sending")
-	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, CodeOK)
-	if err != nil {
-		s.l.Warnf("Unable to get snapshot list for pool %s", pool)
-		return nil, err
-	}
-
-	var vols []ResourceVolume
-	entries := ResultEntries{Entries: &vols}
-	rsp := GeneralResponse{Data: &entries}
-
-	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return nil, errU
-	}
-
-	switch stat {
-	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-
-			if ok {
-				return data, nil
-			}
-			return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
-		}
-	default:
-		if rsp.Error != nil {
-			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
-		}
-	}
-	return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+	path := pagedcSuffix(fmt.Sprintf(apiPrefix+"/pools/%s/volumes", pool), &page, &dc)
+	return readEntries[ResourceVolume](ctx, s, path, getVolumesEntriesErrors)
 }
 
 func (s *RestEndpoint) GetSnapshotsEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/snapshots", pool)
-
-	l := jcom.LFC(ctx)
-
-	l = l.WithFields(log.Fields{
-		"func":    "GetSnapshotsEntries",
-		"addr":    addr,
-		"section": "rest",
-	})
-
-	addr = pagedcSuffix(addr, &page, &dc)
-
-	l.Debugln("Sending")
-	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, GetAllSnapshotsRCode)
-	if err != nil {
-		s.l.Warnf("Unable to get snapshot list for pool %s", pool)
-		return nil, err
-	}
-
-	var snaps []ResourceSnapshotShort
-	entries := ResultEntries{Entries: &snaps}
-	rsp := GeneralResponse{Data: &entries}
-	//var rsp GeneralResponse
-	//{Data: &entries}
-
-	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return nil, errU
-	}
-
-	switch stat {
-	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-
-			if ok {
-				return data, nil
-			}
-			return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
-		}
-	default:
-		if rsp.Error != nil {
-			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
-		}
-	}
-	return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+	path := pagedcSuffix(fmt.Sprintf(apiPrefix+"/pools/%s/volumes/snapshots", pool), &page, &dc)
+	return readEntries[ResourceSnapshotShort](ctx, s, path, getSnapshotsEntriesErrors)
 }
 
 func (s *RestEndpoint) GetNASVolumesEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes", pool)
-
-	l := jcom.LFC(ctx)
-
-	l = l.WithFields(log.Fields{
-		"func":    "GetNASVolumesEntries",
-		"addr":    addr,
-		"section": "rest",
-	})
-
-	addr = pagedcSuffix(addr, &page, &dc)
-
-	l.Debugln("Sending")
-	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, CodeOK)
-	if err != nil {
-		s.l.Warnf("Unable to get list of shares")
-		return nil, err
-	}
-
-	var snaps []ResourceNASVolume
-	entries := ResultEntries{Entries: &snaps}
-	rsp := GeneralResponse{Data: &entries}
-
-	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return nil, errU
-	}
-
-	switch stat {
-	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-			if ok {
-				return data, nil
-			} else {
-				return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
-			}
-		}
-	default:
-		if rsp.Error != nil {
-			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
-		}
-	}
-	return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+	path := pagedcSuffix(fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes", pool), &page, &dc)
+	return readEntries[ResourceNASVolume](ctx, s, path, getNASVolumesEntriesErrors)
 }
 
+// GetNASVolumeSnapshotsEntries returns one page of the snapshots of one NAS
+// volume. On API v4 the entries are short entries, as in the list of all NAS
+// snapshots.
 func (s *RestEndpoint) GetNASVolumeSnapshotsEntries(ctx context.Context, pool string, nvds string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s", pool, nvds)
-
-	l := jcom.LFC(ctx)
-
-	l = l.WithFields(log.Fields{
-		"func":    "GetNASVolumeSnapshotsEntries",
-		"addr":    addr,
-		"section": "rest",
-	})
-
-	addr = pagedcSuffix(addr, &page, &dc)
-
-	l.Debugln("Sending")
-	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, CodeOK)
-	if err != nil {
-		s.l.Warnf("Unable to get list of shares")
-		return nil, err
-	}
-
-	var snaps []ResourceNASVolumeSnapshot
-	entries := ResultEntries{Entries: &snaps}
-	rsp := GeneralResponse{Data: &entries}
-
-	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return nil, errU
-	}
-
-	switch stat {
-	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-			if ok {
-				return data, nil
-			} else {
-				return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
-			}
-		}
-	default:
-		if rsp.Error != nil {
-			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
-		}
-	}
-	return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+	path := pagedcSuffix(fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots", pool, nvds), &page, &dc)
+	return readEntries[ResourceNASSnapshotShort](ctx, s, path, getNASVolumeSnapshotsEntriesErrors)
 }
 
 func (s *RestEndpoint) GetNASSnapshotsEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/snapshots", pool)
-
-	l := jcom.LFC(ctx)
-
-	l = l.WithFields(log.Fields{
-		"func":    "GetNASSnapshotsEntries",
-		"addr":    addr,
-		"section": "rest",
-	})
-
-	ctx = jcom.WithLogger(ctx, l)
-
-	addr = pagedcSuffix(addr, &page, &dc)
-
-	l.Debugln("Sending")
-	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, CodeOK)
-	if err != nil {
-		s.l.Warnf("Unable to get NAS snapshot list for pool %s", pool)
-		return nil, err
-	}
-
-	var snaps []ResourceNASSnapshotShort
-	entries := ResultEntries{Entries: &snaps}
-	rsp := GeneralResponse{Data: &entries}
-	//var rsp GeneralResponse
-	//{Data: &entries}
-
-	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return nil, errU
-	}
-
-	switch stat {
-	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-
-			if ok {
-				return data, nil
-			}
-			return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
-		}
-	default:
-		if rsp.Error != nil {
-			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
-		}
-	}
-	return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
+	path := pagedcSuffix(fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/snapshots", pool), &page, &dc)
+	return readEntries[ResourceNASSnapshotShort](ctx, s, path, getNASSnapshotsEntriesErrors)
 }
