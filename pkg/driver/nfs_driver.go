@@ -615,9 +615,19 @@ func (d *CSINFSDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDe
 		// delclone := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
 
 		for _, snapclone := range dsnaps {
-			if rErr := d.re.DeleteNASClone(ctx, pool, ld.VDS(), sd.SDS(), snapclone); rErr != nil {
+			rErr := d.re.DeleteNASClone(ctx, pool, ld.VDS(), sd.SDS(), snapclone)
+			switch jrest.ErrCode(rErr) {
+			case jrest.RestErrorOk:
+			case jrest.RestErrorResourceDNE:
+				// the clone is gone already: nothing is in the way
+			case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusyVolumeHasSnapshots:
+				// the clone has clones or snapshots of its own
 				msg = fmt.Sprintf("Unable to delete snapshot %s with ID %s because it has volume associated with it %s that cant be deleted, please delete physical zvol first", sd.Name(), sd.CSIID(), snapclone)
 				return jrest.GetError(jrest.RestErrorResourceBusy, msg)
+			default:
+				// any other failure keeps its own meaning: a lost
+				// connection is not "busy"
+				return rErr
 			}
 		}
 	}
