@@ -28,7 +28,7 @@ import (
 
 func (s *RestEndpoint) GetTarget(ctx context.Context, pool string, tname string) (*ResourceTarget, RestError) {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets/%s", pool, tname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets/%s", pool, tname)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -64,7 +64,7 @@ func (s *RestEndpoint) GetTarget(ctx context.Context, pool string, tname string)
 
 func (s *RestEndpoint) CreateTarget(ctx context.Context, pool string, desc *CreateTargetDescriptor) RestError {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets", pool)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets", pool)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -101,7 +101,7 @@ func (s *RestEndpoint) CreateTarget(ctx context.Context, pool string, desc *Crea
 
 func (s *RestEndpoint) DeleteTarget(ctx context.Context, pool string, tname string) RestError {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets/%s", pool, tname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets/%s", pool, tname)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -133,7 +133,7 @@ func (s *RestEndpoint) DeleteTarget(ctx context.Context, pool string, tname stri
 
 func (s *RestEndpoint) AttachVolumeToTarget(ctx context.Context, pool string, tname string, desc *TargetLunDescriptor) (err RestError) {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets/%s/luns", pool, tname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets/%s/luns", pool, tname)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -166,7 +166,7 @@ func (s *RestEndpoint) AttachVolumeToTarget(ctx context.Context, pool string, tn
 
 func (s *RestEndpoint) DettachVolumeFromTarget(ctx context.Context, pool string, tname string, vname string) RestError {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets/%s/luns/%s", pool, tname, vname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets/%s/luns/%s", pool, tname, vname)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{

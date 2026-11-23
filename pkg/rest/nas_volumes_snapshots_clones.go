@@ -27,7 +27,7 @@ import (
 )
 
 func (s *RestEndpoint) GetNASVolumeSnapshotClones(ctx context.Context, pool string, vds string, sds string) (clones []ResourceVolumeSnapshotClones, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, vds, sds)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, vds, sds)
 
 	l := s.l.WithFields(log.Fields{
 		"func":    "GetNASVolumeSnapshotClones",
@@ -64,7 +64,7 @@ func (s *RestEndpoint) GetNASVolumeSnapshotClones(ctx context.Context, pool stri
 //   - *vid* physical volume id as it used by JovianDSS
 //   - *desc* data, including new volume name, that would be transfered to create clone
 func (s *RestEndpoint) CreateNASClone(ctx context.Context, pool string, nvid string, nsds string, desc CloneNASVolumeDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, nvid, nsds)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, nvid, nsds)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -88,7 +88,7 @@ func (s *RestEndpoint) CreateNASClone(ctx context.Context, pool string, nvid str
 }
 
 func (s *RestEndpoint) DeleteNASClone(ctx context.Context, pool string, nvds string, nsds string, ncds string) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s/clones/%s", pool, nvds, nsds, ncds)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots/%s/clones/%s", pool, nvds, nsds, ncds)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{

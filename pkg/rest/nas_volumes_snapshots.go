@@ -27,7 +27,7 @@ import (
 
 // GetNASVolumeSnapshot provides information about specific NAS volume snapshot requested
 func (s *RestEndpoint) GetNASVolumeSnapshot(ctx context.Context, pool string, vname string, sname string) (sdp *ResourceNASVolumeSnapshot, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s", pool, vname, sname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots/%s", pool, vname, sname)
 
 	l := jcom.LFC(ctx)
 

@@ -58,7 +58,7 @@ func (s *RestEndpoint) GetVolumeSnapshotsEntries(ctx context.Context, pool strin
 }
 
 func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes", pool)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes", pool)
 
 	l := jcom.LFC(ctx)
 
@@ -104,7 +104,7 @@ func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page 
 }
 
 func (s *RestEndpoint) GetSnapshotsEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/snapshots", pool)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/snapshots", pool)
 
 	l := jcom.LFC(ctx)
 
@@ -152,7 +152,7 @@ func (s *RestEndpoint) GetSnapshotsEntries(ctx context.Context, pool string, pag
 }
 
 func (s *RestEndpoint) GetNASVolumesEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes", pool)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes", pool)
 
 	l := jcom.LFC(ctx)
 
@@ -198,7 +198,7 @@ func (s *RestEndpoint) GetNASVolumesEntries(ctx context.Context, pool string, pa
 }
 
 func (s *RestEndpoint) GetNASVolumeSnapshotsEntries(ctx context.Context, pool string, nvds string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s", pool, nvds)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s", pool, nvds)
 
 	l := jcom.LFC(ctx)
 
@@ -244,7 +244,7 @@ func (s *RestEndpoint) GetNASVolumeSnapshotsEntries(ctx context.Context, pool st
 }
 
 func (s *RestEndpoint) GetNASSnapshotsEntries(ctx context.Context, pool string, page int64, dc int64) (ent *ResultEntries, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/snapshots", pool)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/snapshots", pool)
 
 	l := jcom.LFC(ctx)
 

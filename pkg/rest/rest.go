@@ -27,6 +27,11 @@ import (
 
 var vendorVersion = "dev"
 
+// apiPrefix is the one prefix of every path the plugin requests. The plugin
+// uses JovianDSS REST API v4 only: there is no setting for the version and
+// no fallback to an older one.
+const apiPrefix = "api/v4"
+
 type RestEndpoint struct {
 	rec jcom.RestEndpointCfg
 	rp  RestProxy

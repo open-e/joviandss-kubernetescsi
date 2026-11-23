@@ -26,7 +26,7 @@ import (
 )
 
 func (s *RestEndpoint) CreateShare(ctx context.Context, desc *CreateShareDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/shares")
+	addr := fmt.Sprintf(apiPrefix + "/shares")
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{

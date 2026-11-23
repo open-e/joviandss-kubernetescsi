@@ -67,7 +67,7 @@ func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string)
 	var resvol ResourceVolume
 	rsp := GeneralResponse{Data: &resvol}
 
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s", pool, vname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s", pool, vname)
 
 	l := s.l.WithFields(log.Fields{
 		"func": "GetVolume",
@@ -93,7 +93,7 @@ func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string)
 }
 
 func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol CreateVolumeDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes", pool)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes", pool)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -127,7 +127,7 @@ func (s *RestEndpoint) CreateVolume(ctx context.Context, pool string, vol Create
 //
 // set rSnapshots to true in order to delete snapshots
 func (s *RestEndpoint) DeleteVolume(ctx context.Context, pool string, vname string, data DeleteVolumeDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s", pool, vname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s", pool, vname)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -153,7 +153,7 @@ func (s *RestEndpoint) DeleteVolume(ctx context.Context, pool string, vname stri
 
 // GetVolumeSnapshot provides information about specific volume snapshot requested
 func (s *RestEndpoint) GetVolumeSnapshot(ctx context.Context, pool string, vname string, sname string) (sdp *ResourceSnapshot, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s", pool, vname, sname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s/snapshots/%s", pool, vname, sname)
 
 	l := jcom.LFC(ctx)
 
@@ -192,7 +192,7 @@ func (s *RestEndpoint) GetVolumeSnapshot(ctx context.Context, pool string, vname
 //   - *vid* physical volume id as it used by JovianDSS
 //   - *desc* data, including snapahot name, that would be transfered to create snapshot
 func (s *RestEndpoint) CreateSnapshot(ctx context.Context, pool string, vid string, desc *CreateSnapshotDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots", pool, vid)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s/snapshots", pool, vid)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -216,7 +216,7 @@ func (s *RestEndpoint) CreateSnapshot(ctx context.Context, pool string, vid stri
 func (s *RestEndpoint) DeleteSnapshot(ctx context.Context, pool string, vname string, sname string, data DeleteSnapshotDescriptor) (err RestError) {
 	l := jcom.LFC(ctx)
 
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s", pool, vname, sname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s/snapshots/%s", pool, vname, sname)
 
 	l = l.WithFields(log.Fields{
 		"func": "DeleteSnapshot",
@@ -253,7 +253,6 @@ func (s *RestEndpoint) DeleteSnapshot(ctx context.Context, pool string, vname st
 // 	RecursivelyDependents: rDependent,
 // 	ForceUmount:           false,
 // }
-// addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones/%s", s.pool, vname, sname, cname)
 // msg := fmt.Sprintf("Deleting clone of snapshot %s  volume: %s", sname, vname)
 // l.Trace(msg)
 // stat, body, err := s.rp.Send("DELETE", addr, data, CreateCloneRCode)

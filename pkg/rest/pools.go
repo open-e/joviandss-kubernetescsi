@@ -31,7 +31,7 @@ func (s *RestEndpoint) GetPool(ctx context.Context, pool string) (*ResourcePool,
 	var respool ResourcePool
 	var rsp = GeneralResponse{Data: &respool}
 
-	addr := fmt.Sprintf("api/v3/pools/%s", pool)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s", pool)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
