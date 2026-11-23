@@ -864,7 +864,11 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("ControllerPublishVolume: volume %s, node %s, read only %t, capability %+v", req.GetVolumeId(), req.GetNodeId(), req.GetReadonly(), req.GetVolumeCapability())
+	// The capability is logged by its access mode and type alone: its mount
+	// flags come from a StorageClass and can hold a password.
+	l.Debugf("ControllerPublishVolume: volume %s, node %s, read only %t, access mode %s, block %t",
+		req.GetVolumeId(), req.GetNodeId(), req.GetReadonly(),
+		req.GetVolumeCapability().GetAccessMode().GetMode(), req.GetVolumeCapability().GetBlock() != nil)
 	var err error
 
 	vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId())
