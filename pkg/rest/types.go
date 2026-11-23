@@ -17,659 +17,502 @@ under the License.
 
 package rest
 
+// The reply types of the JovianDSS REST API, as the plugin decodes them.
+//
+// They are transcribed from the description of the recorded API in
+// jdss-rest-api-spec, commit 434c9cd: the tracked OpenAPI of JovianDSS 1,
+// API v4, under empirical/jdss1/v4/openapi3/paths/. The comment on each type
+// names the path file its fields were read from. When that repository gains
+// recordings, read the types again from the path files that changed since
+// that commit, and name the new commit here.
+//
+// A field the plugin reads has the exact type the recordings show for its
+// endpoint, and a comment that marks it required or optional. Every other
+// field of a reply is kept as raw JSON, so that its type can never make a
+// reply fail to decode. The checks of the required fields, the conversions
+// and the accessors are in types_methods.go.
+
 import (
 	"encoding/json"
-	"net"
-	"regexp"
-	"strconv"
 	"time"
 )
 
-const resourceNamePattern = `/([\w\-\/]+)`
-
-const originNamePattern = `(?P<pool>[\w\-\.]+)/(?P<volume>[\w\-\.]+)@(?P<snapshot>[\w\-\.]+)`
-
-var (
-	resourceNameRegexp = regexp.MustCompile(resourceNamePattern)
-	originNameRegexp   = regexp.MustCompile(originNamePattern)
-)
-
-type GeneralResponse struct {
-	Data  interface{} `json:"data,omitempty"`
-	Error *ErrorT     `json:"error,ommitempty"`
-}
-
-type ResultEntries struct {
-	Results int64       `json:"results"`
-	Entries interface{} `json:"entries"`
-}
-
+// ResourceVolume is a zvol or a clone of one: the reply of
+// GET pools/<pool>/volumes/<volume>, from the path file
+// pools/+poolname+/volumes/+volumename+.yaml, and an entry of
+// GET pools/<pool>/volumes, from pools/+poolname+/volumes.yaml. The spec
+// keeps a zvol and a clone as two alternatives; a field that one of them
+// sends as null is optional here.
 type ResourceVolume struct {
-	Name                 string `json:"name,omitempty"`
-	Size                 int64  `json:"size,omitempty"`
-	Origin               string `json:"origin,omitempty"`
-	Relatime             string `json:"relatime,omitempty"`
-	Acltype              string `json:"acltype,omitempty"`
-	Vscan                string `json:"vscan,omitempty"`
-	FullName             string `json:"full_name,omitempty"`
-	UserRefs             string `json:"userrefs,omitempty"`
-	PrimaryCache         string `json:"primarycache,omitempty"`
-	LogBias              string `json:"logbias,omitempty"`
-	Creation             string `json:"creation,omitempty"`
-	Sync                 string `json:"sync,omitempty"`
-	IsClone              bool   `json:"is_clone,omitempty"`
-	Dedup                string `json:"dedup,omitempty"`
-	ShareNFS             string `json:"sharenfs,omitempty"`
-	ReceiveResumeToken   string `json:"receive_resume_token,omitempty"`
-	VolSize              int64  `json:"volsize,omitempty"`
-	Referenced           string `json:"referenced,omitempty"`
-	ShareSMB             string `json:"sharesmb,omitempty"`
-	CreateTxg            string `json:"createtxg,omitempty"`
-	Reservation          string `json:"reservation,omitempty"`
-	SContext             string `json:"scontext,omitempty"`
-	MountPoint           string `json:"mountpoint,omitempty"`
-	CaseSensitivity      string `json:"casesensitivity,omitempty"`
-	GUID                 string `json:"guid,omitempty"`
-	UsedByRefReservation string `json:"usedbyrefreservation,omitempty"`
-	DNodeSize            string `json:"dnodesize,omitempty"`
-	Written              string `json:"written,omitempty"`
-	LogicalUsed          string `json:"logicalused,omitempty"`
-	CompressRatio        string `json:"compressratio,omitempty"`
-	RootContext          string `json:"rootcontext,omitempty"`
-	DefaultSCSIID        string `json:"default_scsi_id,omitempty"`
-	Type                 string `json:"type,omitempty"`
-	Compression          string `json:"compression,omitempty"`
-	Snapdir              string `json:"snapdir,omitempty"`
-	Overlay              string `json:"overlay,omitempty"`
-	Encryption           string `json:"encryption,omitempty"`
-	Xattr                string `json:"xattr,omitempty"`
-	VolMode              string `json:"volmode,omitempty"`
-	Copies               string `json:"copies,omitempty"`
-	SnapshotLimit        string `json:"snapshot_limit,omitempty"`
-	AclInherit           string `json:"aclinherit,omitempty"`
-	DefContext           string `json:"defcontext,omitempty"`
-	ReadOnly             string `json:"readonly,omitempty"`
-	Version              string `json:"version,omitempty"`
-	RecordSize           string `json:"recordsize,omitempty"`
-	FilesystemLimit      string `json:"filesystem_limit,omitempty"`
-	Mounted              string `json:"mounted,omitempty"`
-	MLSLabel             string `json:"mlslabel,omitempty"`
-	SecondaryCache       string `json:"secondarycache,omitempty"`
-	RefReservation       string `json:"refreservation,omitempty"`
-	Available            string `json:"available,omitempty"`
-	SanVolumeID          string `json:"san:volume_id,omitempty"`
-	EncryptionRoot       string `json:"encryptionroot,omitempty"`
-	Exec                 string `json:"exec,omitempty"`
-	RefQuota             string `json:"refquota,omitempty"`
-	RefCompressRatio     string `json:"refcompressratio,omitempty"`
-	Quota                string `json:"quota,omitempty"`
-	UTF8Only             string `json:"utf8only,omitempty"`
-	KeyLocation          string `json:"keylocation,omitempty"`
-	Snapdev              string `json:"snapdev,omitempty"`
-	SnapshotCount        string `json:"snapshot_count,omitempty"`
-	FSContext            string `json:"fscontext,omitempty"`
-	Clones               string `json:"clones,omitempty"`
-	CanMount             string `json:"canmount,omitempty"`
-	KeyStatus            string `json:"keystatus,omitempty"`
-	Atime                string `json:"atime,omitempty"`
-	UsedBySnapshots      string `json:"usedbysnapshots,omitempty"`
-	Normalization        string `json:"normalization,omitempty"`
-	UsedByChildren       string `json:"usedbychildren,omitempty"`
-	VolBlockSize         string `json:"volblocksize,omitempty"`
-	UsedByDataset        string `json:"usedbydataset,omitempty"`
-	ObjSetID             string `json:"objsetid,omitempty"`
-	DeferDestroy         string `json:"defer_destroy,omitempty"`
-	PBKDF2Iters          string `json:"pbkdf2iters,omitempty"`
-	Checksum             string `json:"checksum,omitempty"`
-	RedundantMetadata    string `json:"redundant_metadata,omitempty"`
-	FilesystemCount      string `json:"filesystem_count,omitempty"`
-	Devices              string `json:"devices,omitempty"`
-	KeyFormat            string `json:"keyformat,omitempty"`
-	SetUID               string `json:"setuid,omitempty"`
-	Used                 string `json:"used,omitempty"`
-	LogicalReferenced    string `json:"logicalreferenced,omitempty"`
-	Context              string `json:"context,omitempty"`
-	Zoned                string `json:"zoned,omitempty"`
-	NBMAND               string `json:"nbmand,omitempty"`
+	Name    string  `json:"name"`    // required
+	Origin  *string `json:"origin"`  // optional: null on a zvol, pool/volume@snapshot on a clone
+	VolSize string  `json:"volsize"` // required: a number sent as a string, read through GetSize
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Aclinherit           json.RawMessage `json:"aclinherit"`
+	Acltype              json.RawMessage `json:"acltype"`
+	Atime                json.RawMessage `json:"atime"`
+	Available            json.RawMessage `json:"available"`
+	Canmount             json.RawMessage `json:"canmount"`
+	Casesensitivity      json.RawMessage `json:"casesensitivity"`
+	Checksum             json.RawMessage `json:"checksum"`
+	Clones               json.RawMessage `json:"clones"`
+	Compression          json.RawMessage `json:"compression"`
+	Compressratio        json.RawMessage `json:"compressratio"`
+	Context              json.RawMessage `json:"context"`
+	Copies               json.RawMessage `json:"copies"`
+	Createtxg            json.RawMessage `json:"createtxg"`
+	Creation             json.RawMessage `json:"creation"`
+	Dedup                json.RawMessage `json:"dedup"`
+	DefaultScsiId        json.RawMessage `json:"default_scsi_id"`
+	Defcontext           json.RawMessage `json:"defcontext"`
+	DeferDestroy         json.RawMessage `json:"defer_destroy"`
+	Devices              json.RawMessage `json:"devices"`
+	Dnodesize            json.RawMessage `json:"dnodesize"`
+	Encryption           json.RawMessage `json:"encryption"`
+	Encryptionroot       json.RawMessage `json:"encryptionroot"`
+	Exec                 json.RawMessage `json:"exec"`
+	FilesystemCount      json.RawMessage `json:"filesystem_count"`
+	FilesystemLimit      json.RawMessage `json:"filesystem_limit"`
+	Fscontext            json.RawMessage `json:"fscontext"`
+	FullName             json.RawMessage `json:"full_name"`
+	Guid                 json.RawMessage `json:"guid"`
+	IsClone              json.RawMessage `json:"is_clone"`
+	Keyformat            json.RawMessage `json:"keyformat"`
+	Keylocation          json.RawMessage `json:"keylocation"`
+	Keystatus            json.RawMessage `json:"keystatus"`
+	Logbias              json.RawMessage `json:"logbias"`
+	Logicalreferenced    json.RawMessage `json:"logicalreferenced"`
+	Logicalused          json.RawMessage `json:"logicalused"`
+	Mlslabel             json.RawMessage `json:"mlslabel"`
+	Mounted              json.RawMessage `json:"mounted"`
+	Mountpoint           json.RawMessage `json:"mountpoint"`
+	Nbmand               json.RawMessage `json:"nbmand"`
+	Normalization        json.RawMessage `json:"normalization"`
+	Objsetid             json.RawMessage `json:"objsetid"`
+	Overlay              json.RawMessage `json:"overlay"`
+	Pbkdf2iters          json.RawMessage `json:"pbkdf2iters"`
+	Prefetch             json.RawMessage `json:"prefetch"`
+	Primarycache         json.RawMessage `json:"primarycache"`
+	Quota                json.RawMessage `json:"quota"`
+	Readonly             json.RawMessage `json:"readonly"`
+	ReceiveResumeToken   json.RawMessage `json:"receive_resume_token"`
+	Recordsize           json.RawMessage `json:"recordsize"`
+	RedundantMetadata    json.RawMessage `json:"redundant_metadata"`
+	Refcompressratio     json.RawMessage `json:"refcompressratio"`
+	Referenced           json.RawMessage `json:"referenced"`
+	Refquota             json.RawMessage `json:"refquota"`
+	Refreservation       json.RawMessage `json:"refreservation"`
+	Relatime             json.RawMessage `json:"relatime"`
+	Reservation          json.RawMessage `json:"reservation"`
+	Rootcontext          json.RawMessage `json:"rootcontext"`
+	SanVolumeId          json.RawMessage `json:"san:volume_id"`
+	Scontext             json.RawMessage `json:"scontext"`
+	Secondarycache       json.RawMessage `json:"secondarycache"`
+	Setuid               json.RawMessage `json:"setuid"`
+	Sharenfs             json.RawMessage `json:"sharenfs"`
+	Sharesmb             json.RawMessage `json:"sharesmb"`
+	Snapdev              json.RawMessage `json:"snapdev"`
+	Snapdir              json.RawMessage `json:"snapdir"`
+	SnapshotCount        json.RawMessage `json:"snapshot_count"`
+	SnapshotLimit        json.RawMessage `json:"snapshot_limit"`
+	SnapshotsChanged     json.RawMessage `json:"snapshots_changed"`
+	SpecialSmallBlocks   json.RawMessage `json:"special_small_blocks"`
+	Sync                 json.RawMessage `json:"sync"`
+	Type                 json.RawMessage `json:"type"`
+	Used                 json.RawMessage `json:"used"`
+	Usedbychildren       json.RawMessage `json:"usedbychildren"`
+	Usedbydataset        json.RawMessage `json:"usedbydataset"`
+	Usedbyrefreservation json.RawMessage `json:"usedbyrefreservation"`
+	Usedbysnapshots      json.RawMessage `json:"usedbysnapshots"`
+	Userrefs             json.RawMessage `json:"userrefs"`
+	Utf8only             json.RawMessage `json:"utf8only"`
+	Version              json.RawMessage `json:"version"`
+	Volblocksize         json.RawMessage `json:"volblocksize"`
+	Volmode              json.RawMessage `json:"volmode"`
+	Volthreading         json.RawMessage `json:"volthreading"`
+	Vscan                json.RawMessage `json:"vscan"`
+	Written              json.RawMessage `json:"written"`
+	Xattr                json.RawMessage `json:"xattr"`
+	Zoned                json.RawMessage `json:"zoned"`
+
+	size int64 // VolSize as a number, set by checkRequired
 }
 
-func (m *ResourceVolume) UnmarshalJSON(data []byte) error {
-	type Alias ResourceVolume
-	aux := &struct {
-		VolSize string `json:"volsize,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(m),
-	}
-	if err := json.Unmarshal(data, aux); err != nil {
-		return err
-	}
-
-	if aux.VolSize != "" { // Only parse if non-empty
-		parsedVolSize, err := strconv.ParseInt(aux.VolSize, 10, 64)
-		if err != nil {
-			return err
-		}
-		m.VolSize = parsedVolSize
-	}
-
-	return nil
-}
-
-func (v *ResourceVolume) GetSize() int64 {
-	return v.VolSize
-	// if i, err := strconv.ParseInt(v.VolSize, 10, 64); err != nil {
-	// 	return 0
-	// } else {
-	// 	return i
-	// }
-}
-
-func (v *ResourceVolume) OriginVolume() string {
-	if len(v.Origin) > 0 {
-		if originNameRegexp.MatchString(v.Origin) {
-			match := originNameRegexp.FindStringSubmatch(v.Origin)
-			volume := originNameRegexp.SubexpIndex("volume")
-			return match[volume]
-		}
-	}
-	return ""
-}
-
-func (v *ResourceVolume) OriginSnapshot() string {
-	if len(v.Origin) > 0 {
-		if originNameRegexp.MatchString(v.Origin) {
-			match := originNameRegexp.FindStringSubmatch(v.Origin)
-			snapshot := originNameRegexp.SubexpIndex("snapshot")
-			return match[snapshot]
-		}
-	}
-	return ""
-}
-
+// ResourceSnapshot is a zvol snapshot read by name: the reply of
+// GET pools/<pool>/volumes/<volume>/snapshots/<snapshot>, from the path file
+// pools/+poolname+/volumes/+volumename+/snapshots/+snapshotname+.yaml.
+// The reply carries no name.
 type ResourceSnapshot struct {
-	Referenced        string    `json:"referenced,omitempty"`
-	UserRefs          string    `json:"userrefs,omitempty"`
-	PrimaryCache      string    `json:"primarycache,omitempty"`
-	Creation          time.Time `json:"creation,omitempty"`
-	VolSize           int64     `json:"volsize,omitempty"`
-	CreateTxg         string    `json:"createtxg,omitempty"`
-	GUID              string    `json:"guid,omitempty"`
-	CompressRatio     string    `json:"compressratio,omitempty"`
-	RootContext       string    `json:"rootcontext,omitempty"`
-	Encryption        string    `json:"encryption,omitempty"`
-	DefContext        string    `json:"defcontext,omitempty"`
-	Written           string    `json:"written,omitempty"`
-	Type              string    `json:"type,omitempty"`
-	SecondaryCache    string    `json:"secondarycache,omitempty"`
-	Used              string    `json:"used,omitempty"`
-	RefCompressRatio  string    `json:"refcompressratio,omitempty"`
-	FSContext         string    `json:"fscontext,omitempty"`
-	ObjSetID          string    `json:"objsetid,omitempty"`
-	Name              string    `json:"name,omitempty"`
-	DeferDestroy      string    `json:"defer_destroy,omitempty"`
-	SANVolumeID       string    `json:"san:volume_id,omitempty"`
-	MLSLabel          string    `json:"mlslabel,omitempty"`
-	LogicalReferenced string    `json:"logicalreferenced,omitempty"`
-	Context           string    `json:"context,omitempty"`
-	Clones            string    `json:"clones,omitempty"`
+	Clones   *string `json:"clones"`   // optional: missing on a snapshot without clones, read through ClonesNames
+	Creation string  `json:"creation"` // required: a date sent as a string, read through GetCreation
+	VolSize  string  `json:"volsize"`  // required: a number sent as a string, read through GetSize
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Compressratio     json.RawMessage `json:"compressratio"`
+	Context           json.RawMessage `json:"context"`
+	Createtxg         json.RawMessage `json:"createtxg"`
+	Defcontext        json.RawMessage `json:"defcontext"`
+	DeferDestroy      json.RawMessage `json:"defer_destroy"`
+	Encryption        json.RawMessage `json:"encryption"`
+	Fscontext         json.RawMessage `json:"fscontext"`
+	Guid              json.RawMessage `json:"guid"`
+	Logicalreferenced json.RawMessage `json:"logicalreferenced"`
+	Mlslabel          json.RawMessage `json:"mlslabel"`
+	Objsetid          json.RawMessage `json:"objsetid"`
+	Prefetch          json.RawMessage `json:"prefetch"`
+	Primarycache      json.RawMessage `json:"primarycache"`
+	Refcompressratio  json.RawMessage `json:"refcompressratio"`
+	Referenced        json.RawMessage `json:"referenced"`
+	Rootcontext       json.RawMessage `json:"rootcontext"`
+	SanVolumeId       json.RawMessage `json:"san:volume_id"`
+	Secondarycache    json.RawMessage `json:"secondarycache"`
+	Type              json.RawMessage `json:"type"`
+	Used              json.RawMessage `json:"used"`
+	Userrefs          json.RawMessage `json:"userrefs"`
+	Written           json.RawMessage `json:"written"`
+
+	size    int64     // VolSize as a number, set by checkRequired
+	created time.Time // Creation as a time, set by checkRequired
 }
 
-func (m *ResourceSnapshot) UnmarshalJSON(data []byte) error {
-	type Alias ResourceSnapshot
-	aux := &struct {
-		Creation string `json:"creation,omitempty"`
-		VolSize  string `json:"volsize,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(m), // Point Alias to ResourceSnapshot to reuse JSON tags
-	}
-	if err := json.Unmarshal(data, aux); err != nil {
-		return err
-	}
-	const layout = "2006-01-02 15:04:05"
-	if aux.Creation != "" { // Only parse if non-empty
-		parsedTime, err := time.Parse(layout, aux.Creation)
-		if err != nil {
-			return err
-		}
-		m.Creation = parsedTime
-	}
-
-	if aux.VolSize != "" { // Only parse if non-empty
-		parsedVolSize, err := strconv.ParseInt(aux.VolSize, 10, 64)
-		if err != nil {
-			return err
-		}
-		m.VolSize = parsedVolSize
-	}
-
-	return nil
-}
-
-func (s *ResourceSnapshot) ClonesNames() (clones []string) {
-	if len(s.Clones) > 0 {
-		matches := resourceNameRegexp.FindAllStringSubmatch(s.Clones, -1)
-
-		for _, v := range matches {
-			clones = append(clones, v[1])
-		}
-	}
-	return clones
-}
-
-func (s *ResourceSnapshot) GetSize() int64 {
-	return s.VolSize
-}
-
+// ResourceSnapshotShortProperties is the properties object of a zvol snapshot
+// list entry, from pools/+poolname+/volumes/snapshots.yaml.
 type ResourceSnapshotShortProperties struct {
-	Creation     time.Time `json:"creation,omitempty"`
-	ResourceType string    `json:"resource_type,omitempty"`
+	Creation int64 `json:"creation"` // required: seconds since the epoch, read through GetCreation
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Guid json.RawMessage `json:"guid"`
 }
 
-func (m *ResourceSnapshotShortProperties) UnmarshalJSON(data []byte) error {
-	type Alias ResourceSnapshotShortProperties
-	aux := &struct {
-		Creation string `json:"creation,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(m), // Point Alias to ResourceSnapshot to reuse JSON tags
-	}
-	if err := json.Unmarshal(data, aux); err != nil {
-		return err
-	}
+// ResourceSnapshotParent is the parent object of a zvol snapshot list entry,
+// from pools/+poolname+/volumes/snapshots.yaml: the volume the snapshot
+// belongs to.
+type ResourceSnapshotParent struct {
+	Name string `json:"name"` // required
 
-	if len(aux.Creation) > 0 { // Only parse if non-empty
-		creationTime, err := strconv.ParseInt(aux.Creation, 10, 64)
-		if err != nil {
-			return nil
-		}
-		m.Creation = time.Unix(creationTime, 0)
-	}
-
-	return nil
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Properties json.RawMessage `json:"properties"`
+	Type       json.RawMessage `json:"type"`
 }
 
+// ResourceSnapshotShort is a short entry of a zvol snapshot list: an entry of
+// GET pools/<pool>/volumes/snapshots, from the path file
+// pools/+poolname+/volumes/snapshots.yaml.
 type ResourceSnapshotShort struct {
-	Volume     string
-	Name       string
-	Properties ResourceSnapshotShortProperties
+	Name       string                          `json:"name"`       // required
+	Parent     ResourceSnapshotParent          `json:"parent"`     // required: its name is read
+	Properties ResourceSnapshotShortProperties `json:"properties"` // required: its creation is read
 }
 
+// ResourceVolumeSnapshotClones is one clone of a snapshot: an item of
+// GET pools/<pool>/volumes/<volume>/snapshots/<snapshot>/clones, from the path
+// file pools/+poolname+/volumes/+volumename+/snapshots/+snapshotname+/clones.yaml,
+// and of GET pools/<pool>/nas-volumes/<dataset>/snapshots/<snapshot>/clones,
+// from pools/+poolname+/nas-volumes/+datasetname+/snapshots/+snapshotname+/clones.yaml,
+// whose items carry the name only.
 type ResourceVolumeSnapshotClones struct {
-	IsClone  string `json:"is_clone,omitempty"`
-	FullName string `json:"full_name,omitempty"`
-	Name     string `json:"name,omitempty"`
-	Origin   string `json:"origin,omitempty"`
+	Name string `json:"name"` // required
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	FullName json.RawMessage `json:"full_name"`
+	IsClone  json.RawMessage `json:"is_clone"`
 }
 
+// ResourcePool is the reply of GET pools/<pool>, from the path file
+// pools/+poolname+.yaml.
 type ResourcePool struct {
-	Available         int64                    `json:"available,omitempty"`
-	Status            int                      `json:"status,omitempty"`
-	ImportStatus      ResourcePoolImportStatus `json:"import_status,omitempty"`
-	Scan              *interface{}             `json:"scan,omitempty"`
-	Encryption        ResourcePoolEncryption   `json:"encryption,omitempty"`
-	DeduplicationRate string                   `json:"deduplication_rate,omitempty"`
-	SysvolUpgrade     string                   `json:"sysvol_upgrade,omitempty"`
-	Vdevs             []ResourcePoolVdev       `json:"vdevs,omitempty"`
-	ID                string                   `json:"id,omitempty"`
-	Health            string                   `json:"health,omitempty"`
-	IOStats           ResourcePoolIOStats      `json:"iostats,omitempty"`
-	Operation         string                   `json:"operation,omitempty"`
-	Size              string                   `json:"size,omitempty"`
-	AutoTrim          bool                     `json:"autotrim,omitempty"`
-	Name              string                   `json:"name,omitempty"`
+	Available string `json:"available"` // required: a number sent as a string, read through GetAvailable
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Autoreplace                        json.RawMessage `json:"autoreplace"`
+	Autotrim                           json.RawMessage `json:"autotrim"`
+	DeduplicationEnabled               json.RawMessage `json:"deduplication_enabled"`
+	DeduplicationRate                  json.RawMessage `json:"deduplication_rate"`
+	Encryption                         json.RawMessage `json:"encryption"`
+	Health                             json.RawMessage `json:"health"`
+	Id                                 json.RawMessage `json:"id"`
+	ImportStatus                       json.RawMessage `json:"import_status"`
+	Iostats                            json.RawMessage `json:"iostats"`
+	IsPoolEncryptionPasswordConfigured json.RawMessage `json:"is_pool_encryption_password_configured"`
+	LicenseStorageCapacity             json.RawMessage `json:"license_storage_capacity"`
+	Name                               json.RawMessage `json:"name"`
+	Operation                          json.RawMessage `json:"operation"`
+	Scan                               json.RawMessage `json:"scan"`
+	Size                               json.RawMessage `json:"size"`
+	SpecialSmallBlocks                 json.RawMessage `json:"special_small_blocks"`
+	Status                             json.RawMessage `json:"status"`
+	SysvolUpgrade                      json.RawMessage `json:"sysvol_upgrade"`
+	Vdevs                              json.RawMessage `json:"vdevs"`
+
+	available int64 // Available as a number, set by checkRequired
 }
 
-func (m *ResourcePool) UnmarshalJSON(data []byte) error {
-	type Alias ResourcePool
-	aux := &struct {
-		Available string `json:"available,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(m), // Point Alias to ResourceSnapshot to reuse JSON tags
-	}
-	if err := json.Unmarshal(data, aux); err != nil {
-		return err
-	}
-
-	if len(aux.Available) > 0 { // Only parse if non-empty
-		available, err := strconv.ParseInt(aux.Available, 10, 64)
-		if err != nil {
-			return nil
-		}
-		m.Available = available
-	}
-	return nil
-}
-
+// ResourcePoolImportStatus is the import_status object of a pool, from
+// pools/+poolname+.yaml. Nothing reads it.
 type ResourcePoolImportStatus struct {
-	ImportSteps      ResourcePoolImportSteps `json:"import_steps,omitempty"`
-	ImportSuccessful bool                    `json:"import_successful,omitempty"`
+	// Not read: kept as sent, so that no type of theirs can fail.
+	ImportSteps      json.RawMessage `json:"import_steps"`
+	ImportSuccessful json.RawMessage `json:"import_successful"`
 }
 
+// ResourcePoolImportSteps is the import_steps object of a pool's import_status,
+// from pools/+poolname+.yaml. Nothing reads it.
 type ResourcePoolImportSteps struct {
-	SanSetup          bool `json:"san_setup,omitempty"`
-	VipSetup          bool `json:"vip_setup,omitempty"`
-	ZfsImport         bool `json:"zfs_import,omitempty"`
-	MountSystemVolume bool `json:"mount_system_volume,omitempty"`
-	NasSetup          bool `json:"nas_setup,omitempty"`
+	// Not read: kept as sent, so that no type of theirs can fail.
+	MountSystemVolume json.RawMessage `json:"mount_system_volume"`
+	NasSetup          json.RawMessage `json:"nas_setup"`
+	NvmetSetup        json.RawMessage `json:"nvmet_setup"`
+	SanSetup          json.RawMessage `json:"san_setup"`
+	VipSetup          json.RawMessage `json:"vip_setup"`
+	ZfsImport         json.RawMessage `json:"zfs_import"`
 }
 
+// ResourcePoolEncryption is the encryption object of a pool, from
+// pools/+poolname+.yaml. Nothing reads it.
 type ResourcePoolEncryption struct {
-	Enabled bool `json:"enabled,omitempty"`
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Enabled json.RawMessage `json:"enabled"`
 }
 
+// ResourcePoolVdev is an item of the vdevs of a pool, from pools/+poolname+.yaml.
+// Nothing reads it.
 type ResourcePoolVdev struct {
-	Name           string              `json:"name,omitempty"`
-	IOStats        ResourcePoolIOStats `json:"iostats,omitempty"`
-	Disks          []Disk              `json:"disks,omitempty"`
-	Health         string              `json:"health,omitempty"`
-	VdevReplacings []string            `json:"vdev_replacings,omitempty"`
-	VdevSpares     []string            `json:"vdev_spares,omitempty"`
-	Type           string              `json:"type,omitempty"`
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Disks          json.RawMessage `json:"disks"`
+	Health         json.RawMessage `json:"health"`
+	Iostats        json.RawMessage `json:"iostats"`
+	Name           json.RawMessage `json:"name"`
+	Type           json.RawMessage `json:"type"`
+	VdevReplacings json.RawMessage `json:"vdev_replacings"`
+	VdevSpares     json.RawMessage `json:"vdev_spares"`
 }
 
+// Disk is an item of the disks of a pool's vdev, from pools/+poolname+.yaml.
+// Nothing reads it.
 type Disk struct {
-	Origin   string               `json:"origin,omitempty"`
-	Slot     string               `json:"slot,omitempty"`
-	Led      string               `json:"led,omitempty"`
-	Name     string               `json:"name,omitempty"`
-	IOStats  ResourcePoolIOStats  `json:"iostats,omitempty"`
-	Alias    string               `json:"alias,omitempty"`
-	Health   string               `json:"health,omitempty"`
-	SN       string               `json:"sn,omitempty"`
-	TrimData ResourcePoolTrimData `json:"trim_data,omitempty"`
-	Path     *string              `json:"path,omitempty"` // Using *string to handle null values
-	Model    string               `json:"model,omitempty"`
-	ID       string               `json:"id,omitempty"`
-	Size     int64                `json:"size,omitempty"`
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Alias          json.RawMessage `json:"alias"`
+	DiskDevName    json.RawMessage `json:"disk_dev_name"`
+	Health         json.RawMessage `json:"health"`
+	Id             json.RawMessage `json:"id"`
+	InitializeData json.RawMessage `json:"initialize_data"`
+	Iostats        json.RawMessage `json:"iostats"`
+	Led            json.RawMessage `json:"led"`
+	Model          json.RawMessage `json:"model"`
+	Name           json.RawMessage `json:"name"`
+	Origin         json.RawMessage `json:"origin"`
+	PartitionLabel json.RawMessage `json:"partition_label"`
+	Path           json.RawMessage `json:"path"`
+	Size           json.RawMessage `json:"size"`
+	Slot           json.RawMessage `json:"slot"`
+	Sn             json.RawMessage `json:"sn"`
+	TrimData       json.RawMessage `json:"trim_data"`
+	Type           json.RawMessage `json:"type"`
 }
 
+// ResourcePoolTrimData is the trim_data object of a disk, from
+// pools/+poolname+.yaml. Nothing reads it.
 type ResourcePoolTrimData struct {
-	Status   string       `json:"status,omitempty"`
-	Progress *interface{} `json:"progress,omitempty"`  // Using *interface{} to handle null values
-	TrimTime *interface{} `json:"trim_time,omitempty"` // Using *interface{} to handle null values
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Progress json.RawMessage `json:"progress"`
+	Status   json.RawMessage `json:"status"`
+	TrimTime json.RawMessage `json:"trim_time"`
 }
 
+// ResourcePoolIOStats is the iostats object of a pool, of a vdev and of a disk,
+// from pools/+poolname+.yaml. Nothing reads it.
 type ResourcePoolIOStats struct {
-	Read   string `json:"read,omitempty"`
-	Write  string `json:"write,omitempty"`
-	Chksum string `json:"chksum,omitempty"`
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Chksum json.RawMessage `json:"chksum"`
+	Read   json.RawMessage `json:"read"`
+	Write  json.RawMessage `json:"write"`
 }
 
+// ResourceTarget is the reply of GET pools/<pool>/san/iscsi/targets/<target>,
+// from the path file pools/+poolname+/san/iscsi/targets/+targetname+.yaml.
 type ResourceTarget struct {
-	Name                string                    `json:"name,omitempty"`
-	Active              bool                      `json:"active,omitempty"`
-	Conflicted          bool                      `json:"conflicted,omitempty"`
-	IncomingUsersActive bool                      `json:"incoming_users_active,omitempty"`
-	OutgoingUser        *CreateTargetOutgoingUser `json:"outgoing_user,omitempty"`
-	AllowIP             []string                  `json:"allow_ip,omitempty"`
-	DenyIP              []string                  `json:"deny_ip,omitempty"`
+	Active bool `json:"active"` // required
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	ActiveFlag          json.RawMessage `json:"active_flag"`
+	AllowIp             json.RawMessage `json:"allow_ip"`
+	Conflicted          json.RawMessage `json:"conflicted"`
+	DenyIp              json.RawMessage `json:"deny_ip"`
+	EncryptionLocked    json.RawMessage `json:"encryption_locked"`
+	IncomingUsersActive json.RawMessage `json:"incoming_users_active"`
+	Name                json.RawMessage `json:"name"`
+	OutgoingUser        json.RawMessage `json:"outgoing_user"`
+	VipAllowedPortals   json.RawMessage `json:"vip_allowed_portals"`
 }
 
+// ShareNFS is the nfs object of a share, from shares/+sharename+.yaml. Nothing
+// reads it.
 type ShareNFS struct {
-	NoRootSquash          bool     `json:"no_root_squash"`
-	AllowWriteIP          []net.IP `json:"allow_write_ip"`
-	AllSquash             bool     `json:"all_squash"`
-	Enabled               bool     `json:"enabled"`
-	InsecureConnections   bool     `json:"insecure_connections"`
-	SynchronousDataRecord bool     `json:"synchronous_data_record"`
-	InsecureLockRequests  bool     `json:"insecure_lock_requests"`
-	AllowAccessIP         []net.IP `json:"allow_access_ip"`
+	// Not read: kept as sent, so that no type of theirs can fail.
+	AllSquash             json.RawMessage `json:"all_squash"`
+	AllowAccessIp         json.RawMessage `json:"allow_access_ip"`
+	AllowWriteIp          json.RawMessage `json:"allow_write_ip"`
+	Enabled               json.RawMessage `json:"enabled"`
+	InsecureConnections   json.RawMessage `json:"insecure_connections"`
+	InsecureLockRequests  json.RawMessage `json:"insecure_lock_requests"`
+	NoRootSquash          json.RawMessage `json:"no_root_squash"`
+	SynchronousDataRecord json.RawMessage `json:"synchronous_data_record"`
 }
 
+// ShareSMB is the smb object of a share, from shares/+sharename+.yaml. Nothing
+// reads it.
 type ShareSMB struct {
-	Enabled           bool   `json:"enabled"`
-	ReadOnly          bool   `json:"read_only"`
-	Visible           bool   `json:"visible"`
-	HandlingLargeDirs bool   `json:"handling_large_dirs"`
-	DefaultCase       string `json:"default_case"`
-	InheritOwner      bool   `json:"inherit_owner"`
-	InheritPerms      bool   `json:"inherit_perms"`
-	AccessMode        string `json:"access_mode"`
-	Timemachine       bool   `json:"timemachine"`
-	Recycle           bool   `json:"recycle"`
-	RecycleName       string `json:"recycle_name"`
+	// Not read: kept as sent, so that no type of theirs can fail.
+	AccessMode        json.RawMessage `json:"access_mode"`
+	DefaultCase       json.RawMessage `json:"default_case"`
+	Enabled           json.RawMessage `json:"enabled"`
+	ExtraFeatures     json.RawMessage `json:"extra_features"`
+	Fruit             json.RawMessage `json:"fruit"`
+	HandlingLargeDirs json.RawMessage `json:"handling_large_dirs"`
+	HideUnreadable    json.RawMessage `json:"hide_unreadable"`
+	InheritOwner      json.RawMessage `json:"inherit_owner"`
+	InheritPerms      json.RawMessage `json:"inherit_perms"`
+	IpRestrictions    json.RawMessage `json:"ip_restrictions"`
+	ReadOnly          json.RawMessage `json:"read_only"`
+	Recycle           json.RawMessage `json:"recycle"`
+	RecycleName       json.RawMessage `json:"recycle_name"`
+	Spotlight         json.RawMessage `json:"spotlight"`
+	Timemachine       json.RawMessage `json:"timemachine"`
+	Visible           json.RawMessage `json:"visible"`
+	Xattr             json.RawMessage `json:"xattr"`
 }
 
+// ResourceShare is a share: the reply of GET shares/<share>, from the path file
+// shares/+sharename+.yaml. Nothing reads it yet.
 type ResourceShare struct {
-	Comment    string   `json:"comment"`
-	Name       string   `json:"name"`
-	RealPath   string   `json:"real_path"`
-	NFS        ShareNFS `json:"nfs"`
-	SMB        ShareSMB `json:"smb"`
-	Active     bool     `json:"active"`
-	Path       string   `json:"path"`
-	Conflicted bool     `json:"conflicted"`
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Active               json.RawMessage `json:"active"`
+	ActiveFlag           json.RawMessage `json:"active_flag"`
+	Comment              json.RawMessage `json:"comment"`
+	Conflicted           json.RawMessage `json:"conflicted"`
+	EncryptionLocked     json.RawMessage `json:"encryption_locked"`
+	MissingConfiguration json.RawMessage `json:"missing_configuration"`
+	MissingDirectory     json.RawMessage `json:"missing_directory"`
+	Name                 json.RawMessage `json:"name"`
+	Nfs                  json.RawMessage `json:"nfs"`
+	Path                 json.RawMessage `json:"path"`
+	RealPath             json.RawMessage `json:"real_path"`
+	Smb                  json.RawMessage `json:"smb"`
 }
 
+// ResourceNASVolume is a NAS volume, a dataset: the reply of
+// GET pools/<pool>/nas-volumes/<dataset>, from the path file
+// pools/+poolname+/nas-volumes/+datasetname+.yaml, and an entry of
+// GET pools/<pool>/nas-volumes, from pools/+poolname+/nas-volumes.yaml.
 type ResourceNASVolume struct {
-	ID                        string       `json:"id,omitempty"`
-	Name                      string       `json:"name"`
-	FullName                  string       `json:"fullName,omitempty"`
-	ScreenName                string       `json:"screenName,omitempty"`
-	Deduplication             DedupSetting `json:"deduplication,omitempty"`
-	Compression               Compression  `json:"compression,omitempty"`
-	RecordSize                int64        `json:"recordsize,omitempty"`
-	Sync                      SyncSetting  `json:"sync,omitempty"`
-	LogBias                   LogBias      `json:"logBias,omitempty"`
-	PrimaryCache              CacheSetting `json:"primaryCache,omitempty"`
-	SecondaryCache            CacheSetting `json:"secondaryCache,omitempty"`
-	AccessTime                AtimeSetting `json:"accessTime,omitempty"`
-	Copies                    Copies       `json:"copies,omitempty"`
-	Quota                     int64        `json:"quota,omitempty"`
-	Reservation               string       `json:"reservation,omitempty"`
-	ResWithDescendents        bool         `json:"resWithDescendents,omitempty"`
-	RefquotaWithDescendents   bool         `json:"refquotaWithDescendents,omitempty"`
-	Pool                      string       `json:"pool,omitempty"`
-	Type                      string       `json:"type,omitempty"`
-	SharesCount               int          `json:"sharesCount,omitempty"`
-	OdpLocalRetention         bool         `json:"odpLocalRetention,omitempty"`
-	OdpLocalEnabled           bool         `json:"odpLocalEnabled,omitempty"`
-	OdpRemoteRetention        bool         `json:"odpRemoteRetention,omitempty"`
-	OdpRemoteSrcPath          string       `json:"odpRemoteSrcPath,omitempty"`
-	OdpRemoteSrcHostname      string       `json:"odpRemoteSrcHostname,omitempty"`
-	OdpIsReceivingDataStopped bool         `json:"odpIsReceivingDataStopped,omitempty"`
-	UsedByTracker             bool         `json:"usedByTracker,omitempty"`
-	Origin                    string       `json:"origin,omitempty"`
+	Name   string  `json:"name"`   // required
+	Origin *string `json:"origin"` // optional: null on a volume that is not a clone
+	Quota  *string `json:"quota"`  // optional: null without a quota, a number sent as a string with one, read through GetSize
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Atime              json.RawMessage `json:"atime"`
+	Available          json.RawMessage `json:"available"`
+	Canmount           json.RawMessage `json:"canmount"`
+	Clones             json.RawMessage `json:"clones"`
+	Compression        json.RawMessage `json:"compression"`
+	Copies             json.RawMessage `json:"copies"`
+	Creation           json.RawMessage `json:"creation"`
+	Dedup              json.RawMessage `json:"dedup"`
+	Encryption         json.RawMessage `json:"encryption"`
+	FullName           json.RawMessage `json:"full_name"`
+	Logbias            json.RawMessage `json:"logbias"`
+	Logicalreferenced  json.RawMessage `json:"logicalreferenced"`
+	Logicalused        json.RawMessage `json:"logicalused"`
+	Primarycache       json.RawMessage `json:"primarycache"`
+	PropertySource     json.RawMessage `json:"property_source"`
+	Readonly           json.RawMessage `json:"readonly"`
+	Recordsize         json.RawMessage `json:"recordsize"`
+	Refquota           json.RawMessage `json:"refquota"`
+	Refreservation     json.RawMessage `json:"refreservation"`
+	Reservation        json.RawMessage `json:"reservation"`
+	Secondarycache     json.RawMessage `json:"secondarycache"`
+	SnapshotCount      json.RawMessage `json:"snapshot_count"`
+	SpecialSmallBlocks json.RawMessage `json:"special_small_blocks"`
+	Sync               json.RawMessage `json:"sync"`
+	Used               json.RawMessage `json:"used"`
+	Usedbychildren     json.RawMessage `json:"usedbychildren"`
+	Usedbydataset      json.RawMessage `json:"usedbydataset"`
+	Usedbysnapshots    json.RawMessage `json:"usedbysnapshots"`
+
+	size int64 // Quota as a number, 0 without a quota, set by checkRequired
 }
 
-func (v *ResourceNASVolume) GetSize() int64 {
-	return v.Quota
-}
-
-func (v *ResourceNASVolume) OriginVolume() string {
-	if len(v.Origin) > 0 {
-		if originNameRegexp.MatchString(v.Origin) {
-			match := originNameRegexp.FindStringSubmatch(v.Origin)
-			volume := originNameRegexp.SubexpIndex("volume")
-			return match[volume]
-		}
-	}
-	return ""
-}
-
-func (v *ResourceNASVolume) OriginSnapshot() string {
-	if len(v.Origin) > 0 {
-		if originNameRegexp.MatchString(v.Origin) {
-			match := originNameRegexp.FindStringSubmatch(v.Origin)
-			snapshot := originNameRegexp.SubexpIndex("snapshot")
-			return match[snapshot]
-		}
-	}
-	return ""
-}
-
-func (m *ResourceNASVolume) UnmarshalJSON(data []byte) error {
-	type Alias ResourceNASVolume
-	aux := &struct {
-		Copies     string `json:"copies,omitempty"`
-		RecordSize string `json:"recordsize,omitempty"`
-		Quota      string `json:"quota,omitempty"`
-
-		*Alias
-	}{
-		Alias: (*Alias)(m),
-	}
-	if err := json.Unmarshal(data, aux); err != nil {
-		return err
-	}
-	if aux.Copies != "" {
-		num, err := strconv.Atoi(aux.Copies)
-		if err != nil {
-			return err
-		}
-		m.Copies = Copies(num)
-	}
-
-	if aux.RecordSize != "" {
-
-		num, err := strconv.ParseInt(aux.RecordSize, 10, 64)
-		if err != nil {
-			return err
-		}
-		m.RecordSize = num
-	}
-
-	if aux.Quota != "" {
-
-		num, err := strconv.ParseInt(aux.Quota, 10, 64)
-		if err != nil {
-			return err
-		}
-		m.Quota = num
-	}
-	return nil
-}
-
+// ResourceNASVolumeSnapshot is a NAS snapshot read by name: the reply of
+// GET pools/<pool>/nas-volumes/<dataset>/snapshots/<snapshot>, from the path
+// file pools/+poolname+/nas-volumes/+datasetname+/snapshots/+snapshotname+.yaml.
+// The reply carries no volsize.
 type ResourceNASVolumeSnapshot struct {
-	SetUID            string    `json:"setuid,omitempty"`
-	AclType           string    `json:"acltype,omitempty"`
-	UserRefs          string    `json:"userrefs,omitempty"`
-	PrimaryCache      string    `json:"primarycache,omitempty"`
-	Creation          time.Time `json:"creation,omitempty"`
-	Referenced        string    `json:"referenced,omitempty"`
-	CreateTXG         string    `json:"createtxg,omitempty"`
-	CaseSensitivity   string    `json:"casesensitivity,omitempty"`
-	GUID              string    `json:"guid,omitempty"`
-	XAttr             string    `json:"xattr,omitempty"`
-	CompressRatio     string    `json:"compressratio,omitempty"`
-	RootContext       string    `json:"rootcontext,omitempty"`
-	UTF8Only          string    `json:"utf8only,omitempty"`
-	Encryption        string    `json:"encryption,omitempty"`
-	DefContext        string    `json:"defcontext,omitempty"`
-	Written           string    `json:"written,omitempty"`
-	Version           string    `json:"version,omitempty"`
-	MlsLabel          string    `json:"mlslabel,omitempty"`
-	SecondaryCache    string    `json:"secondarycache,omitempty"`
-	Used              string    `json:"used,omitempty"`
-	Exec              string    `json:"exec,omitempty"`
-	RefCompressRatio  string    `json:"refcompressratio,omitempty"`
-	FsContext         string    `json:"fscontext,omitempty"`
-	Normalization     string    `json:"normalization,omitempty"`
-	ObjSetID          string    `json:"objsetid,omitempty"`
-	Name              string    `json:"name"`
-	DeferDestroy      string    `json:"defer_destroy,omitempty"`
-	Type              string    `json:"type,omitempty"`
-	Devices           string    `json:"devices,omitempty"`
-	LogicalReferenced string    `json:"logicalreferenced,omitempty"`
-	Context           string    `json:"context,omitempty"`
-	NbMand            string    `json:"nbmand,omitempty"`
-	Clones            string    `json:"clones,omitempty"`
+	Clones   *string `json:"clones"`   // optional: missing on a snapshot without clones, read through ClonesNames
+	Creation string  `json:"creation"` // required: a date sent as a string, read through GetCreation
+	Name     string  `json:"name"`     // required
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Acltype           json.RawMessage `json:"acltype"`
+	Casesensitivity   json.RawMessage `json:"casesensitivity"`
+	Compressratio     json.RawMessage `json:"compressratio"`
+	Context           json.RawMessage `json:"context"`
+	Createtxg         json.RawMessage `json:"createtxg"`
+	Defcontext        json.RawMessage `json:"defcontext"`
+	DeferDestroy      json.RawMessage `json:"defer_destroy"`
+	Devices           json.RawMessage `json:"devices"`
+	Encryption        json.RawMessage `json:"encryption"`
+	Exec              json.RawMessage `json:"exec"`
+	Fscontext         json.RawMessage `json:"fscontext"`
+	Guid              json.RawMessage `json:"guid"`
+	Logicalreferenced json.RawMessage `json:"logicalreferenced"`
+	Mlslabel          json.RawMessage `json:"mlslabel"`
+	Nbmand            json.RawMessage `json:"nbmand"`
+	Normalization     json.RawMessage `json:"normalization"`
+	Objsetid          json.RawMessage `json:"objsetid"`
+	Prefetch          json.RawMessage `json:"prefetch"`
+	Primarycache      json.RawMessage `json:"primarycache"`
+	Refcompressratio  json.RawMessage `json:"refcompressratio"`
+	Referenced        json.RawMessage `json:"referenced"`
+	Rootcontext       json.RawMessage `json:"rootcontext"`
+	Secondarycache    json.RawMessage `json:"secondarycache"`
+	Setuid            json.RawMessage `json:"setuid"`
+	Type              json.RawMessage `json:"type"`
+	Used              json.RawMessage `json:"used"`
+	Userrefs          json.RawMessage `json:"userrefs"`
+	Utf8only          json.RawMessage `json:"utf8only"`
+	Version           json.RawMessage `json:"version"`
+	Written           json.RawMessage `json:"written"`
+	Xattr             json.RawMessage `json:"xattr"`
+
+	created time.Time // Creation as a time, set by checkRequired
 }
 
-func (m *ResourceNASVolumeSnapshot) UnmarshalJSON(data []byte) error {
-	type Alias ResourceNASVolumeSnapshot
-	aux := &struct {
-		Creation string `json:"creation,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(m),
-	}
-	if err := json.Unmarshal(data, aux); err != nil {
-		return err
-	}
-	const layout = "2006-01-02 15:04:05"
-	if aux.Creation != "" { // Only parse if non-empty
-		parsedTime, err := time.Parse(layout, aux.Creation)
-		if err != nil {
-			return err
-		}
-		m.Creation = parsedTime
-	}
-
-	return nil
-}
-
-func (s *ResourceNASVolumeSnapshot) ClonesNames() (clones []string) {
-	if len(s.Clones) > 0 {
-		matches := resourceNameRegexp.FindAllStringSubmatch(s.Clones, -1)
-
-		for _, v := range matches {
-			clones = append(clones, v[1])
-		}
-	}
-	return clones
-}
-
-func (s *ResourceNASVolumeSnapshot) GetSize() int64 {
-	return 0
-}
-
+// ResourceNASSnapshotShortProperties is the properties object of a NAS snapshot
+// list entry, from pools/+poolname+/nas-volumes/snapshots.yaml.
 type ResourceNASSnapshotShortProperties struct {
-	Creation     time.Time `json:"creation,omitempty"`
-	ResourceType string    `json:"resource_type,omitempty"`
-	Guid         string    `json:"guid,omitempty"`
+	Creation int64 `json:"creation"` // required: seconds since the epoch, read through GetCreation
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Guid json.RawMessage `json:"guid"`
 }
 
-func (m *ResourceNASSnapshotShortProperties) UnmarshalJSON(data []byte) error {
-	type Alias ResourceNASSnapshotShortProperties
-	aux := &struct {
-		Creation int64 `json:"creation,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(m), // Point Alias to ResourceSnapshot to reuse JSON tags
-	}
-	if err := json.Unmarshal(data, aux); err != nil {
-		return err
-	}
-
-	if aux.Creation > 0 { // Only parse if non-empty
-		//creationTime, err := strconv.ParseInt(aux.Creation, 10, 64)
-		//if err != nil {
-		//	return nil
-		//}
-		m.Creation = time.Unix(aux.Creation, 0)
-	}
-
-	return nil
-}
-
+// ResourceNASSnapshotParent is the parent object of a NAS snapshot list entry,
+// from pools/+poolname+/nas-volumes/snapshots.yaml: the NAS volume the
+// snapshot belongs to.
 type ResourceNASSnapshotParent struct {
-	Name       string                             `json:"name"`
-	Type       JovianDSSStorageProtocolType       `json:"type"`
-	Properties ResourceNASSnapshotShortProperties `json:"properties"`
+	Name string `json:"name"` // required
+
+	// Not read: kept as sent, so that no type of theirs can fail.
+	Properties json.RawMessage `json:"properties"`
+	Type       json.RawMessage `json:"type"`
 }
 
-func (m *ResourceNASSnapshotParent) UnmarshalJSON(data []byte) error {
-	type Alias ResourceNASSnapshotParent
-	aux := &struct {
-		Type int `json:"copies,omitempty"`
-		*Alias
-	}{
-		Alias: (*Alias)(m),
-	}
-	if err := json.Unmarshal(data, aux); err != nil {
-		return err
-	}
-	m.Type = JovianDSSStorageProtocolType(aux.Type)
-
-	return nil
-}
-
+// ResourceNASSnapshotShort is a short entry of a NAS snapshot list: an entry of
+// GET pools/<pool>/nas-volumes/snapshots, from the path file
+// pools/+poolname+/nas-volumes/snapshots.yaml.
 type ResourceNASSnapshotShort struct {
-	Parent     ResourceNASSnapshotParent          `json:"parent"`
-	Name       string                             `json:"name"`
-	Properties ResourceNASSnapshotShortProperties `json:"properties"`
+	Name       string                             `json:"name"`       // required
+	Parent     ResourceNASSnapshotParent          `json:"parent"`     // required: its name is read
+	Properties ResourceNASSnapshotShortProperties `json:"properties"` // required: its creation is read
 }

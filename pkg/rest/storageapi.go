@@ -86,6 +86,9 @@ func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string)
 	}
 
 	if stat == CodeOK || stat == CodeNoContent {
+		if errD := decodeData(body, &resvol); errD != nil {
+			return nil, errD
+		}
 		return &resvol, nil
 	}
 
@@ -170,11 +173,10 @@ func (s *RestEndpoint) GetVolumeSnapshot(ctx context.Context, pool string, vname
 	}
 
 	var snapdata ResourceSnapshot
-	rsp := &GeneralResponse{Data: &snapdata}
 
 	if stat == CodeOK || stat == CodeAccepted {
 		l.Debug("Obtained volume listing")
-		if err = s.unmarshal(body, &rsp); err != nil {
+		if err = decodeData(body, &snapdata); err != nil {
 			return nil, err
 		}
 		return &snapdata, nil

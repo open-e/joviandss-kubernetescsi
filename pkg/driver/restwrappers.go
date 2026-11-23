@@ -37,7 +37,7 @@ func RestSnapshotEntryBasedID(entry jrest.ResourceSnapshot) string {
 }
 
 func RestSnapshotShortEntryBasedID(entry jrest.ResourceSnapshotShort) string {
-	basedid := fmt.Sprintf("%s_%s", base64.StdEncoding.EncodeToString([]byte(entry.Volume)), base64.StdEncoding.EncodeToString([]byte(entry.Volume)))
+	basedid := fmt.Sprintf("%s_%s", base64.StdEncoding.EncodeToString([]byte(entry.Parent.Name)), base64.StdEncoding.EncodeToString([]byte(entry.Parent.Name)))
 	return basedid
 }
 

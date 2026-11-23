@@ -37,9 +37,7 @@ func (s *RestEndpoint) GetTarget(ctx context.Context, pool string, tname string)
 		"func":    "GetTarget",
 	})
 
-	var outUser CreateTargetOutgoingUser
 	var resTarget ResourceTarget
-	resTarget.OutgoingUser = &outUser
 	var rsp = GeneralResponse{Data: &resTarget}
 
 	l.Debugf("Getting target %s information", tname)
@@ -56,6 +54,9 @@ func (s *RestEndpoint) GetTarget(ctx context.Context, pool string, tname string)
 	}
 
 	if stat == CodeOK {
+		if errD := decodeData(body, &resTarget); errD != nil {
+			return nil, errD
+		}
 		return &resTarget, nil
 	}
 

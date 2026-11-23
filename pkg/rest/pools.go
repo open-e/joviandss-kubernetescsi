@@ -54,6 +54,9 @@ func (s *RestEndpoint) GetPool(ctx context.Context, pool string) (*ResourcePool,
 	}
 
 	if stat == CodeOK || stat == CodeNoContent {
+		if errD := decodeData(body, &respool); errD != nil {
+			return nil, errD
+		}
 		return &respool, nil
 	}
 	return nil, getError(ctx, body)

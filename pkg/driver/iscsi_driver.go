@@ -451,9 +451,11 @@ func (d *CSIISCSiDriver) GetSnapshot(ctx context.Context, pool string, vd LunDes
 		return nil, err
 	} else {
 		gv := GeneralSnapshot{
-			Name:     nv.Name,
+			// the reply of a zvol snapshot read by name carries no name:
+			// the name is the one that was asked for
+			Name:     sd.SDS(),
 			VolSize:  nv.GetSize(),
-			Creation: nv.Creation,
+			Creation: nv.GetCreation(),
 		}
 		return &gv, nil
 	}

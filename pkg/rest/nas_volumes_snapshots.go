@@ -44,11 +44,10 @@ func (s *RestEndpoint) GetNASVolumeSnapshot(ctx context.Context, pool string, vn
 	}
 
 	var snapdata ResourceNASVolumeSnapshot
-	rsp := &GeneralResponse{Data: &snapdata}
 
 	if stat == CodeOK || stat == CodeAccepted {
 		l.Debug("Obtained volume listing")
-		if err = s.unmarshal(body, &rsp); err != nil {
+		if err = decodeData(body, &snapdata); err != nil {
 			return nil, err
 		}
 		return &snapdata, nil

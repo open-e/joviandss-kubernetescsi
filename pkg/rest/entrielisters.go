@@ -87,14 +87,12 @@ func (s *RestEndpoint) GetVolumesEntries(ctx context.Context, pool string, page 
 
 	switch stat {
 	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-
-			if ok {
-				return data, nil
-			}
-			return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
+		// each entry is decoded and checked for its required fields
+		checked, results, errD := decodeEntries[ResourceVolume](body)
+		if errD != nil {
+			return nil, errD
 		}
+		return &ResultEntries{Results: results, Entries: &checked}, nil
 	default:
 		if rsp.Error != nil {
 			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
@@ -135,14 +133,12 @@ func (s *RestEndpoint) GetSnapshotsEntries(ctx context.Context, pool string, pag
 
 	switch stat {
 	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-
-			if ok {
-				return data, nil
-			}
-			return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
+		// each entry is decoded and checked for its required fields
+		checked, results, errD := decodeEntries[ResourceSnapshotShort](body)
+		if errD != nil {
+			return nil, errD
 		}
+		return &ResultEntries{Results: results, Entries: &checked}, nil
 	default:
 		if rsp.Error != nil {
 			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
@@ -181,14 +177,12 @@ func (s *RestEndpoint) GetNASVolumesEntries(ctx context.Context, pool string, pa
 
 	switch stat {
 	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-			if ok {
-				return data, nil
-			} else {
-				return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
-			}
+		// each entry is decoded and checked for its required fields
+		checked, results, errD := decodeEntries[ResourceNASVolume](body)
+		if errD != nil {
+			return nil, errD
 		}
+		return &ResultEntries{Results: results, Entries: &checked}, nil
 	default:
 		if rsp.Error != nil {
 			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
@@ -227,14 +221,12 @@ func (s *RestEndpoint) GetNASVolumeSnapshotsEntries(ctx context.Context, pool st
 
 	switch stat {
 	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-			if ok {
-				return data, nil
-			} else {
-				return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
-			}
+		// each entry is decoded and checked for its required fields
+		checked, results, errD := decodeEntries[ResourceNASVolumeSnapshot](body)
+		if errD != nil {
+			return nil, errD
 		}
+		return &ResultEntries{Results: results, Entries: &checked}, nil
 	default:
 		if rsp.Error != nil {
 			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)
@@ -277,14 +269,12 @@ func (s *RestEndpoint) GetNASSnapshotsEntries(ctx context.Context, pool string, 
 
 	switch stat {
 	case CodeOK, CodeCreated:
-		if rsp.Data != nil {
-			data, ok := rsp.Data.(*ResultEntries)
-
-			if ok {
-				return data, nil
-			}
-			return nil, GetError(RestErrorRequestMalfunction, fmt.Sprintf("response is not expected %+v", rsp.Data))
+		// each entry is decoded and checked for its required fields
+		checked, results, errD := decodeEntries[ResourceNASSnapshotShort](body)
+		if errD != nil {
+			return nil, errD
 		}
+		return &ResultEntries{Results: results, Entries: &checked}, nil
 	default:
 		if rsp.Error != nil {
 			return nil, ErrorFromErrorT(ctx, rsp.Error, s.l)

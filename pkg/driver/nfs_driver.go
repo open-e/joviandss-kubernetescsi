@@ -588,7 +588,7 @@ func (d *CSINFSDriver) GetSnapshot(ctx context.Context, pool string, vd LunDesc,
 		gv := GeneralSnapshot{
 			Name:     nv.Name,
 			VolSize:  nv.GetSize(),
-			Creation: nv.Creation,
+			Creation: nv.GetCreation(),
 		}
 		return &gv, nil
 	}

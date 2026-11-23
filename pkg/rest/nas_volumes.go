@@ -49,6 +49,9 @@ func (s *RestEndpoint) GetNASVolume(ctx context.Context, pool string, vname stri
 	}
 
 	if stat == CodeOK || stat == CodeNoContent {
+		if errD := decodeData(body, &resvol); errD != nil {
+			return nil, errD
+		}
 		return &resvol, nil
 	}
 

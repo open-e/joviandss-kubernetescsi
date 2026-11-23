@@ -49,7 +49,7 @@ func (s *RestEndpoint) GetNASVolumeSnapshotClones(ctx context.Context, pool stri
 	}
 
 	if stat == CodeOK || stat == CodeNoContent {
-		return clones, nil
+		return decodeItems[ResourceVolumeSnapshotClones](body)
 	}
 
 	return nil, getError(ctx, body)

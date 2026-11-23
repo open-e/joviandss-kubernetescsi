@@ -49,7 +49,7 @@ func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string,
 	}
 
 	if stat == CodeOK || stat == CodeNoContent {
-		return clones, nil
+		return decodeItems[ResourceVolumeSnapshotClones](body)
 	}
 
 	return nil, getError(ctx, body)
