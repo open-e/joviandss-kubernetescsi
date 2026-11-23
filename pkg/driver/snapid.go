@@ -136,6 +136,12 @@ func NewSnapshotDescFromCSIID(csiid string) (*SnapshotDesc, error) {
 
 	sd.sds = strings.Join(csiidl[:len(csiidl)-1], "_")
 
+	// The name of the snapshot goes into a REST path: an empty one would
+	// address the collection, and "." or ".." the parent.
+	if sd.sds == "" || sd.sds == "." || sd.sds == ".." {
+		return nil, status.Errorf(codes.InvalidArgument, "Snapshot ID %s names no snapshot", csiid)
+	}
+
 	sd.parseSDS(sd.sds)
 	return &sd, nil
 }

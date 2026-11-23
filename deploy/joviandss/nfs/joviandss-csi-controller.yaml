@@ -200,6 +200,11 @@ spec:
               mountPath: /config
               readOnly: true
       volumes:
+        # The config file, and beside it the certificate that the "cafile"
+        # setting names, if the storage's certificate needs one: every file
+        # of this secret appears under /config, so a file added as
+        #   --from-file ca.pem=./storage-ca.pem
+        # is /config/ca.pem (docs/configuration.md, "Certificate of the storage").
         - name: config
           secret:
             secretName: jdss-controller-cfg 

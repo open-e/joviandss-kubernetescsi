@@ -2,11 +2,10 @@ package rest
 
 import (
 	"context"
-	"fmt"
 )
 
 func (s *RestEndpoint) GetNASVolumeSnapshotClones(ctx context.Context, pool string, vds string, sds string) (clones []ResourceVolumeSnapshotClones, err RestError) {
-	path := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, vds, sds)
+	path := apiPath("/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, vds, sds)
 	return readItems[ResourceVolumeSnapshotClones](ctx, s, path, getNASVolumeSnapshotClonesErrors)
 }
 
@@ -20,11 +19,11 @@ func (s *RestEndpoint) GetNASVolumeSnapshotClones(ctx context.Context, pool stri
 //   - *nsds* the snapshot the clone is made of
 //   - *desc* data, including new volume name, that would be transfered to create clone
 func (s *RestEndpoint) CreateNASClone(ctx context.Context, pool string, nvid string, nsds string, desc CloneNASVolumeDescriptor) RestError {
-	path := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, nvid, nsds)
+	path := apiPath("/pools/%s/nas-volumes/%s/snapshots/%s/clones", pool, nvid, nsds)
 	return s.request(ctx, "POST", path, desc, createNASCloneErrors, CodeOK, CodeCreated)
 }
 
 func (s *RestEndpoint) DeleteNASClone(ctx context.Context, pool string, nvds string, nsds string, ncds string) RestError {
-	path := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots/%s/clones/%s", pool, nvds, nsds, ncds)
+	path := apiPath("/pools/%s/nas-volumes/%s/snapshots/%s/clones/%s", pool, nvds, nsds, ncds)
 	return s.request(ctx, "DELETE", path, nil, deleteNASCloneErrors, CodeNoContent)
 }

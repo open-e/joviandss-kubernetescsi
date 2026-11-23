@@ -11,7 +11,7 @@ Installation of this components is pretty straightforward on most of linux distr
 Due to architecture and security policies [additional actions have to be take prior to following instructions provided below](talos.md).
 
 `Plugin` talks to JovianDSS through REST API v4 only.
-It needs a JovianDSS release that serves API v4: for JovianDSS 1 that is `1.0up33.65410` or newer.
+It supports JovianDSS 1 from release `1.0up33.65410` on. JovianDSS 2 is not supported: it takes another login than the plugin sends.
 The appliance still serves API v3, but `plugin` no longer calls it.
 
 
@@ -62,6 +62,8 @@ Check this [guide on configuration](configuration.md) to get more information on
 ```bash
 kubectl create secret -n joviandss-csi generic jdss-controller-cfg --from-file ./deploy/cfg/cfg.yaml 
 ```
+
+The plugin checks the certificate of the storage. A storage that presents a self-signed certificate needs `cafile` or `insecure` in the `endpoint` section of the config file, and the file that `cafile` names has to be added to the same `secret`: see [Certificate of the storage](configuration.md#certificate-of-the-storage).
 
 Please keep in mind that config file name and secret name are both referenced in `./deploy/joviandss/joviandss-csi-controller.yaml`.
 

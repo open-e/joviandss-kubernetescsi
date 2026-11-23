@@ -41,13 +41,6 @@ var (
 // creationLayout is how a snapshot read by name gives its creation time.
 const creationLayout = "2006-01-02 15:04:05"
 
-// ResultEntries is the data of a list reply: the length of the whole list
-// and the entries of one page.
-type ResultEntries struct {
-	Results int64       `json:"results"`
-	Entries interface{} `json:"entries"`
-}
-
 ///////////////////////////////////////////////////////////////////////////////
 // Decoding
 

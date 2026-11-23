@@ -18,50 +18,66 @@ under the License.
 package driver
 
 import (
-	//"fmt"
-	//"strings"
 	"context"
-	"encoding/base64"
 	"fmt"
+	"strings"
 
 	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
-
-func RestVolumeEntryBasedID(entry jrest.ResourceVolume) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
-
-func RestSnapshotEntryBasedID(entry jrest.ResourceSnapshotShort) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
-
-func RestSnapshotShortEntryBasedID(entry jrest.ResourceSnapshotShort) string {
-	basedid := fmt.Sprintf("%s_%s", base64.StdEncoding.EncodeToString([]byte(entry.Parent.Name)), base64.StdEncoding.EncodeToString([]byte(entry.Parent.Name)))
-	return basedid
-}
-
-func RestNASVolumeEntryBasedID(entry jrest.ResourceNASVolume) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
-
-func RestNASVolumeSnapshotEntryBasedID(entry jrest.ResourceNASSnapshotShort) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
-
-func RestNASSnapshotShortEntryBasedID(entry jrest.ResourceNASSnapshotShort) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
 
 // keptSnapshot is a snapshot that the cleanup of intermediate snapshots left
 // on a volume, with the clones that were read for it.
 type keptSnapshot struct {
 	Name   string
 	Clones []string
+}
+
+// isIntermediate reports whether a snapshot is one the plugin made to clone
+// a volume from a volume: it carries the name of the new volume, so its
+// name reads as the name of a volume of the plugin. The first letter is not
+// enough: the cleanup deletes an intermediate snapshot that has no clones,
+// and a snapshot made by hand can start with "v" too.
+func isIntermediate(name string) bool {
+	if name == "" {
+		return false
+	}
+	_, err := NewVolumeDescFromVDS(name)
+	return err == nil
+}
+
+// isCSISnapshot reports whether a snapshot has a name the plugin gives to a
+// CSI snapshot.
+func isCSISnapshot(name string) bool { return name != "" && IsSDS(name) }
+
+// volumeHasSnapshots is the error of a DeleteVolume on a volume that still
+// has snapshots after the cleanup of the intermediate ones. Its code is
+// RestErrorResourceBusy, which the controller answers FailedPrecondition, as
+// CSI asks for a volume with snapshots. The message names what is in the
+// way: the volumes cloned from it, its CSI snapshots, and the snapshots the
+// plugin did not make.
+func volumeHasSnapshots(volume string, kept []keptSnapshot) jrest.RestError {
+	var dvols, dsnaps, ncsi []string
+	for _, snap := range kept {
+		switch {
+		case isCSISnapshot(snap.Name):
+			dsnaps = append(dsnaps, snap.Name)
+		case isIntermediate(snap.Name):
+			dvols = append(dvols, snap.Clones...)
+		default:
+			ncsi = append(ncsi, snap.Name)
+		}
+	}
+	msg := fmt.Sprintf("Volume %s is dependent upon by", volume)
+	if len(dvols) > 0 {
+		msg += fmt.Sprintf(" volumes: %s", strings.Join(dvols, ","))
+	}
+	if len(dsnaps) > 0 {
+		msg += fmt.Sprintf(" snapshots: %s", strings.Join(dsnaps, ","))
+	}
+	if len(ncsi) > 0 {
+		msg += fmt.Sprintf(" not CSI related snapshots: %s", strings.Join(ncsi, ","))
+	}
+	return jrest.GetError(jrest.RestErrorResourceBusy, msg)
 }
 
 // deleteSnapshotWithoutClones deletes a snapshot only after the appliance

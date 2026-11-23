@@ -99,7 +99,9 @@ func (d *CSIISCSiDriver) deleteIntermediateSnapshot(ctx context.Context, pool st
 		"proto":   "iSCSI",
 		"section": "driver",
 	})
-	forceUmount := true
+	// force_umount false: a delete never detaches a zvol from its target;
+	// only DettachVolumeFromTarget does that.
+	forceUmount := false
 	snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 	// Just in case lets delete this snapshot and do everything from groud up
 	if err = d.re.DeleteSnapshot(ctx, pool, vds, sds, snapdeldata); err != nil {
@@ -189,26 +191,16 @@ func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool st
 		"proto":   "iSCSI",
 		"section": "driver",
 	})
-	token := NewCSIListingToken()
-	isnaps, _, gserr := d.ListVolumeSnapshots(ctx, pool, vd, 0, token)
-
-	// The error of the listing comes first: a real error, such as "not
-	// found", must not turn into a failed typecast.
+	snaps, gserr := d.volumeSnapshots(ctx, pool, vd)
 	if gserr != nil {
 		l.Debugf("Unable to get list of snapshots for volume %s", vd.Name())
 		return nil, gserr
 	}
 
-	snaps, ok := isnaps.([]jrest.ResourceSnapshotShort)
-	if !ok {
-		err = jrest.GetError(jrest.RestErrorFailureUnknown, "Unable to typecast snapshot data")
-		return nil, err
-	}
-
 	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
 
 	for _, snap := range snaps {
-		if IsVDS(snap.Name) {
+		if isIntermediate(snap.Name) {
 			// An intermediate snapshot. A list entry does not say whether
 			// the snapshot has clones, so the appliance is asked, and the
 			// snapshot is deleted only when it answers that there is none.
@@ -218,17 +210,29 @@ func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool st
 					return d.re.GetVolumeSnapshotClones(ctx, pool, vd.VDS(), sname)
 				},
 				func(ctx context.Context) jrest.RestError {
-					forceUmount := true
+					// force_umount false: a delete never detaches a zvol from its target;
+					// only DettachVolumeFromTarget does that.
+					forceUmount := false
 					snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 					return d.re.DeleteSnapshot(ctx, pool, vd.VDS(), sname, snapdeldata)
 				})
 			if derr != nil {
+				if derr.GetCode() == jrest.RestErrorResourceDNE {
+					// The snapshot went away after the list was read: it is
+					// in the way no longer. Only "not found" for the list
+					// itself says that the volume is gone; passed on from
+					// here, it would let the volume go with the snapshots
+					// that are still to be looked at.
+					l.Debugf("Intermediate snapshot %s of volume %s is gone: %s", sname, vd.Name(), derr.Error())
+					continue
+				}
 				return nil, derr
 			}
 			if !deleted {
 				out = append(out, keptSnapshot{Name: sname, Clones: clonesNames(clones)})
 			}
-		} else if IsSDS(snap.Name) {
+		} else {
+			// a CSI snapshot, or a snapshot the plugin did not make: it stays
 			out = append(out, keptSnapshot{Name: snap.Name})
 		}
 	}
@@ -236,6 +240,13 @@ func (d *CSIISCSiDriver) cleanIntermediateSnapshots(ctx context.Context, pool st
 	return out, nil
 }
 
+// deleteLUN deletes a volume. The appliance refuses the delete of a zvol
+// that has a snapshot, "volume has children", or a clone. Either refusal
+// can come from an intermediate snapshot that a clone no longer needs, so
+// the cleanup of intermediate snapshots runs for both, and the delete is
+// sent again when the cleanup leaves no snapshot. A volume that still has
+// snapshots is not deleted: the error names them, and its code is the one
+// the controller answers FailedPrecondition.
 func (d *CSIISCSiDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) (err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
@@ -244,7 +255,9 @@ func (d *CSIISCSiDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeD
 		"section": "driver",
 	})
 
-	forceUmount := true
+	// force_umount false: a delete never detaches a zvol from its target;
+	// only DettachVolumeFromTarget does that.
+	forceUmount := false
 	deldata := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
 	err = d.re.DeleteVolume(ctx, pool, vd.VDS(), deldata)
 
@@ -261,51 +274,37 @@ func (d *CSIISCSiDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeD
 	}
 	l.Debugf("Volume %s is busy, indentifying relaying resources", vd.Name())
 
-	if err.GetCode() == jrest.RestErrorResourceBusy {
-		snaps, gserr := d.cleanIntermediateSnapshots(ctx, pool, vd)
+	snaps, gserr := d.cleanIntermediateSnapshots(ctx, pool, vd)
+	if gserr != nil {
+		switch gserr.GetCode() {
+		case jrest.RestErrorResourceDNE:
+			return gserr
+		default:
+			// TODO: think about providing better error information for cases
+			// when we are not able to provide proper list of dependent snapshots
+			return err
+		}
+	}
+	l.Debugf("Snapshots after cleaning intermediate one %+v", snaps)
 
-		if gserr != nil {
-			switch gserr.GetCode() {
-			case jrest.RestErrorResourceDNE:
-				return gserr
-			default:
-				// TODO: think about providing better error information for cases
-				// when we are not able to provide proper list of dependent snapshots
-				return err
-			}
-		}
-		l.Debugf("Snapshots after cleaning intermediate one %+v", snaps)
-		// Looks like this volume is busy and we are not able to delete it
-
-		var dvols []string
-		var dsnaps []string
-		var ncsi []string
-		msg := fmt.Sprintf("Volume %s is dependent upon by", vd.Name())
-
-		for _, snap := range snaps {
-			if IsSDS(snap.Name) {
-				dsnaps = append(dsnaps, snap.Name)
-			} else if IsVDS(snap.Name) {
-				dvols = append(dvols, snap.Clones...)
-			} else {
-				msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(dsnaps[:], ","))
-			}
-		}
-
-		if len(dvols) > 0 {
-			msg += fmt.Sprintf(" volumes: %s", strings.Join(dvols[:], ","))
-		}
-		if len(dsnaps) > 0 {
-			msg += fmt.Sprintf(" snapshots: %s", strings.Join(dsnaps[:], ","))
-		}
-		if len(ncsi) > 0 {
-			msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(ncsi[:], ","))
-		}
-		err = jrest.GetError(jrest.RestErrorResourceBusy, msg)
-		// fmt.Sprintf("%s %v %v", msg, dsnaps, dvols))
+	if len(snaps) > 0 {
+		// the volume has snapshots, and stays
+		return volumeHasSnapshots(vd.Name(), snaps)
 	}
 
-	return err
+	// The cleanup left no snapshot: what refused the delete is gone, or
+	// was never a snapshot of this volume.
+	err = d.re.DeleteVolume(ctx, pool, vd.VDS(), deldata)
+	switch jrest.ErrCode(err) {
+	case jrest.RestErrorOk, jrest.RestErrorResourceDNE:
+		return nil
+	case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusyVolumeHasSnapshots:
+		// still refused, with no snapshot to name: the appliance's own words
+		return jrest.GetError(jrest.RestErrorResourceBusy,
+			fmt.Sprintf("Volume %s is dependent upon by: %s", vd.Name(), err.Error()))
+	default:
+		return err
+	}
 }
 
 func (d *CSIISCSiDriver) DeleteVolume(ctx context.Context, pool string, vid *VolumeDesc) jrest.RestError {
@@ -319,7 +318,10 @@ func (d *CSIISCSiDriver) DeleteVolume(ctx context.Context, pool string, vid *Vol
 	return d.deleteLUN(ctx, pool, vid)
 }
 
-func (d *CSIISCSiDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (vols interface{}, tnew *CSIListingToken, err jrest.RestError) {
+// ListAllVolumes returns the volumes of the plugin on the pool that follow
+// the place the token gives, maxret of them at most, all when maxret is 0,
+// and the token of the next call when volumes follow.
+func (d *CSIISCSiDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token *CSIListingToken) (vols interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllVolumes",
@@ -327,28 +329,33 @@ func (d *CSIISCSiDriver) ListAllVolumes(ctx context.Context, pool string, maxret
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceVolume, err jrest.RestError) {
-		l.Debugln("Getting Volume entries")
-		entr, err := d.re.GetVolumesEntries(ctx, pool, token.Page(), token.DC())
-		if err != nil {
-			return nil, err
-		}
-
-		if entries, ok := entr.Entries.(*[]jrest.ResourceVolume); ok == true {
-			return *entries, nil
-		}
-		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
-		return nil, nil
-	}
-
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestVolumeEntryBasedID); err != nil {
+	entries, tnew, err := listEntries(ctx,
+		func(ctx context.Context, page, perPage int) ([]jrest.ResourceVolume, jrest.RestError) {
+			return d.re.GetVolumesEntries(ctx, pool, page, perPage)
+		},
+		func(v jrest.ResourceVolume) string { return v.Name },
+		sameVolume,
+		func(v jrest.ResourceVolume) bool { return ownVolumeName(l, v.Name) },
+		func(v jrest.ResourceVolume) string { return keyPart(v.Name) },
+		token, maxret)
+	if err != nil {
 		return nil, nil, err
-	} else {
-		return entries, csitoken, nil
 	}
+	return entries, tnew, nil
 }
 
-func (d *CSIISCSiDriver) ListAllSnapshots(ctx context.Context, pool string, maxret int, token CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
+// ownSnapshot reports whether an entry of a snapshot list is a snapshot of
+// a zvol. Both lists of all snapshots return the snapshots of zvols and of
+// NAS volumes together, so this driver drops those of NAS volumes; another
+// kind of parent is kept.
+func (d *CSIISCSiDriver) ownSnapshot(s jrest.ResourceSnapshotShort) bool {
+	return s.Parent.Type != jrest.SnapshotParentNASVolume
+}
+
+// ListAllSnapshots does for the snapshots of the pool what ListAllVolumes
+// does for its volumes, in the order of the parent's name and then of the
+// snapshot's.
+func (d *CSIISCSiDriver) ListAllSnapshots(ctx context.Context, pool string, maxret int, token *CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllSnapshots",
@@ -356,31 +363,26 @@ func (d *CSIISCSiDriver) ListAllSnapshots(ctx context.Context, pool string, maxr
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceSnapshotShort, err jrest.RestError) {
-		l.Debugln("Getting SnapshotShort entries")
-		entr, err := d.re.GetSnapshotsEntries(ctx, pool, token.Page(), token.DC())
-		if err != nil {
-			return nil, err
-		}
-
-		if entries, ok := entr.Entries.(*[]jrest.ResourceSnapshotShort); ok == true {
-			return *entries, nil
-		}
-		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
-		return nil, nil
-	}
-
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestSnapshotShortEntryBasedID); err != nil {
+	entries, tnew, err := listEntries(ctx,
+		func(ctx context.Context, page, perPage int) ([]jrest.ResourceSnapshotShort, jrest.RestError) {
+			return d.re.GetSnapshotsEntries(ctx, pool, page, perPage)
+		},
+		func(s jrest.ResourceSnapshotShort) string { return s.Name },
+		sameSnapshot,
+		func(s jrest.ResourceSnapshotShort) bool {
+			return d.ownSnapshot(s) && ownSnapshotNames(l, s.Parent.Name, s.Name)
+		},
+		func(s jrest.ResourceSnapshotShort) string { return snapshotsListKey(s.Parent.Name, s.Name) },
+		token, maxret)
+	if err != nil {
 		return nil, nil, err
-	} else {
-		// ts := csitoken.Token()
-		return entries, csitoken, nil
 	}
+	return entries, tnew, nil
 }
 
 // ListVolumeSnapshots provides maxret records of snapshots of volume starting from token
 // if no token nor limit on number of snapshot is given it will list all snapshots of particular volume
-func (d *CSIISCSiDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSIISCSiDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token *CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListVolumeSnapshots",
@@ -388,26 +390,39 @@ func (d *CSIISCSiDriver) ListVolumeSnapshots(ctx context.Context, pool string, v
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceSnapshotShort, err jrest.RestError) {
-		l.Debugln("Getting Volume Snapshots entries")
-		entr, err := d.re.GetVolumeSnapshotsEntries(ctx, pool, vid.VDS(), token.Page(), token.DC())
-		if err != nil {
-			return nil, err
-		}
-
-		if entries, ok := entr.Entries.(*[]jrest.ResourceSnapshotShort); ok == true {
-			return *entries, nil
-		}
-		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
-		return nil, nil
-	}
-
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestSnapshotEntryBasedID); err != nil {
+	entries, tnew, err := listEntries(ctx,
+		func(ctx context.Context, page, perPage int) ([]jrest.ResourceSnapshotShort, jrest.RestError) {
+			return d.re.GetVolumeSnapshotsEntries(ctx, pool, vid.VDS(), page, perPage)
+		},
+		func(s jrest.ResourceSnapshotShort) string { return s.Name },
+		sameSnapshot,
+		func(s jrest.ResourceSnapshotShort) bool { return d.ownSnapshot(s) && ownSnapshotName(l, vid, s.Name) },
+		func(s jrest.ResourceSnapshotShort) string { return keyPart(s.Name) },
+		token, maxret)
+	if err != nil {
 		return nil, nil, err
-	} else {
-		// ts := csitoken.Token()
-		return entries, csitoken, nil
 	}
+	return entries, tnew, nil
+}
+
+// volumeSnapshots reads every snapshot of one volume, with no token and no
+// limit, and whatever its name: the cleanup looks at the snapshots the
+// plugin did not make too.
+func (d *CSIISCSiDriver) volumeSnapshots(ctx context.Context, pool string, vd *VolumeDesc) ([]jrest.ResourceSnapshotShort, jrest.RestError) {
+	read, err := readList(ctx,
+		func(ctx context.Context, page, perPage int) ([]jrest.ResourceSnapshotShort, jrest.RestError) {
+			return d.re.GetVolumeSnapshotsEntries(ctx, pool, vd.VDS(), page, perPage)
+		})
+	if err != nil {
+		return nil, err
+	}
+	var snaps []jrest.ResourceSnapshotShort
+	for _, s := range mergePages(read, func(s jrest.ResourceSnapshotShort) string { return s.Name }, sameSnapshot) {
+		if d.ownSnapshot(s) {
+			snaps = append(snaps, s)
+		}
+	}
+	return snaps, nil
 }
 
 func NewJovianDSSCSIISCSiDriver(cfg *jcom.RestEndpointCfg, l *logrus.Entry) (d CSIDriver, err error) {
@@ -492,7 +507,11 @@ func (d *CSIISCSiDriver) DeleteSnapshot(ctx context.Context, pool string, ld Lun
 
 	l.Debugf("Delete snapshot %s for volume %s", sd.SDS(), ld.VDS())
 
-	forceUmount := true
+	// force_umount false: a delete never detaches a zvol from its target;
+
+	// only DettachVolumeFromTarget does that.
+
+	forceUmount := false
 	deldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 
 	err := d.re.DeleteSnapshot(ctx, pool, ld.VDS(), sd.SDS(), deldata)
@@ -521,13 +540,25 @@ func (d *CSIISCSiDriver) DeleteSnapshot(ctx context.Context, pool string, ld Lun
 	}
 
 	if len(dsnaps) > 0 {
-		forceUmount := true
+		// force_umount false: a delete never detaches a zvol from its target;
+		// only DettachVolumeFromTarget does that.
+		forceUmount := false
 		delclone := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
 
 		for _, snapclone := range dsnaps {
-			if rErr := d.re.DeleteClone(ctx, pool, ld.VDS(), sd.SDS(), snapclone, delclone); rErr != nil {
+			rErr := d.re.DeleteClone(ctx, pool, ld.VDS(), sd.SDS(), snapclone, delclone)
+			switch jrest.ErrCode(rErr) {
+			case jrest.RestErrorOk:
+			case jrest.RestErrorResourceDNE:
+				// the clone is gone already: nothing is in the way
+			case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusyVolumeHasSnapshots:
+				// the clone has clones or snapshots of its own
 				msg = fmt.Sprintf("Unable to delete snapshot %s with ID %s because it has volume associated with it %s that cant be deleted, please delete physical zvol first", sd.Name(), sd.CSIID(), snapclone)
 				return jrest.GetError(jrest.RestErrorResourceBusy, msg)
+			default:
+				// any other failure keeps its own meaning: a lost
+				// connection is not "busy"
+				return rErr
 			}
 		}
 	}

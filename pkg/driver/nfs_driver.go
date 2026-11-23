@@ -256,25 +256,15 @@ func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool stri
 		"func":    "cleanIntermediateSnapshots",
 		"section": "driver",
 	})
-	token := NewCSIListingToken()
-	isnaps, _, gserr := d.ListVolumeSnapshots(ctx, pool, vd, 0, token)
-
-	// The error of the listing comes first: a real error, such as "not
-	// found", must not turn into a failed typecast.
+	snaps, gserr := d.volumeSnapshots(ctx, pool, vd)
 	if gserr != nil {
 		l.Debugf("Unable to get list of snapshots for volume %s", vd.Name())
 		return nil, gserr
 	}
-
-	snaps, ok := isnaps.([]jrest.ResourceNASSnapshotShort)
-	if !ok {
-		err = jrest.GetError(jrest.RestErrorFailureUnknown, "Unable to typecast snapshot data")
-		return nil, err
-	}
 	l.Debugf("Clean intermediate snapshots return %d records", len(snaps))
 
 	for _, snap := range snaps {
-		if IsVDS(snap.Name) {
+		if isIntermediate(snap.Name) {
 			// An intermediate snapshot. The appliance deletes a NAS snapshot
 			// that has a clone, and the clone with it, and a list entry does
 			// not say whether the snapshot has clones. So the appliance is
@@ -289,12 +279,22 @@ func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool stri
 					return d.re.DeleteNASSnapshot(ctx, pool, vd.VDS(), sname)
 				})
 			if derr != nil {
+				if derr.GetCode() == jrest.RestErrorResourceDNE {
+					// The snapshot went away after the list was read: it is
+					// in the way no longer. Only "not found" for the list
+					// itself says that the volume is gone; passed on from
+					// here, it would let the volume go with the snapshots
+					// that are still to be looked at.
+					l.Debugf("Intermediate snapshot %s of volume %s is gone: %s", sname, vd.Name(), derr.Error())
+					continue
+				}
 				return nil, derr
 			}
 			if !deleted {
 				out = append(out, keptSnapshot{Name: sname, Clones: clonesNames(clones)})
 			}
-		} else if IsSDS(snap.Name) {
+		} else {
+			// a CSI snapshot, or a snapshot the plugin did not make: it stays
 			out = append(out, keptSnapshot{Name: snap.Name})
 		}
 	}
@@ -338,6 +338,16 @@ func (d *CSINFSDriver) deleteNASVolAndShare(ctx context.Context, pool string, vd
 	return nil
 }
 
+// deleteLUN deletes a NAS volume. The appliance does not refuse the delete
+// of a NAS volume that has a snapshot: it deletes the snapshots with it. So
+// the driver looks first: it reads the snapshots of the volume, runs the
+// cleanup of the intermediate ones, and sends the delete only when no
+// snapshot is left. A volume that still has snapshots is not deleted: the
+// error names them, and its code is the one the controller answers
+// FailedPrecondition.
+//
+// A snapshot made between the read and the delete is not seen, and goes
+// with the volume: the appliance has no delete that spares snapshots.
 func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDesc) (err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
@@ -345,66 +355,37 @@ func (d *CSINFSDriver) deleteLUN(ctx context.Context, pool string, vd *VolumeDes
 		"section": "driver",
 	})
 
+	snaps, gserr := d.cleanIntermediateSnapshots(ctx, pool, vd)
+	switch jrest.ErrCode(gserr) {
+	case jrest.RestErrorOk:
+		if len(snaps) > 0 {
+			// the volume has snapshots, and stays
+			l.Debugf("Snapshots after cleaning intermediate one %+v", snaps)
+			return volumeHasSnapshots(vd.Name(), snaps)
+		}
+	case jrest.RestErrorResourceDNE:
+		// The volume is not there, so it has no snapshot to lose. The delete
+		// is sent all the same, and answers for itself.
+		l.Debugf("NAS volume %s has no snapshot list: %s", vd.Name(), gserr.Error())
+	default:
+		// the snapshots could not be read: nothing is deleted
+		return gserr
+	}
+
 	err = d.deleteNASVolAndShare(ctx, pool, vd)
 
 	switch jrest.ErrCode(err) {
-	case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusyVolumeHasSnapshots:
-		break
 	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNEVolume:
 		l.Debugf("NAS volume %s do not exists. Do nothing.", vd.Name())
 		return nil
 	case jrest.RestErrorOk:
 		return nil
 	default:
+		// RestErrorResourceBusy among them: a volume whose snapshot has a
+		// clone outside the plugin's names
 		l.Debugf("Unable to delete lun %s, error had happaned %+v", vd.Name(), err.Error())
 		return err
 	}
-	l.Debugf("Volume %s is busy, indentifying relaying resources", vd.Name())
-
-	if err.GetCode() == jrest.RestErrorResourceBusy {
-		snaps, gserr := d.cleanIntermediateSnapshots(ctx, pool, vd)
-
-		if gserr != nil {
-			switch gserr.GetCode() {
-			case jrest.RestErrorResourceDNE:
-				return gserr
-			default:
-				// TODO: think about providing better error information for cases
-				// when we are not able to provide proper list of dependent snapshots
-				return err
-			}
-		}
-		l.Debugf("Snapshots after cleaning intermediate one %+v", snaps)
-		// Looks like this volume is busy and we are not able to delete it
-
-		var dvols []string
-		var dsnaps []string
-		var ncsi []string
-		msg := fmt.Sprintf("Volume %s is dependent upon by", vd.Name())
-
-		for _, snap := range snaps {
-			if IsSDS(snap.Name) {
-				dsnaps = append(dsnaps, snap.Name)
-			} else if IsVDS(snap.Name) {
-				dvols = append(dvols, snap.Clones...)
-			} else {
-				msg += fmt.Sprintf(" not CSI relates snapshots: %s", strings.Join(dsnaps[:], ","))
-			}
-		}
-
-		if len(dvols) > 0 {
-			msg += fmt.Sprintf(" volumes: %s", strings.Join(dvols[:], ","))
-		}
-		if len(dsnaps) > 0 {
-			msg += fmt.Sprintf(" snapshots: %s", strings.Join(dsnaps[:], ","))
-		}
-		if len(ncsi) > 0 {
-			msg += fmt.Sprintf(" not CSI related snapshots: %s", strings.Join(ncsi[:], ","))
-		}
-		err = jrest.GetError(jrest.RestErrorResourceBusy, msg)
-	}
-
-	return err
 }
 
 func (d *CSINFSDriver) DeleteVolume(ctx context.Context, pool string, vid *VolumeDesc) jrest.RestError {
@@ -417,69 +398,71 @@ func (d *CSINFSDriver) DeleteVolume(ctx context.Context, pool string, vid *Volum
 	return d.deleteLUN(ctx, pool, vid)
 }
 
-func (d *CSINFSDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token CSIListingToken) (vols interface{}, tnew *CSIListingToken, err jrest.RestError) {
+// ListAllVolumes returns the NAS volumes of the plugin on the pool that
+// follow the place the token gives, maxret of them at most, all when maxret
+// is 0, and the token of the next call when volumes follow.
+func (d *CSINFSDriver) ListAllVolumes(ctx context.Context, pool string, maxret int, token *CSIListingToken) (vols interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllVolumes",
+		"proto":   "NFS",
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceNASVolume, err jrest.RestError) {
-		l.Debugln("Getting Volume entries")
-		entr, err := d.re.GetNASVolumesEntries(ctx, pool, token.Page(), token.DC())
-		if err != nil {
-			return nil, err
-		}
-
-		if entries, ok := entr.Entries.(*[]jrest.ResourceNASVolume); ok == true {
-			return *entries, nil
-		}
-		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
-		return nil, nil
-	}
-
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestNASVolumeEntryBasedID); err != nil {
+	entries, tnew, err := listEntries(ctx,
+		func(ctx context.Context, page, perPage int) ([]jrest.ResourceNASVolume, jrest.RestError) {
+			return d.re.GetNASVolumesEntries(ctx, pool, page, perPage)
+		},
+		func(v jrest.ResourceNASVolume) string { return v.Name },
+		sameNASVolume,
+		func(v jrest.ResourceNASVolume) bool { return ownVolumeName(l, v.Name) },
+		func(v jrest.ResourceNASVolume) string { return keyPart(v.Name) },
+		token, maxret)
+	if err != nil {
 		return nil, nil, err
-	} else {
-		return entries, csitoken, nil
 	}
+	return entries, tnew, nil
 }
 
-func (d *CSINFSDriver) ListAllSnapshots(ctx context.Context, pool string, maxret int, token CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
+// ownSnapshot reports whether an entry of a snapshot list is a snapshot of
+// a NAS volume. Both lists of all snapshots return the snapshots of zvols
+// and of NAS volumes together, so this driver drops those of zvols; another
+// kind of parent is kept.
+func (d *CSINFSDriver) ownSnapshot(s jrest.ResourceNASSnapshotShort) bool {
+	return s.Parent.Type != jrest.SnapshotParentVolume
+}
+
+// ListAllSnapshots does for the NAS snapshots of the pool what
+// ListAllVolumes does for its NAS volumes, in the order of the parent's
+// name and then of the snapshot's.
+func (d *CSINFSDriver) ListAllSnapshots(ctx context.Context, pool string, maxret int, token *CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListAllSnapshots",
+		"proto":   "NFS",
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceNASSnapshotShort, err jrest.RestError) {
-		l.Debugln("Getting SnapshotShort entries")
-		entr, err := d.re.GetNASSnapshotsEntries(ctx, pool, token.Page(), token.DC())
-		if err != nil {
-			return nil, err
-		}
-		l.Debugf("Rest returned entries %+v", entr)
-
-		if entries, ok := entr.Entries.(*[]jrest.ResourceNASSnapshotShort); ok == true {
-			return *entries, nil
-		}
-		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
-		return nil, nil
-	}
-
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestNASSnapshotShortEntryBasedID); err != nil {
-		l.Warnf("Getting snapshots error %+v", err)
+	entries, tnew, err := listEntries(ctx,
+		func(ctx context.Context, page, perPage int) ([]jrest.ResourceNASSnapshotShort, jrest.RestError) {
+			return d.re.GetNASSnapshotsEntries(ctx, pool, page, perPage)
+		},
+		func(s jrest.ResourceNASSnapshotShort) string { return s.Name },
+		sameNASSnapshot,
+		func(s jrest.ResourceNASSnapshotShort) bool {
+			return d.ownSnapshot(s) && ownSnapshotNames(l, s.Parent.Name, s.Name)
+		},
+		func(s jrest.ResourceNASSnapshotShort) string { return snapshotsListKey(s.Parent.Name, s.Name) },
+		token, maxret)
+	if err != nil {
 		return nil, nil, err
-	} else {
-		// ts := csitoken.Token()
-		l.Debugf("Entries %+v", entries)
-		return entries, csitoken, nil
 	}
+	return entries, tnew, nil
 }
 
 // ListVolumeSnapshots provides maxret records of snapshots of volume starting from token
 // if no token nor limit on number of snapshot is given it will list all snapshots of particular volume
-func (d *CSINFSDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
+func (d *CSINFSDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid *VolumeDesc, maxret int, token *CSIListingToken) (snaps interface{}, tnew *CSIListingToken, err jrest.RestError) {
 	l := jcom.LFC(ctx)
 	l = l.WithFields(logrus.Fields{
 		"func":    "ListNASVolumeSnapshots",
@@ -487,25 +470,41 @@ func (d *CSINFSDriver) ListVolumeSnapshots(ctx context.Context, pool string, vid
 		"section": "driver",
 	})
 
-	grf := func(ctx context.Context, token CSIListingToken) (lres []jrest.ResourceNASSnapshotShort, err jrest.RestError) {
-		l.Debugln("Getting Volume Snapshots entries")
-		entr, err := d.re.GetNASVolumeSnapshotsEntries(ctx, pool, vid.VDS(), token.Page(), token.DC())
-		if err != nil {
-			return nil, err
-		}
-
-		if entries, ok := entr.Entries.(*[]jrest.ResourceNASSnapshotShort); ok == true {
-			return *entries, nil
-		}
-		l.Warnf("Unable to identify format of %+v, it have %T", entr.Entries, entr.Entries)
-		return nil, nil
-	}
-
-	if entries, csitoken, err := getResourcesList(ctx, maxret, token, grf, RestNASVolumeSnapshotEntryBasedID); err != nil {
+	entries, tnew, err := listEntries(ctx,
+		func(ctx context.Context, page, perPage int) ([]jrest.ResourceNASSnapshotShort, jrest.RestError) {
+			return d.re.GetNASVolumeSnapshotsEntries(ctx, pool, vid.VDS(), page, perPage)
+		},
+		func(s jrest.ResourceNASSnapshotShort) string { return s.Name },
+		sameNASSnapshot,
+		func(s jrest.ResourceNASSnapshotShort) bool {
+			return d.ownSnapshot(s) && ownSnapshotName(l, vid, s.Name)
+		},
+		func(s jrest.ResourceNASSnapshotShort) string { return keyPart(s.Name) },
+		token, maxret)
+	if err != nil {
 		return nil, nil, err
-	} else {
-		return entries, csitoken, nil
 	}
+	return entries, tnew, nil
+}
+
+// volumeSnapshots reads every snapshot of one NAS volume, with no token and
+// no limit, and whatever its name: the cleanup looks at the snapshots the
+// plugin did not make too.
+func (d *CSINFSDriver) volumeSnapshots(ctx context.Context, pool string, vd *VolumeDesc) ([]jrest.ResourceNASSnapshotShort, jrest.RestError) {
+	read, err := readList(ctx,
+		func(ctx context.Context, page, perPage int) ([]jrest.ResourceNASSnapshotShort, jrest.RestError) {
+			return d.re.GetNASVolumeSnapshotsEntries(ctx, pool, vd.VDS(), page, perPage)
+		})
+	if err != nil {
+		return nil, err
+	}
+	var snaps []jrest.ResourceNASSnapshotShort
+	for _, s := range mergePages(read, func(s jrest.ResourceNASSnapshotShort) string { return s.Name }, sameNASSnapshot) {
+		if d.ownSnapshot(s) {
+			snaps = append(snaps, s)
+		}
+	}
+	return snaps, nil
 }
 
 func NewJovianDSSCSINFSDriver(cfg *jcom.RestEndpointCfg, l *logrus.Entry) (d CSIDriver, err error) {
@@ -625,9 +624,19 @@ func (d *CSINFSDriver) DeleteSnapshot(ctx context.Context, pool string, ld LunDe
 		// delclone := jrest.DeleteVolumeDescriptor{ForceUmount: &forceUmount}
 
 		for _, snapclone := range dsnaps {
-			if rErr := d.re.DeleteNASClone(ctx, pool, ld.VDS(), sd.SDS(), snapclone); rErr != nil {
+			rErr := d.re.DeleteNASClone(ctx, pool, ld.VDS(), sd.SDS(), snapclone)
+			switch jrest.ErrCode(rErr) {
+			case jrest.RestErrorOk:
+			case jrest.RestErrorResourceDNE:
+				// the clone is gone already: nothing is in the way
+			case jrest.RestErrorResourceBusy, jrest.RestErrorResourceBusyVolumeHasSnapshots:
+				// the clone has clones or snapshots of its own
 				msg = fmt.Sprintf("Unable to delete snapshot %s with ID %s because it has volume associated with it %s that cant be deleted, please delete physical zvol first", sd.Name(), sd.CSIID(), snapclone)
 				return jrest.GetError(jrest.RestErrorResourceBusy, msg)
+			default:
+				// any other failure keeps its own meaning: a lost
+				// connection is not "busy"
+				return rErr
 			}
 		}
 	}

@@ -62,11 +62,16 @@ func NewVolumeDescFromName(name string) (*VolumeDesc, error) {
 		return nil, status.Error(codes.InvalidArgument, "Name missing in request")
 	}
 
-	if len(name) <= 240 {
+	// The name on the appliance is also the CSI ID of the volume, and CSI
+	// limits a string field to 128 bytes: with the three characters of the
+	// prefix, a name of at most maxGeneratedName bytes fits, in its plain
+	// form or in its base32 form. A longer one takes the hash form, which is
+	// 67 characters. 128 is also within the 131 the appliance takes.
+	if len(name) <= maxGeneratedName {
 		if allowedSymbolsRegexp.MatchString(name) {
 			vid.vds = "vp_" + name
 			vid.idFormat = "vp"
-		} else if bname := jcom.JBase32FromStr(name); len(bname) <= 240 {
+		} else if bname := jcom.JBase32FromStr(name); len(bname) <= maxGeneratedName {
 			vid.vds = "vb_" + bname
 			vid.idFormat = "vb"
 		} else {
@@ -144,8 +149,41 @@ func NewVolumeDescFromVDS(vds string) (*VolumeDesc, error) {
 	return &vd, nil
 }
 
+// NewVolumeDescFromCSIID reads the ID of a volume that came in through a
+// CSI request. The plugin does not control such an ID: it comes back from
+// Kubernetes in every later request, and anyone allowed to create a static
+// PersistentVolume can put any string there. So it is checked against the
+// rules the appliance has for the name of a zvol or a NAS volume, and an ID
+// that breaks them is refused with InvalidArgument before any REST call.
 func NewVolumeDescFromCSIID(csiid string) (*VolumeDesc, error) {
+	if err := checkApplianceName(csiid); err != nil {
+		return nil, status.Errorf(codes.InvalidArgument, "Volume ID %q is refused: %s", csiid, err.Error())
+	}
 	return NewVolumeDescFromVDS(csiid)
+}
+
+// The rules for the name of a zvol, a clone, a NAS volume and a NAS clone
+// on the appliance. It refuses any other character, and a name of more than
+// 132; 131 keeps one character of margin.
+const (
+	maxApplianceName = 131
+	maxGeneratedName = 125 // the CSI name, or its base32 form, behind a prefix of three
+)
+
+var applianceNameRegexp = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// checkApplianceName says why a name cannot be the name of a volume on the
+// appliance, and nil for one that can.
+func checkApplianceName(name string) error {
+	switch {
+	case name == "":
+		return fmt.Errorf("it is empty")
+	case len(name) > maxApplianceName:
+		return fmt.Errorf("it has %d characters, and a name on the appliance has at most %d", len(name), maxApplianceName)
+	case !applianceNameRegexp.MatchString(name):
+		return fmt.Errorf("a name on the appliance holds only a-z, A-Z, 0-9, _ and -")
+	}
+	return nil
 }
 
 func (vid *VolumeDesc) Name() string {

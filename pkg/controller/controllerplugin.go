@@ -25,6 +25,7 @@ import (
 	//"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -138,6 +139,30 @@ func parseOrigin(or string) (*origin, error) {
 	return &out, nil
 }
 
+// The rule for the name of an iSCSI target: lower case only, which the
+// appliance does not require but the plugin keeps to, and 220 characters at
+// most, the longest name seen accepted.
+const maxTargetName = 220
+
+var targetNameRegexp = regexp.MustCompile(`^[a-z0-9]([a-z0-9.:-]*[a-z0-9])?$`)
+
+// checkIQNPrefix checks the iscsi.iqn setting once, at setup. The plugin
+// builds the name of a target as <prefix>:<hash>, where the hash is 64
+// lower-case hex digits, so the setting decides whether the name meets the
+// rule for target names.
+func checkIQNPrefix(prefix string) error {
+	if !targetNameRegexp.MatchString(prefix) {
+		return status.Errorf(codes.InvalidArgument,
+			"iscsi.iqn: %q is refused: the prefix of a target name holds only a-z, 0-9, '.', ':' and '-', and starts and ends with a letter or a digit", prefix)
+	}
+	if len(prefix)+1+64 > maxTargetName {
+		return status.Errorf(codes.InvalidArgument,
+			"iscsi.iqn: %q is refused: with ':' and the 64 characters of the hash a target name would have %d characters, and it has at most %d",
+			prefix, len(prefix)+1+64, maxTargetName)
+	}
+	return nil
+}
+
 // SetupControllerPlugin set controller plugin struct with proper values
 func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err error) {
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
@@ -166,6 +191,10 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
 
 			if len(cfg.ISCSIEndpointCfg.Iqn) == 0 {
 				cfg.ISCSIEndpointCfg.Iqn = "iqn.csi.2019-04"
+			}
+			if err = checkIQNPrefix(cfg.ISCSIEndpointCfg.Iqn); err != nil {
+				cp.le.Errorf("%s", err.Error())
+				return err
 			}
 			cp.iqnPrefix = cfg.ISCSIEndpointCfg.Iqn
 		}
@@ -390,6 +419,7 @@ func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.Volu
 //
 // if volume with same name exists yet does not fall into requirments it fails with ALLREADY_EXISTS
 // if volume does not exists it fails with NOT_FOUND
+// if the volume cannot be read for any other reason it fails with INTERNAL
 // if volume do exists and fit requirmnets it will return csi volume struct and nil as error
 func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDesc, caprage *csi.CapacityRange, source *csi.VolumeContentSource) (*int64, error) {
 	l := jcom.LFC(ctx)
@@ -408,6 +438,13 @@ func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDe
 		if jerr.GetCode() == jrest.RestErrorResourceDNE {
 			return nil, status.Error(codes.NotFound, jerr.Error())
 		}
+		// Any other failure says nothing about the volume, and gives none to
+		// read: an appliance that cannot be reached, a certificate that does
+		// not verify, a failed login.
+		return nil, status.Error(codes.Internal, jerr.Error())
+	}
+	if vdata == nil {
+		return nil, status.Errorf(codes.Internal, "No data of volume %s", vd.Name())
 	}
 
 	s := vdata.GetSize()
@@ -585,17 +622,19 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	maxEnt := int64(req.GetMaxEntries())
 	startingToken := req.GetStartingToken()
-	token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken)
 
+	if maxEnt < 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "Number of Entries must not be negative.")
+	}
+
+	// A token that does not parse, has another version or was issued for
+	// another list is answered Aborted, as CSI prescribes.
+	token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken, jdrvr.VolumesList())
 	if rErr != nil {
 		return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
 	}
 
-	if maxEnt < 0 {
-		return nil, status.Errorf(codes.Internal, "Number of Entries must not be negative.")
-	}
-	l.Debugf("Driver %+v", cp.d)
-	if volList, ts, rErr := cp.d.ListAllVolumes(ctx, cp.pool, int(maxEnt), *token); rErr != nil {
+	if volList, ts, rErr := cp.d.ListAllVolumes(ctx, cp.pool, int(maxEnt), token); rErr != nil {
 		l.Debugf("Unable to comlete listing %s", rErr.Error())
 		return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error())
 	} else {
@@ -748,11 +787,6 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	sourceVolumeId := req.GetSourceVolumeId()
 	snapshotId := req.GetSnapshotId()
 	startingToken := req.GetStartingToken()
-	token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken)
-
-	if rErr != nil {
-		return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
-	}
 
 	if maxEnt < 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "Number of Entries must not be negative.")
@@ -763,7 +797,18 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		if vd, err := jdrvr.NewVolumeDescFromCSIID(sourceVolumeId); err != nil {
 			return nil, err
 		} else {
-			if snapList, ts, rErr := cp.d.ListVolumeSnapshots(ctx, cp.pool, vd, int(maxEnt), *token); rErr != nil {
+			// the token of the list of this volume's snapshots, and of no other
+			token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken, jdrvr.VolumeSnapshotsList(vd.VDS()))
+			if rErr != nil {
+				return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
+			}
+			if snapList, ts, rErr := cp.d.ListVolumeSnapshots(ctx, cp.pool, vd, int(maxEnt), token); rErr != nil {
+				if jrest.ErrCode(rErr) == jrest.RestErrorResourceDNE {
+					// CSI: a source volume that does not exist is an empty
+					// list, not an error.
+					l.Debugf("Volume %s does not exist, it has no snapshots: %s", vd.Name(), rErr.Error())
+					return &resp, nil
+				}
 				return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error())
 			} else {
 				if ts != nil {
@@ -805,7 +850,11 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		l.Debugf("get snapshot %s", snapshotId)
 	} else {
 		l.Debugln("listing all snapshots")
-		if snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, int(maxEnt), *token); rErr != nil {
+		token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken, jdrvr.SnapshotsList())
+		if rErr != nil {
+			return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
+		}
+		if snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, int(maxEnt), token); rErr != nil {
 			return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error())
 		} else {
 			if ts != nil {
@@ -829,7 +878,11 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("ControllerPublishVolume: volume %s, node %s, read only %t, capability %+v", req.GetVolumeId(), req.GetNodeId(), req.GetReadonly(), req.GetVolumeCapability())
+	// The capability is logged by its access mode and type alone: its mount
+	// flags come from a StorageClass and can hold a password.
+	l.Debugf("ControllerPublishVolume: volume %s, node %s, read only %t, access mode %s, block %t",
+		req.GetVolumeId(), req.GetNodeId(), req.GetReadonly(),
+		req.GetVolumeCapability().GetAccessMode().GetMode(), req.GetVolumeCapability().GetBlock() != nil)
 	var err error
 
 	vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId())

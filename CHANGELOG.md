@@ -38,6 +38,13 @@ Everything on `master` after v1.1.0, including the `nfs-support` branch
 - Talos patches in `deploy/talos/`: a `KernelModuleConfig` document for the
   iSCSI modules (the old single-document patch is kept as
   `modulepatch-legacy.yaml`) and `workload-isolation-patch.yaml`.
+- Settings of the `endpoint` section: `cafile` and `insecure` for the
+  certificate of the storage, `retrydelay`, the pause before a `GET` answered
+  without data is sent again, and `maxreplysize`, the largest reply the plugin
+  reads (1 MiB when not set). `tries`, which nothing read before, is the
+  number of times such a `GET` is sent.
+- Unit tests, run by `make test`, on replies recorded from a JovianDSS 1
+  appliance (`pkg/rest/testdata`), and `make vet`.
 
 ### Changed
 
@@ -46,6 +53,39 @@ Everything on `master` after v1.1.0, including the `nfs-support` branch
   calls it. The oldest supported JovianDSS 1 release is `1.0up33.65410`; an
   older release, or one that serves a different API v4, stops working after
   the upgrade.
+- **The certificate of the storage is checked by default.** A JovianDSS that
+  presents a self-signed certificate, as it does until an administrator
+  imports one, is refused after the upgrade until the `endpoint` section of
+  the configuration sets `cafile`, to the certificate or its CA, or `insecure:
+  true` (`docs/configuration.md`, "Certificate of the storage"). The plugin
+  uses HTTPS only, with TLS 1.2 or newer, and follows no redirect; `prot` is
+  no longer needed, and a value other than `https` is refused.
+- A volume that has a snapshot is not deleted: `DeleteVolume` answers
+  `FailedPrecondition` and names what is in the way, for iSCSI and NFS, where
+  it answered `Internal` before. Leftover snapshots that the plugin made
+  itself while cloning are removed first.
+- `ListVolumes` and `ListSnapshots` read the whole list of the storage on
+  every call and resume after the last name returned. A `next_token` of an
+  earlier build is refused with `Aborted`, as is any token the plugin did not
+  issue for that list; a negative `max_entries` is answered `InvalidArgument`.
+  A call returns `max_entries` entries whenever that many follow.
+- Volume and snapshot IDs of a CSI request are checked against the names the
+  storage takes, and refused with `InvalidArgument` before any request is
+  sent. The name the plugin gives a new volume, which is also its CSI ID, has
+  128 characters at most; a volume that an earlier build made under a longer
+  name is no longer found by its CSI name.
+- `iscsi.iqn` is checked at start: lower case letters, digits, `.`, `:` and
+  `-`, and 155 characters at most.
+- Errors of the storage are recognised by status, class, errno and message
+  for each request, from the replies recorded on JovianDSS 1 with API v4: a
+  missing pool, a failed login, a name that is too long, a full pool on the
+  NAS volume create, and a repeated snapshot or share create among them. An
+  error the plugin does not know is reported with everything the storage
+  sent, and logged once.
+- The iSCSI deletes send `force_umount: false`.
+- The configuration guides describe the keys the code reads: `pool` is a key
+  of the top level, the log file key is `logfile`, only the first address of
+  `endpoint.addrs` is used.
 - Node plugin reworked: new stage and publish code on `k8s.io/mount-utils`, and
   a different error code when a volume cannot be attached.
 - Container images are built from CentOS Stream 9 instead of Ubuntu.
@@ -62,8 +102,34 @@ Everything on `master` after v1.1.0, including the `nfs-support` branch
 - The old driver code, replaced by the shared driver interface with one
   implementation per protocol.
 
+### Fixed
+
+- NFS `DeleteVolume` destroyed every snapshot of the volume: the storage
+  deletes a NAS volume together with its snapshots, and the plugin did not
+  look first.
+- The clean-up of the snapshots that the plugin makes while cloning deleted a
+  snapshot without asking whether it had clones; on NFS the storage then
+  deletes the clones with it. The clones are read first.
+- A repeated NFS `CreateVolume` failed for ever on "Share already exists".
+  An existing share is taken when its path is the volume's own.
+- `ControllerUnpublishVolume` left the target behind when the volume was no
+  longer attached to it.
+- A volume with a leftover clone snapshot could never be deleted.
+- The lists of one volume's snapshots returned nothing on iSCSI and failed on
+  NFS; the lists of all snapshots mixed the snapshots of zvols and of NAS
+  volumes.
+- The controller crashed on any `starting_token` that was not empty, on a
+  request that got no reply (an address that does not resolve, a refused
+  connection, a timeout), on a failed reply without an error body, and on a
+  bad `endpoint` configuration.
+
 ### Security
 
+- Request bodies, which can hold a CHAP password, request headers, which hold
+  the REST password, and whole CSI requests are no longer logged at any
+  level.
+- Names put into a REST path are escaped, and an empty name, `.` and `..` are
+  refused, so that an ID from a CSI request cannot address another object.
 - `golang.org/x/net` (v0.24.0) and `google.golang.org/grpc` updated against
   the HTTP/2 Rapid Reset attack on the gRPC server (#6).
 

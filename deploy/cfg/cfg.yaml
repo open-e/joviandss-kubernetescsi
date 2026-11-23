@@ -1,19 +1,21 @@
 loglevel  : Info
-logpath   : /tmp/csi-log
-pool      : Pool-0
+# logfile : /tmp/csi-log # without it the log goes to standard output
+pool      : Pool-0 # pool name that you have created on JovianDSS
 endpoint :
-  name: MainStorage
   addrs:
-    - 192.168.0.100 # 192.168.0.3
-  port: 82 # 82
+    - 192.168.0.100 # only the first address is used
+  port: 82
   user: admin # JovianDSS Web/REST user name
   pass: admin # JovianDSS Web/REST user passowrd
-  prot: https
-  pool: Pool-0  # pool name that you have created on JovianDSS
-  tries: 3
+  # The certificate of the storage is checked. For a storage with a
+  # self-signed certificate set one of these (docs/configuration.md):
+  # cafile: /config/ca.pem # the certificate of the storage, or of its CA
+  # insecure: true         # no check at all
   idletimeout: 30s
+  tries: 3        # a GET answered without data is sent this many times in all
+  retrydelay: 1s  # the pause before it is sent again
 iscsi:
-  iqn : iqn.csi.2019-04 
+  iqn : iqn.csi.2019-04
   addrs:
     - 192.168.0.100 # IP address that would be used to attach volumes over ISCSI
   port: 3260

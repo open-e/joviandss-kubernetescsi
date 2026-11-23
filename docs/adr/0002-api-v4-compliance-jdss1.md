@@ -488,6 +488,10 @@ whatever the implementation changes in what it states: the read fields of
 Table 5 ([question 51](#decisions)) and the minimum release
 ([question 58](#decisions)) are the changes it expects
 (user decision, [question 72](#decisions)).
+One thing in the order differs in the series as it is written: the fixtures,
+their unit tests and the package comment of stage 2 stand after the first
+two commits of stage 3, because those tests pass every recorded error
+through the handler of a failed reply, which stage 3 makes.
 
 ### First commit: make `go vet` pass in `pkg/rest` and `pkg/controller`
 [First_commit_make_go_vet_pass_in_pkg_rest_and_pkg_controller](#first-commit-make-go-vet-pass-in-pkgrest-and-pkgcontroller)
@@ -747,7 +751,8 @@ decoders do today) to `pkg/rest/types_methods.go`, with a
 same way: transcribe the reply sub-types `Disk`, `ShareNFS` and `ShareSMB`
 under their names, and move the envelopes `GeneralResponse` and
 `ResultEntries` and the two regular expressions the accessors use
-to `types_methods.go`. `jdss-rest-api-spec` stays read only: the user runs its
+to `types_methods.go`. Stage 3 removes both envelopes: its handler reads the
+error object of a reply itself, and its list calls return a typed page. `jdss-rest-api-spec` stays read only: the user runs its
 tools, and reading its tracked files needs none of them. When the `jdss-rest-api-spec` project adds recordings, read the types again from the path files
 that changed between the header's commit and the new one, and review the diff of
 `types.go`. Two checks guard the types: the audit compares
@@ -860,6 +865,15 @@ it fail; run on the current code, the tool gives the
 recorded error of a plugin call that the catalogue does not cover for that call; it lists the entries marked "not in the spec" apart, not as faults; and it
 writes nothing into `jdss-rest-api-spec`.
 
+The tool as it is written ([question 51](#decisions)): it reads each call's
+method, path, success statuses, catalogue and types from the source of
+`pkg/rest`, and lists Table 4's deliberate changes apart, as notes that are
+no faults: `is_clone`, optional by decision where the OpenAPI has it
+required, and a key that is not read and that one of two replies sharing a
+type lacks, as `full_name` and `is_clone` of the NAS clones reply. A status
+that a call accepts and no recording shows is a note too. It exits with
+status 1 when a check finds a fault.
+
 #### impl_plugin_rest_return_parse_errors
 
 **Return parse errors** ([bug_plugin_rest_pool_and_snapshot_unmarshal_swallow_parse_errors](#bug_plugin_rest_pool_and_snapshot_unmarshal_swallow_parse_errors)). Two custom decoders swallow a
@@ -936,7 +950,7 @@ Fix the rest of [response content](#response-content-and-defaults), of the [erro
   parent's, [bug_rest_v4_snapshot_and_clone_creates_missing_pool_and_missing_parent_errors_overlap](#bug_rest_v4_snapshot_and_clone_creates_missing_pool_and_missing_parent_errors_overlap),
   so take it there as the parent missing, [question 48](#decisions)); map "name too
   long" to `RestErrorArgumentIncorrect`, a code the drivers return
-  today but the mapping in `errors.go` never produces; and on v4 map the snapshot list of a missing parent to "not found".
+  today but the mapping in `errors.go` never produces; and on v4 map the snapshot list of a missing parent to "not found". Make the controller answer that code from the list of one volume's snapshots with an empty list: CSI asks for one when the source volume does not exist, and the iSCSI driver returned one while its list was a stub.
   The caller that turns every zvol `DeleteClone` error into `Busy`
   (`iscsi_driver.go:520`) is a finding of its own, [bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy](#bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy),
   fixed by [impl_plugin_rest_error_catalogue](#impl_plugin_rest_error_catalogue) below.
@@ -1009,8 +1023,10 @@ Fix the rest of [response content](#response-content-and-defaults), of the [erro
   T11.9).
 - **The paging of the CSI lists** (user decision, [question 60](#decisions)):
   [impl_plugin_csi_list_paging_resumes_after_last_name](#impl_plugin_csi_list_paging_resumes_after_last_name) below. It comes
-  after the per-volume lists send their requests and after the filter by
-  kind, because it counts only the entries a reply carries.
+  after the per-volume lists send their requests, and delivers the filter by
+  kind with it: a page is counted as the appliance sent it, and the other
+  driver's snapshots are dropped after that count and before the cut, a
+  place that only the paging has.
 
 #### impl_plugin_volume_snapshot_lists_decode_short_entries_and_callers_follow
 
@@ -1035,7 +1051,18 @@ commits:
   `GetNASVolumeSnapshotClones`: the calls both drivers already make when a
   snapshot delete is refused), and delete the snapshot only when that reply
   lists no clone. When the call fails, nothing is deleted and the cleanup
-  returns the error ([question 34](#decisions)). It costs one more request
+  returns the error ([question 34](#decisions)), but for one failure: when
+  the appliance answers that the snapshot itself is gone, to the read of its
+  clones or to its delete, go on to the next snapshot. That snapshot is in
+  the way no longer, and only "not found" for the list says that the volume
+  is gone: passed on, the code would make the NFS driver delete a volume
+  whose other snapshots it has not looked at, and the iSCSI driver report a
+  volume deleted that is still there. Take a snapshot for an intermediate
+  one only when its name reads as the name of a volume of the plugin
+  (`NewVolumeDescFromVDS`), since it carries the name of the volume cloned
+  through it; the first letter alone, which the code tested, also fits a
+  snapshot made by hand, and the cleanup deletes what it takes for
+  intermediate. It costs one more request
   per intermediate snapshot. Have the cleanup hand back, with each snapshot it keeps, the clones it read, so that `deleteLUN` names them in its message as it does today.
 
 What must hold: a fixture of each per-volume list decodes into its short
@@ -1110,6 +1137,10 @@ only ([question 61](#decisions)).
   the second, since the next call starts after that key.
 - **The token.** Put in it a version, the list it was issued for (the
   volumes, all snapshots, or the snapshots of one volume, for which a hash of the volume's name stands) and a bound: the shortest string that sorts after the key of the last entry returned, or is equal to it, and before the key of the next one; the next call starts after the bound. Keep the token one ASCII string of at most 128 bytes, the limit CSI sets for a string field, with no page and no `_dc`: a key alone can be longer, since an appliance name can have 131 characters and a key of the list of all snapshots holds two names. Where even the bound does not fit, because the two keys share a long beginning, put in its first bytes and a hash of each of the two keys; the next call then starts at the next entry or after the last one, whichever it finds, and after those first bytes when it finds neither ([risk 29](#risks), [question 68](#decisions)).
+  Write a byte of a name that only a name made by hand can hold, anything
+  but printable ASCII, and `!`, `%` and `~`, into a key as `%` and two hex
+  digits, so that a token is printable ASCII whatever the appliance holds;
+  a name the plugin made is written as it is.
   Set `next_token` only when an entry follows the last one returned.
   Answer a `starting_token` that does not parse, has another version or
   belongs to another list with `Aborted`, as CSI prescribes for an invalid
@@ -1121,7 +1152,9 @@ only ([question 61](#decisions)).
   (`snaptoken.go:60-62`); the base64 ID functions
   (`driver/restwrappers.go:29-57`); and `snapshotToken` with
   `NewSnapshotTokenFromStr` (`snaptoken.go:115-170`), which nothing calls
-  and which reads `parts[3]` after checking that there are three parts.
+  and which reads `parts[3]` after checking that there are three parts; and
+  the `ResultEntries` envelope with the type assertion each driver made on
+  it, since the six list calls of `pkg/rest` return a typed page.
 
 Leave ListSnapshots by `snapshot_id` as it is: it reads that one snapshot
 and is not paged. `cleanIntermediateSnapshots` reads one volume's
@@ -1134,6 +1167,13 @@ csi-sanity resumes no list here ([question 63](#decisions)). `go test` vets
 a package before it runs its tests, and both packages pass that vet since
 the first commit
 ([impl_plugin_ctrl_no_format_string_from_error_text](#impl_plugin_ctrl_no_format_string_from_error_text)).
+The series tests more of the two packages than the paging: the volume
+delete, the cleanup of intermediate snapshots, the clone deletes and the
+share check of both drivers run against a fake appliance
+(`net/http/httptest`), which records the requests each flow sends, and the
+controller's answers to a negative `max_entries` and to a foreign token are
+tested with a driver that stands in for the real one. `make test` runs
+`pkg/common` as well, from the configuration item of stage 4 on.
 
 What must hold: calls that start with no token and follow `next_token`
 return every entry of a list that does not change, each exactly once and in key order, for
@@ -1218,6 +1258,73 @@ handling errors.
   parent missing, the volume on the snapshot creates and the snapshot on the clone creates,
   never as the pool missing, and give its entry a `TODO` comment saying that the
   missing parent cannot be told from a missing pool ([question 48](#decisions)).
+- **How the catalogue is written.** Write it into one file,
+  `pkg/rest/error_catalogue.go`, as the reply types are written into
+  `types.go`, with the `jdss-rest-api-spec` commit in its header. In the
+  scenarios files a kind of error has one status, one `class`, one `errno`
+  and one pattern whatever the call, so write each kind once, as an
+  `errorKind`, and for each call the list of its kinds with the code each one
+  means for that call (`kind.means(code)`): 95 kinds and 210 entries over
+  the 32 calls at commit `434c9cd`. The entries of a call are tried in
+  order and the first that matches decides, so put an entry whose pattern
+  also matches the message of another after that other. Two kinds have no
+  pattern in the spec, `ValidationError_6317af` and `ValidationError_7d2ccd`:
+  match them on status, `class` and `errno` alone. Three kinds of the target
+  create cannot be told apart by status, `class`, `errno` and pattern,
+  `TargetNameConflictErrorTargetWithNameIqnOrgHurltest`,
+  `TargetNameConflictErrorTargetWithNameIsAlreadyPresent_7a89c4` and
+  `TargetNameConflictErrorTargetWithNameIsAlreadyPresent_cfbcb7`, and the
+  first holds the IQN prefix of the hurl tests in its pattern: all three
+  mean "exists", a reply gets the second code of the first of them that
+  matches, and the three are reported to the `jdss-rest-api-spec` project
+  as one error. Keep the message of an appliance error on one line in the
+  `RestError`: some messages list the datasets in the way on lines of their
+  own.
+- **The entries that get another code than before**, 63 of the 210; the 147
+  others keep the code their call returned, 107 of them Unknown:
+  - a missing pool, `RestErrorResourceDNEPool` (new, 17): the kinds
+    `ItemNotFoundErrorPoolDoesNotExist`, `ItemNotFoundErrorPoolNotFound`,
+    `ItemNotFoundErrorTargetPartitionNotExists`,
+    `ZpoolError1GivenZpoolDoesnTExists`,
+    `ZfsCmdError0CannotOpenDatasetDoesNotExist_96e556` on the NAS volume
+    create, and `ZfsResourceError1ZfsResourceNotFoundInThis_597b56`, whose
+    message names `<pool>@<pool>`, on the calls that are not creates;
+  - a name too long, `RestErrorArgumentIncorrect`:
+    `ZvolValidationError1ZvolNameTooLongZvolName`,
+    `DatasetValidationError1DatasetNameTooLongDatasetName`, the four kinds
+    `ZfsCmdError1000CannotOpenNameIsTooLong`, the two kinds
+    `ZfsCmdError201CannotCreateSnapshotNameIsToo` and
+    `OSError36ErrnoFileNameTooLongNfs`. `Target name is too long.` shares
+    the kind `ValidationError_7d2ccd`, which has no pattern, with other
+    messages, and stays Unknown;
+  - `ItemNotFoundErrorTargetNotExists` is `RestErrorResourceDNETarget` on
+    the four target calls that get it, and
+    `ItemNotFoundErrorVolumeNameIsNotAttachedTo` is
+    `RestErrorResourceDNELun` (new, 18);
+  - `ItemNotFoundErrorResourceNotFound`, the five `NotFound` kinds of the
+    NAS clone delete, and on the snapshot and clone creates the two kinds
+    that can be the pool or the parent, are `RestErrorResourceDNE`;
+  - `ZfsResourceError5SnapshotAlreadyExists` and
+    `Unclassed1ShareAlreadyExists` are `RestErrorResourceExists`,
+    `ZfsOeErrorInOrderToDeleteADataset` is `RestErrorResourceBusy`, and
+    `ZfsCmdError4CannotCreateOutOfSpace` is `RestErrorOutOfSpace`;
+  - a reply without a JSON error body: 401 and 403 are `RestErrorAuthFailed`
+    (new, 19), 404 is `RestErrorResourceDNE`.
+
+  Give `Error()` a text for every code, so that no known error is printed
+  as "Unknown internal Error".
+- **The entries not in the spec, as they are written.** Five: the old
+  `Resource ... already exists.` with errno 1 and with errno 100, on the six
+  creates of volumes, clones and snapshots; the old `Zfs resource: ... not
+  found in this collection` without an errno, on the fifteen calls that list
+  a kind of that message; `cannot create ...: out of space` with errno 4 on
+  the zvol create; and `cannot create snapshots : out of space` with errno
+  1000 on the NAS snapshot create. No recording gives the status or the
+  `class` of the two old patterns, so their entries take any. The two
+  out-of-space entries are 500 with the class `zfslib.wrap.zfs.ZfsCmdError`,
+  as the jdss1 v3 and jdss2 recordings show them. They stand after the
+  entries of the spec in each call, and an error they match gets the code
+  of the layer of its class as its second code.
 - **Codes that say what happened, per kind**, as the Proxmox plugin's `jdssc`
   does (`jdssc/jdssc/jovian_common/exception.py`: not found per volume, snapshot, target and pool; already exists per volume, snapshot and dataset; busy; communication failure): give each kind its own code, for example volume not found, snapshot already exists, volume has clones, pool missing, out of space, invalid argument, authentication failed, and make callers decide on the code alone, never on message text.
 - **A code for each kind of error, by layer** (user decision,
@@ -1284,7 +1391,7 @@ handling errors.
   the caller's default until the work on those modules decides otherwise
   ([Relationship](#relationship-to-other-designs)). This stage changes a
   caller only where an earlier decision says so. Let no caller map "any error" to one meaning: fix the zvol `DeleteClone` caller that does so today ([bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy](#bug_plugin_driver_zvol_snapshot_delete_every_clone_delete_error_taken_as_busy), `iscsi_driver.go:520`), and, for review [bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children](#bug_plugin_driver_delete_volume_snapshot_cleanup_only_on_busy_not_on_has_children), keep `volume has children` on its own code (`RestErrorResourceBusyVolumeHasSnapshots` today) and
-  make `DeleteVolume` run the intermediate-snapshot cleanup for it too. Do not delete a volume that still has snapshots after the cleanup, on iSCSI and NFS alike (user decision): answer `FailedPrecondition`, naming them, as CSI asks for a volume with snapshots, where today a volume with a CSI snapshot gets `Internal`. The NFS driver has to look first, since the appliance deletes a NAS volume together with its snapshots ([dataloss_plugin_driver_nfs_delete_volume_destroys_its_snapshots](#dataloss_plugin_driver_nfs_delete_volume_destroys_its_snapshots)): make its `DeleteVolume` read the volume's snapshots, through the per-volume list this stage repairs, run the cleanup, and send the delete only when no snapshot is left.
+  make `DeleteVolume` run the intermediate-snapshot cleanup for it too. Do not delete a volume that still has snapshots after the cleanup, on iSCSI and NFS alike (user decision): answer `FailedPrecondition`, naming them, as CSI asks for a volume with snapshots, where today a volume with a CSI snapshot gets `Internal`. The NFS driver has to look first, since the appliance deletes a NAS volume together with its snapshots ([dataloss_plugin_driver_nfs_delete_volume_destroys_its_snapshots](#dataloss_plugin_driver_nfs_delete_volume_destroys_its_snapshots)): make its `DeleteVolume` read the volume's snapshots, through the per-volume list this stage repairs, run the cleanup, and send the delete only when no snapshot is left. On iSCSI, where the appliance refuses, send the delete again when the cleanup leaves no snapshot. Count a snapshot that the plugin did not make as a snapshot in both drivers: it keeps its volume as a CSI snapshot does, and the error names it. Fix the NFS caller of `DeleteNASClone` as the zvol one is fixed: it returned every error as `Busy` too (`nfs_driver.go:636`).
 - **Kept complete by the audit:** [impl_lab_rest_audit_tool](#impl_lab_rest_audit_tool) lists every recorded error of a plugin
   call that the catalogue does not cover for that call, so a new error in a hurl run shows up as
   a failed check.
@@ -1348,6 +1455,17 @@ not offer such a role (confirmed by the user), so the plugin keeps using the adm
   empty. Go calls `String()` whenever the endpoint is formatted with `%v` or
   `%s`, so today a log line alone can panic.
 
+One guard stands outside `pkg/rest`. `VolumeComply`
+(`controllerplugin.go:404-412`), the first step of CreateVolume, returns
+only for "not found" when the read of the volume fails, and then reads the
+size of a volume it does not have. The certificate check of this stage
+makes that crash likely on an upgrade: an appliance with its self-signed
+certificate, and neither `cafile` nor `insecure` set, would end the
+controller on every CreateVolume. Make it return `Internal` with the cause
+for every failure of the read that is not "not found". The other crashes
+of the controller stay with the work on that module
+([Relationship](#relationship-to-other-designs)).
+
 What must hold, one condition per crash: a refused or timed-out connection returns a
 `RestError` that names its kind ([crash_plugin_rest_nil_response_on_transport_error](#crash_plugin_rest_nil_response_on_transport_error)); a
 configuration without `prot` works as HTTPS and one with `prot: http` is refused with
@@ -1362,7 +1480,8 @@ and the transport errors.
 
 **Escape path segments** ([security_plugin_rest_unescaped_path_segments](#security_plugin_rest_unescaped_path_segments); user decision): pass every
 name or ID put into a REST path through `url.PathEscape`, in all path
-builders in `pkg/rest`. A name then stays one path segment: `/`, `?`, `#`, `%` and
+builders in `pkg/rest`; one function, `apiPath`, builds the path of all 32
+calls from a format and the names that go into it. A name then stays one path segment: `/`, `?`, `#`, `%` and
 spaces are encoded and can no longer add segments, cut the path short or start a
 query. `url.PathEscape` does not change `.` or `..`, and does not catch an empty
 name, so it does not stop a name from addressing the parent or the collection;
@@ -1455,7 +1574,10 @@ guide that puts `pool` in the wrong place still gets no pool.
   (`pkg/common/common.go:50-66`) a `yaml` tag with the name the guides use:
   both structs have only `json` tags today, and yaml.v3 finds their keys
   only through its fallback to the lowercased field name; a key added later
-  in this stage comes with its tag;
+  in this stage comes with its tag. Tag `NFSEndpointCfg` the same way. The
+  two keys of `ISCSIEndpointCfg` that nothing reads, `namelen` and
+  `passlen`, take the names of their `json` tags, where the fallback read
+  `vnamelen` and `vpasslen`;
 - correct both configuration guides, `docs/configuration.md` and
   `docs/configuration-nfs.md`: `pool` belongs at the top level, not under
   `endpoint` (`pkg/common/common.go:76`); the key is `logfile`, not
@@ -1465,6 +1587,13 @@ guide that puts `pool` in the wrong place still gets no pool.
   pause for a GET answered without data, and say that no other request is
   sent again: not a DELETE answered 204, which is a success, and not a
   request that failed ([question 39](#decisions)).
+
+Correct the example `deploy/cfg/cfg.yaml` with the guides: it has `logpath`
+and a `pool` under `endpoint` too. Show `logfile` commented out in the
+examples: set, it moves the log from standard output into a file in the
+container. A unit test in `pkg/common` reads the example of each guide and
+the example file through `SetupConfig` and checks the pool and every key of
+the endpoint, so a guide that drifts from the code fails `make test`.
 
 What must hold: every key of `RestEndpointCfg` and `ISCSIEndpointCfg` has a
 `yaml` tag with the name the guides give it; both guides put `pool` at the
@@ -1580,6 +1709,18 @@ hand-written types, **before** any fix, the same fixtures show the failures
 [bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_volumes_volume_snapshots_post_already_exists_unrecognised), [bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_post_already_exists_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_post_already_exists_unrecognised), [bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone](#bug_rest_v4_pools_pool_san_iscsi_targets_target_luns_lun_delete_404_not_attached_taken_as_target_gone), [bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_delete_has_clones_message_unrecognised), [bug_rest_v4_shares_post_409_already_exists_unrecognised](#bug_rest_v4_shares_post_409_already_exists_unrecognised), [bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised](#bug_rest_v4_pools_pool_nas_volumes_dataset_snapshots_snapshot_clones_clone_delete_404_not_exists_unrecognised) and [bug_plugin_rest_get_error_maps_body_only_ignores_http_status](#bug_plugin_rest_get_error_maps_body_only_ignores_http_status) and, with a fake server,
 [bug_plugin_rest_get_calls_decode_body_before_204_check](#bug_plugin_rest_get_calls_decode_body_before_204_check) and [bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay](#bug_plugin_rest_create_target_202_polls_get_target_ten_times_without_delay): the fixtures are
 evidence before they are tests.
+
+The fixtures as they are written: 30 success replies under
+`pkg/rest/testdata/replies/`, listed in `replies.json` with the hurl run,
+file and case of each and what it shows, and 335 error replies under
+`testdata/errors/`, one for each error entry of the scenarios files of the 32
+calls, listed in `errors.json` with the two codes each must get and the code
+its call returned before the catalogue. Two things in them are replaced: an
+address of the lab in the message of one recorded error, by `192.0.2.1`, as
+the spec masks it; and in the pool reply, trimmed to one disk of each vdev,
+the identifiers of the pool and of the disks, by zeros. The tests pass each
+error through the handler with the catalogue of its call, and serve every
+fixture to the call itself from a fake appliance.
 
 #### impl_plugin_rest_request_body_keys_checked_against_schema
 
@@ -4252,6 +4393,9 @@ func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) e
 			return fmt.Errorf("retrydelay: %w", err)
 		}
 	}
+	if cfg.MaxReplySize < 0 {
+		return fmt.Errorf("maxreplysize: %d is refused, it is a number of bytes", cfg.MaxReplySize)
+	}
 
 	tc := &tls.Config{MinVersion: tls.VersionTLS12}
 	switch {
@@ -4288,7 +4432,7 @@ func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) e
 	rp.user = cfg.User
 	rp.pass = cfg.Pass
 	rp.tries = cfg.Tries
-	if rp.tries == 0 {
+	if rp.tries <= 0 {
 		rp.tries = defaultTries
 	}
 	rp.retryDelay = retryDelay
@@ -4506,7 +4650,9 @@ matches none is Unknown, or "not found" for a 404. The catalogue shown is
 that of the LUN detach as its scenarios file holds it at `jdss-rest-api-spec`
 commit `434c9cd`: replies of one status and one class, without `errno`, that
 only the message tells apart; the pool's entry comes first, since its message
-matches the target's pattern too. Each entry gives two codes
+matches the target's pattern too. A kind is written once, with the status,
+class, errno and pattern it has in every scenarios file, and a call's
+catalogue lists its kinds with the code each means for that call. Each entry gives two codes
 ([question 74](#decisions)): what the error means for the call, and the code
 of its kind in the range of its layer, with its number from Table 19
 ([Measurements](#measurements)).
@@ -4575,6 +4721,8 @@ func layerOf(class string) int {
 	return 0
 }
 
+// In error_catalogue.go, transcribed from the scenarios files.
+
 // The kinds of error: one constant for each error model of the spec, under
 // the model's name, numbered once inside the range of its layer and never
 // renumbered. Table 19 lists them all; these three are those of this call.
@@ -4584,53 +4732,101 @@ const (
 	KindItemNotFoundErrorVolumeNameIsNotAttachedTo = LayerProduct + 12 // 4012
 )
 
-// errorEntry is one error a call can get, transcribed from the call's
-// -scenarios.json file. A reply matches it on the status, the class, the
-// errno in its three cases and the message pattern of the error's schema.
+// What a reply of each kind looks like. In the scenarios files a kind has
+// one status, one class, one errno and one pattern whatever the call.
+var (
+	kindItemNotFoundErrorTargetNotExists = errorKind{KindItemNotFoundErrorTargetNotExists, 404, "opene.exceptions.ItemNotFoundError", errnoMissing,
+		regexp.MustCompile(`^Target [\s\S]* not exists\.$`)}
+	kindItemNotFoundErrorTargetPartitionNotExists = errorKind{KindItemNotFoundErrorTargetPartitionNotExists, 404, "opene.exceptions.ItemNotFoundError", errnoMissing,
+		regexp.MustCompile(`^Target partition: [\s\S]* not exists\.$`)}
+	kindItemNotFoundErrorVolumeNameIsNotAttachedTo = errorKind{KindItemNotFoundErrorVolumeNameIsNotAttachedTo, 404, "opene.exceptions.ItemNotFoundError", errnoMissing,
+		regexp.MustCompile(`^Volume name [\s\S]* is not attached to target [\s\S]*$`)}
+)
+
+// The catalogue of DettachVolumeFromTarget,
+// DELETE pools/<pool>/san/iscsi/targets/<target>/luns/<zvol>: its kinds,
+// each with the code it means for this call.
+var dettachVolumeFromTargetErrors = []errorEntry{
+	// the pool's entry first: its message matches the target's pattern too
+	kindItemNotFoundErrorTargetPartitionNotExists.means(RestErrorResourceDNEPool), // new code: the pool is missing
+	kindItemNotFoundErrorTargetNotExists.means(RestErrorResourceDNETarget),        // nothing is left to do
+	kindItemNotFoundErrorVolumeNameIsNotAttachedTo.means(RestErrorResourceDNELun), // new code: the LUN is gone; the caller deletes the target next
+}
+
+// In errors.go.
+
+// errorKind is one error model of the spec: how a reply of that kind looks.
+type errorKind struct {
+	kind    int
+	status  int
+	class   string // "" where the spec lists the class as absent
+	errno   errnoField
+	message *regexp.Regexp // nil where the spec gives the kind no pattern
+}
+
+// means makes the entry of a call's catalogue for this kind of error: code
+// is what the error means for that call.
+func (k errorKind) means(code int) errorEntry {
+	return errorEntry{status: k.status, class: k.class, errno: k.errno, message: k.message, code: code, kind: k.kind}
+}
+
+// What an entry that is not in the spec puts where no recording gives the
+// status or the class of its reply.
+const (
+	anyStatus = 0
+	anyClass  = "*"
+)
+
+// errorEntry is one error a call can get. A reply matches it on the status,
+// the class, the errno in its three cases and the message pattern of the
+// error's schema.
 type errorEntry struct {
 	status  int
-	class   string // "" where the file lists the class as absent
+	class   string
 	errno   errnoField
-	message *regexp.Regexp // the file's pattern; a unit test compiles each
+	message *regexp.Regexp // nil: any message
 	code    int            // what the error means for this call
-	kind    int            // which error the appliance sent
+	kind    int            // which error the appliance sent; 0: not in the spec
 }
 
 func (en errorEntry) matches(status int, e *ErrorT) bool {
-	return status == en.status && e.class() == en.class && e.Errno == en.errno &&
-		e.Message != nil && en.message.MatchString(*e.Message)
+	if en.status != anyStatus && en.status != status {
+		return false
+	}
+	if en.class != anyClass && en.class != e.class() {
+		return false
+	}
+	if en.errno != e.Errno {
+		return false
+	}
+	if en.message == nil {
+		return true
+	}
+	return e.Message != nil && en.message.MatchString(*e.Message)
 }
 
-// In targets.go, beside its call: the catalogue of DettachVolumeFromTarget,
-// DELETE pools/<pool>/san/iscsi/targets/<target>/luns/<zvol>.
-var dettachVolumeFromTargetErrors = []errorEntry{
-	// the pool's entry first: its message matches the target's pattern too
-	{404, "opene.exceptions.ItemNotFoundError", errnoMissing,
-		regexp.MustCompile(`^Target partition: [\s\S]* not exists\.$`),
-		RestErrorResourceDNEPool, // new code: the pool is missing
-		KindItemNotFoundErrorTargetPartitionNotExists},
-	{404, "opene.exceptions.ItemNotFoundError", errnoMissing,
-		regexp.MustCompile(`^Target [\s\S]* not exists\.$`),
-		RestErrorResourceDNETarget, // nothing is left to do
-		KindItemNotFoundErrorTargetNotExists},
-	{404, "opene.exceptions.ItemNotFoundError", errnoMissing,
-		regexp.MustCompile(`^Volume name [\s\S]* is not attached to target [\s\S]*$`),
-		RestErrorResourceDNELun, // new code: the LUN is gone; the caller deletes the target next
-		KindItemNotFoundErrorVolumeNameIsNotAttachedTo},
-}
+// In targets.go.
 
 // DettachVolumeFromTarget ends as every call ends: in its success, or in
-// failedReply with the call's catalogue.
+// failedReply with the call's catalogue. apiPath escapes each name and
+// refuses an empty one, "." and ".."; request sends and checks the status.
 func (s *RestEndpoint) DettachVolumeFromTarget(ctx context.Context, pool string, tname string, vname string) RestError {
-	path, err := lunPath(pool, tname, vname) // each segment escaped and checked
-	if err != nil {
-		return err
+	path := apiPath("/pools/%s/san/iscsi/targets/%s/luns/%s", pool, tname, vname)
+	return s.request(ctx, "DELETE", path, nil, dettachVolumeFromTargetErrors, CodeNoContent)
+}
+
+// In storageapi.go: how a request whose reply holds nothing to read ends.
+func (s *RestEndpoint) request(ctx context.Context, method string, p requestPath, data interface{},
+	entries []errorEntry, ok ...int,
+) RestError {
+	if p.err != nil { // a name that cannot be a part of a path
+		return s.failedReply(ctx, method, p.path, nil, 0, nil, p.err)
 	}
-	status, body, err := s.rp.Send(ctx, "DELETE", path, nil, CodeNoContent)
-	if err == nil && status == CodeNoContent {
+	status, body, err := s.rp.Send(ctx, method, p.path, data, ok[0])
+	if err == nil && isOneOf(status, ok) {
 		return nil
 	}
-	return s.failedReply(ctx, "DELETE", path, dettachVolumeFromTargetErrors, status, body, err)
+	return s.failedReply(ctx, method, p.path, entries, status, body, err)
 }
 
 // In errors.go.
@@ -4639,8 +4835,8 @@ func (s *RestEndpoint) DettachVolumeFromTarget(ctx context.Context, pool string,
 // log line in pkg/rest: at Debug for an error the call's catalogue knows, at
 // Error for an entry that says Unknown on purpose and for anything else.
 // err is an error found before the reply was read as a failure: no reply,
-// a reply over maxreplysize, no data to tries GETs, or a reply that does
-// not decode.
+// a reply over maxreplysize, no data to tries GETs, a reply that does not
+// decode, or a name that cannot go into a path.
 func (s *RestEndpoint) failedReply(ctx context.Context, method, path string, entries []errorEntry,
 	status int, body []byte, err RestError) RestError {
 	l := jcom.LFC(ctx).WithFields(logrus.Fields{"section": "rest", "method": method, "path": path, "status": status})
@@ -4667,7 +4863,13 @@ func (s *RestEndpoint) failedReply(ctx context.Context, method, path string, ent
 	l = l.WithFields(logrus.Fields{"class": e.class(), "errno": e.Errno.String(), "message": e.message()})
 	for _, en := range entries { // the first entry that matches decides
 		if en.matches(status, e) {
-			err = applianceError(en.code, en.kind, e.message())
+			kind := en.kind
+			if kind == 0 {
+				// not in the spec: the code of the layer alone
+				kind = layerOf(e.class())
+			}
+			// the message on one line: some list datasets on lines of their own
+			err = applianceError(en.code, kind, strings.Join(strings.Fields(e.message()), " "))
 			if en.code == RestErrorFailureUnknown {
 				withCodes(err).Error("error of the catalogue, unknown on purpose")
 			} else {
@@ -4724,8 +4926,8 @@ type ResourceVolume struct {
 	Name          string  `json:"name"`            // required
 	VolSize       string  `json:"volsize"`         // required: a number sent as a string
 	Origin        *string `json:"origin"`          // optional: null on a zvol
-	GUID          string  `json:"guid"`            // required, read from stage 3
-	DefaultSCSIID string  `json:"default_scsi_id"` // required, read from stage 3
+	Guid          string  `json:"guid"`            // required, read from stage 3
+	DefaultScsiId string  `json:"default_scsi_id"` // required, read from stage 3
 	IsClone       *bool   `json:"is_clone"`        // optional (question 65), read from stage 3
 
 	// Not read: kept as sent, so that no type of theirs can fail.
@@ -4813,22 +5015,29 @@ func (v *ResourceVolume) OriginSnapshot() string {
 
 // In storageapi.go.
 
-// GetVolume, as every GET with data runs: getWithData, failedReply for a
-// failure, decodeData for the reply.
+// readObject is how every GET of one object runs: getWithData, decodeData
+// for the reply, failedReply for a failure, a reply that does not decode
+// among them.
+func readObject[T any, PT interface {
+	*T
+	replyType
+}](ctx context.Context, s *RestEndpoint, p requestPath, entries []errorEntry, ok ...int) (*T, RestError) {
+	if p.err != nil { // a name that cannot be a part of a path
+		return nil, s.failedReply(ctx, "GET", p.path, nil, 0, nil, p.err)
+	}
+	status, body, err := s.rp.getWithData(ctx, p.path)
+	if err == nil && isOneOf(status, ok) {
+		v := new(T)
+		if err = decodeData(body, PT(v)); err == nil {
+			return v, nil
+		}
+	}
+	return nil, s.failedReply(ctx, "GET", p.path, entries, status, body, err)
+}
+
 func (s *RestEndpoint) GetVolume(ctx context.Context, pool string, vname string) (*ResourceVolume, RestError) {
-	path, err := volumePath(pool, vname) // each segment escaped and checked
-	if err != nil {
-		return nil, err
-	}
-	status, body, err := s.rp.getWithData(ctx, path)
-	if err != nil || status != CodeOK {
-		return nil, s.failedReply(ctx, "GET", path, getVolumeErrors, status, body, err)
-	}
-	var v ResourceVolume
-	if err := decodeData(body, &v); err != nil {
-		return nil, s.failedReply(ctx, "GET", path, nil, status, body, err)
-	}
-	return &v, nil
+	path := apiPath("/pools/%s/volumes/%s", pool, vname) // each name escaped and checked
+	return readObject[ResourceVolume](ctx, s, path, getVolumeErrors, CodeOK)
 }
 ```
 
@@ -4930,7 +5139,27 @@ whose `Token()` the caller writes into `next_token`.
 // volume; for a list of all snapshots, the parent's name, "!" and the
 // snapshot's name. "!" sorts before every character a name of the plugin
 // holds, so the order is by parent, then by name.
-func snapshotsListKey(parent, name string) string { return parent + "!" + name }
+func snapshotsListKey(parent, name string) string { return keyPart(parent) + "!" + keyPart(name) }
+
+// keyPart writes a name into a key. A name the plugin made holds letters,
+// digits, "-", "_" and "=" and is written as it is. Any other byte, which
+// only a name made by hand can hold, is written as "%" and two hex digits,
+// so that a key, and the token made from it, is printable ASCII whatever
+// the appliance holds.
+func keyPart(name string) string {
+	const hex = "0123456789ABCDEF"
+	out := make([]byte, 0, len(name))
+	for i := 0; i < len(name); i++ {
+		// printable ASCII but "!", which parts the two names of a key, "%",
+		// which starts an escaped byte, and "~", the last printable character
+		if c := name[i]; c > '!' && c < '~' && c != '%' {
+			out = append(out, c)
+		} else {
+			out = append(out, '%', hex[c>>4], hex[c&15])
+		}
+	}
+	return string(out)
+}
 
 // cutAfter sorts the entries by key and returns the first limit of them
 // from the place the token gives, all of them when limit is 0; limit is
@@ -5012,6 +5241,9 @@ func shortHash(s string) string {
 // volume's name stands, so that the name does not take room in the token.
 type ListID struct{ tag string }
 
+// Tag returns the name of the list as a token carries it.
+func (l ListID) Tag() string { return l.tag }
+
 func VolumesList() ListID                      { return ListID{"v"} }
 func SnapshotsList() ListID                    { return ListID{"s"} }
 func VolumeSnapshotsList(volume string) ListID { return ListID{"w" + shortHash(volume)[:8]} }
@@ -5026,7 +5258,8 @@ type CSIListingToken struct {
 	hashLast, hashNext string // with prefix only
 }
 
-// bound returns the shortest string b with last <= b < next, for last < next.
+// bound returns the shortest string b with last <= b < next, for
+// last < next: the next call starts after it.
 func bound(last, next string) string {
 	i := 0
 	for i < len(last) && i < len(next) && last[i] == next[i] {
@@ -5035,13 +5268,19 @@ func bound(last, next string) string {
 	switch {
 	case i == len(last): // last is the beginning of next
 		return last
-	case last[i]+1 < next[i]:
-		return last[:i] + string(last[i]+1)
-	case i+1 < len(last):
-		return last[:i+1] + string(last[i+1]+1)
-	default:
-		return last
+	case last[i]+1 < next[i]: // a byte between the two fits
+		return last[:i] + string([]byte{last[i] + 1})
+	case i+1 < len(next): // next[i] follows last[i]: the beginning of next
+		return next[:i+1]
 	}
+	// next ends on the byte that follows last[i]: the bound keeps last[i],
+	// and is made greater than last at the first later byte that has room
+	for j := i + 1; j < len(last); j++ {
+		if last[j] < 0xFF {
+			return last[:j] + string([]byte{last[j] + 1})
+		}
+	}
+	return last
 }
 
 // nextCall is the token of the call after one that returned up to the key
@@ -5065,6 +5304,8 @@ func (t *CSIListingToken) start(keys []string) int {
 		return sort.Search(len(keys), func(i int) bool { return keys[i] > b })
 	}
 	switch {
+	case t == nil:
+		return 0 // no token: the whole list, as the cleanup reads it
 	case t.bound != "":
 		return after(t.bound)
 	case t.prefix == "":
