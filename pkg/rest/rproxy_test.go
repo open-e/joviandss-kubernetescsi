@@ -18,7 +18,16 @@ under the License.
 package rest
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -175,5 +184,190 @@ func TestTriesAndRetryDelay(t *testing.T) {
 	}
 	if n := len(app.seen()); n != 1 {
 		t.Errorf("tries 1: %d requests sent, want 1", n)
+	}
+}
+
+// endpointFor sets up an endpoint for the address of a test server, with
+// the client timeout given.
+func endpointFor(t *testing.T, serverURL string, timeout string) (*RestEndpoint, context.Context) {
+	t.Helper()
+	u, err := url.Parse(serverURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, err := strconv.Atoi(u.Port())
+	if err != nil {
+		t.Fatal(err)
+	}
+	l, _ := testLogger()
+	cfg := jcom.RestEndpointCfg{Addrs: []string{u.Hostname()}, Port: port, User: "admin", Pass: testRestPassword,
+		IdleTimeOut: timeout, RetryDelay: "1ms"}
+	var ep RestEndpoint
+	if err := SetupEndpoint(&ep, &cfg, l); err != nil {
+		t.Fatal(err)
+	}
+	return &ep, withTestLogger(context.Background(), l)
+}
+
+// A request that gets no reply returns a RestError that names the kind of
+// its failure, with 0 as its second code: nothing reads the reply that did
+// not come.
+func TestRequestWithoutAReply(t *testing.T) {
+	// nothing listens on the port: the connection is refused
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	ep, ctx := endpointFor(t, srv.URL, "30s")
+	srv.Close()
+	vol, err := ep.GetVolume(ctx, "Pool-0", "v")
+	if vol != nil || err == nil || err.GetCode() != RestErrorUnableToConnect || err.GetKindCode() != 0 {
+		t.Fatalf("a refused connection: volume %v, error %v", vol, err)
+	}
+	if !strings.Contains(err.Error(), "connection refused or failed") {
+		t.Errorf("a refused connection: %q", err.Error())
+	}
+	if derr := ep.DeleteVolume(ctx, "Pool-0", "v", DeleteVolumeDescriptor{}); derr == nil || derr.GetCode() != RestErrorUnableToConnect {
+		t.Errorf("a refused connection on a delete: %v", derr)
+	}
+
+	// the appliance does not answer in time: the client's own timeout
+	release := make(chan struct{})
+	slow := httptest.NewTLSServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { <-release }))
+	defer slow.Close()
+	defer close(release)
+	ep, ctx = endpointFor(t, slow.URL, "100ms")
+	_, err = ep.GetPool(ctx, "Pool-0")
+	if err == nil || err.GetCode() != RestErrorRequestTimeout || !strings.Contains(err.Error(), "timed out") {
+		t.Errorf("a request without an answer in time: %v", err)
+	}
+}
+
+type timeoutError struct{}
+
+func (timeoutError) Error() string   { return "i/o timeout" }
+func (timeoutError) Timeout() bool   { return true }
+func (timeoutError) Temporary() bool { return true }
+
+// transportError tells the kinds of a failure without a reply apart.
+func TestTransportErrorKinds(t *testing.T) {
+	dial := func(err error) error {
+		return &url.Error{Op: "Get", URL: "https://jdss:82/api/v4/pools/Pool-0", Err: &net.OpError{Op: "dial", Net: "tcp", Err: err}}
+	}
+	for _, c := range []struct {
+		what string
+		err  error
+		code int
+		text string
+	}{
+		{"an address that does not resolve", dial(&net.DNSError{Err: "no such host", Name: "jdss", IsNotFound: true}), RestErrorUnableToConnect, "does not resolve"},
+		{"a refused connection", dial(syscall.ECONNREFUSED), RestErrorUnableToConnect, "connection refused or failed"},
+		{"a dial that times out", dial(timeoutError{}), RestErrorRequestTimeout, "timed out"},
+		{"the client's own timeout", &url.Error{Op: "Get", URL: "https://jdss:82/", Err: timeoutError{}}, RestErrorRequestTimeout, "timed out"},
+		{"a connection reset while the reply is read", &url.Error{Op: "Get", URL: "https://jdss:82/", Err: &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}}, RestErrorRequestMalfunction, "request failed"},
+		{"anything else", errors.New("unexpected EOF"), RestErrorRequestMalfunction, "request failed"},
+	} {
+		err := transportError(c.err)
+		if err.GetCode() != c.code || err.GetKindCode() != 0 || !strings.Contains(err.Error(), c.text) {
+			t.Errorf("%s: %q with the codes %d and %d, want %q with the code %d", c.what, err.Error(), err.GetCode(), err.GetKindCode(), c.text, c.code)
+		}
+	}
+}
+
+// A request that cannot be built is a RestError: the authentication is
+// added only once the request exists.
+func TestRequestThatCannotBeBuilt(t *testing.T) {
+	app := newFakeAppliance(t)
+	app.seen()
+	for _, c := range []struct{ method, path string }{
+		{"GET", "api/v4/pools/Pool\x7f0"},
+		{"BAD METHOD", "api/v4/pools/Pool-0"},
+	} {
+		status, body, err := app.ep.rp.Send(app.ctx, c.method, c.path, nil, CodeOK)
+		if err == nil || err.GetCode() != RestErrorRequestMalfunction || status != 0 || body != nil {
+			t.Errorf("%s %q: status %d, error %v", c.method, c.path, status, err)
+		}
+	}
+	// a request body that does not encode
+	if _, _, err := app.ep.rp.Send(app.ctx, "POST", "api/v4/shares", map[string]interface{}{"f": func() {}}, CodeOK); err == nil || err.GetCode() != RestErrorRequestMalfunction {
+		t.Errorf("a body that does not encode: %v", err)
+	}
+	if n := len(app.seen()); n != 0 {
+		t.Errorf("%d requests reached the appliance", n)
+	}
+}
+
+// A configuration the client cannot use is refused by the name of its
+// setting; the error is returned, logged once, and returned again by every
+// REST call, which never panics.
+func TestSetupErrorIsReturnedByEveryCall(t *testing.T) {
+	good := jcom.RestEndpointCfg{Addrs: []string{"192.0.2.1"}, Port: 82, Prot: "https", IdleTimeOut: "30s"}
+	for _, c := range []struct {
+		setting string
+		change  func(cfg *jcom.RestEndpointCfg)
+	}{
+		{"addrs", func(cfg *jcom.RestEndpointCfg) { cfg.Addrs = nil }},
+		{"prot", func(cfg *jcom.RestEndpointCfg) { cfg.Prot = "http" }},
+		{"idletimeout", func(cfg *jcom.RestEndpointCfg) { cfg.IdleTimeOut = "soon" }},
+		{"idletimeout", func(cfg *jcom.RestEndpointCfg) { cfg.IdleTimeOut = "" }},
+		{"retrydelay", func(cfg *jcom.RestEndpointCfg) { cfg.RetryDelay = "later" }},
+	} {
+		cfg := good
+		c.change(&cfg)
+		l, rec := testLogger()
+		var ep RestEndpoint
+		err := SetupEndpoint(&ep, &cfg, l)
+		if err == nil || !strings.HasPrefix(err.Error(), c.setting+":") {
+			t.Errorf("a bad %s: setup error %v, want one that names the setting", c.setting, err)
+			continue
+		}
+		errors := 0
+		for _, e := range rec.entries {
+			if e.Level == logrus.ErrorLevel && strings.Contains(e.Message, c.setting) {
+				errors++
+			}
+		}
+		if errors != 1 {
+			t.Errorf("a bad %s: %d Error lines that name it, want 1", c.setting, errors)
+		}
+		ctx := withTestLogger(context.Background(), l)
+		_, rerr := ep.GetPool(ctx, "Pool-0")
+		if rerr == nil || rerr.GetCode() != RestErrorRequestMalfunction ||
+			!strings.Contains(rerr.Error(), "REST client not configured") || !strings.Contains(rerr.Error(), c.setting) {
+			t.Errorf("a call after a bad %s: %v", c.setting, rerr)
+		}
+		if rerr := ep.CreateVolume(ctx, "Pool-0", CreateVolumeDescriptor{Name: "v"}); rerr == nil || !strings.Contains(rerr.Error(), c.setting) {
+			t.Errorf("a create after a bad %s: %v", c.setting, rerr)
+		}
+	}
+
+	// an endpoint that was never set up at all
+	var never RestEndpoint
+	l, _ := testLogger()
+	if _, rerr := never.GetPool(withTestLogger(context.Background(), l), "Pool-0"); rerr == nil || !strings.Contains(rerr.Error(), "REST client not configured") {
+		t.Errorf("a call on an endpoint that was never set up: %v", rerr)
+	}
+}
+
+// A configuration without prot works as HTTPS.
+func TestProtIsHTTPSWhenItIsNotSet(t *testing.T) {
+	app := newFakeAppliance(t) // an HTTPS server
+	ep, ctx := endpointFor(t, app.srv.URL, "30s")
+	if ep.rp.prot != "https" {
+		t.Errorf("without prot the scheme is %q", ep.rp.prot)
+	}
+	app.answer(200, "application/json", successBody(t, "GetPool"))
+	if _, err := ep.GetPool(ctx, "Pool-0"); err != nil {
+		t.Errorf("a call of an endpoint without prot: %s", err.Error())
+	}
+}
+
+// An endpoint formats with %v and %s without a panic, with addresses and
+// without.
+func TestEndpointString(t *testing.T) {
+	var empty RestEndpoint
+	if got := fmt.Sprintf("%v %s", &empty, &empty); !strings.Contains(got, "port: 0") {
+		t.Errorf("an endpoint without addresses formats as %q", got)
+	}
+	ep := RestEndpoint{rec: jcom.RestEndpointCfg{Addrs: []string{"192.0.2.1", "192.0.2.2"}, Port: 82}}
+	if got := ep.String(); got != "addrs: 192.0.2.1,192.0.2.2 port: 82" {
+		t.Errorf("an endpoint formats as %q", got)
 	}
 }

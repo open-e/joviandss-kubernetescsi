@@ -19,6 +19,7 @@ package rest
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 
@@ -38,20 +39,17 @@ type RestEndpoint struct {
 	l   *logrus.Entry
 }
 
+// String names the endpoint in a log line. Go calls it whenever the
+// endpoint is formatted with %v or %s, so it reads nothing that may be
+// missing.
 func (re *RestEndpoint) String() string {
-	var ret string
-
-	if len(re.rec.Addrs) > 0 {
-		ret += " addres:"
-		for _, val := range re.rec.Addrs {
-			ret += val
-		}
-	}
-	ret += fmt.Sprintf(" port: %d", re.rec.Port)
-
-	return re.rec.Addrs[0]
+	return fmt.Sprintf("addrs: %s port: %d", strings.Join(re.rec.Addrs, ","), re.rec.Port)
 }
 
+// SetupEndpoint sets the endpoint up and returns the error of a setting it
+// cannot use. It logs that error as well, since its callers drop it, and
+// keeps it for Send, which returns it on every call: a bad configuration
+// then gives an error that names its cause on every REST call.
 func SetupEndpoint(rn *RestEndpoint, cfg *jcom.RestEndpointCfg, logger *logrus.Entry) (err error) {
 	rn.rec = *cfg
 
@@ -59,8 +57,11 @@ func SetupEndpoint(rn *RestEndpoint, cfg *jcom.RestEndpointCfg, logger *logrus.E
 
 	rn.l.Debugf("Setup rest endpoint for addresses %v", cfg.Addrs)
 
-	if ser := SetupRestProxy(&rn.rp, cfg, rn.l); ser != nil {
-		logrus.Errorf("cannot create REST client for: %v", cfg.Addrs)
+	if err = SetupRestProxy(&rn.rp, cfg, rn.l); err != nil {
+		rn.rp.httpRestProxy = nil
+		rn.rp.setupErr = err
+		rn.l.Errorf("cannot set up the REST client for %v: %s", cfg.Addrs, err)
+		return err
 	}
 	return nil
 }
