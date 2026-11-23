@@ -90,7 +90,6 @@ var supportedVolumeCapabilities = []csi.VolumeCapability_AccessMode_Mode{
 type ControllerPlugin struct {
 	l                *log.Logger
 	le               *log.Entry
-	cfg              *ControllerCfg
 	iqnPrefix        string
 	snapReg          string
 	volumesAccess    sync.Mutex

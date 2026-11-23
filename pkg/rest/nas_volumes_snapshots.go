@@ -25,68 +25,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func (s *RestEndpoint) CreateNASVolumeSnapshot(ctx context.Context, pool string, desc *CreateNASVolumeDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes", pool)
-
-	l := jcom.LFC(ctx)
-	l = l.WithFields(log.Fields{
-		"func":    "CreateNASVolume",
-		"section": "rest",
-		"url":     addr,
-	})
-
-	var nasvolume ResourceNASVolume
-	rsp := GeneralResponse{Data: &nasvolume}
-
-	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, GetVolumeRCode)
-	if err != nil {
-		msg := fmt.Sprintf("Unable to create share %s ", desc.Name)
-		l.Warn(msg)
-		return GetError(RestErrorRequestMalfunction, msg)
-	}
-
-	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return errU
-	}
-
-	if stat == CodeOK || stat == CodeCreated {
-		return nil
-	}
-
-	return getError(ctx, body)
-}
-
-func (s *RestEndpoint) DeleteNASVolumeSnapshot(ctx context.Context, pool string, nvds string, nvsds string) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s", pool, nvds, nvsds)
-
-	l := jcom.LFC(ctx)
-	l = l.WithFields(log.Fields{
-		"func":    "DeleteNASVolume",
-		"section": "rest",
-		"url":     addr,
-	})
-
-	var nasvolume ResourceNASVolumeSnapshot
-	rsp := GeneralResponse{Data: &nasvolume}
-
-	stat, body, err := s.rp.Send(ctx, "POST", addr, nil, CodeNoContent)
-	if err != nil {
-		msg := fmt.Sprintf("Unable to delete nas volume %s ", nvds)
-		l.Warn(msg)
-		return GetError(RestErrorRequestMalfunction, msg)
-	}
-
-	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return errU
-	}
-
-	if stat == CodeNoContent {
-		return nil
-	}
-
-	return getError(ctx, body)
-}
-
 // GetNASVolumeSnapshot provides information about specific NAS volume snapshot requested
 func (s *RestEndpoint) GetNASVolumeSnapshot(ctx context.Context, pool string, vname string, sname string) (sdp *ResourceNASVolumeSnapshot, err RestError) {
 	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s", pool, vname, sname)

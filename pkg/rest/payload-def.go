@@ -189,20 +189,8 @@ const GetPoolsRCode = 200
 // 	Refreservation       string
 // }
 
-// GetVolumeData data
-type GetVolumeData struct {
-	Data  *ResourceVolume `json:"data,omitempty"`
-	Error *ErrorT         `json:"error,ommitempty"`
-}
-
 // GetVolumeRCode success response code
 const GetVolumeRCode = 200
-
-// GetVolumesData data structure
-type GetVolumesData struct {
-	Data  *[]ResourceVolume `json:"data"`
-	Error ErrorT            `json:"error"`
-}
 
 // GetVolumesRCode success response code
 const GetVolumesRCode = 200
@@ -215,11 +203,6 @@ const GetVolumesRCode = 200
 //	Name string `json:"name"`
 //	Size string `json:"size"`
 //}
-
-// CreateVolumeData data
-type CreateVolumeData struct {
-	Data CreateVolumeR
-}
 
 // CreateVolumeR response
 type CreateVolumeR struct {
@@ -245,11 +228,6 @@ type DeleteVolume struct {
 	ForceUmount           bool `json:"force_umount"`
 }
 
-// DeleteVolumeData data
-type DeleteVolumeData struct {
-	Error ErrorT
-}
-
 // DeleteVolumeRCode success status code
 const DeleteVolumeRCode = 204
 
@@ -266,11 +244,6 @@ const CreateSnapshotRCode = 200
 
 // CreateSnapshotECodeExists exit code for snapshot exists
 const CreateSnapshotECodeExists = 5
-
-// CreateSnapshotData data
-type CreateSnapshotData struct {
-	Error ErrorT `json:"data"`
-}
 
 ///////////////////////////////////////////////////////////////////////////////
 /// Get Snapshot
@@ -293,12 +266,6 @@ type CreateSnapshotData struct {
 // 	Secondarycache   string
 // }
 
-// GetSnapshotData data
-type GetSnapshotData struct {
-	Data  ResourceSnapshot
-	Error ErrorT
-}
-
 // GetSnapshotRCode success status code
 const GetSnapshotRCode = 200
 
@@ -311,17 +278,6 @@ const GetSnapshotRCodeDNE = 500
 // SnapshotProperties structure
 type SnapshotProperties struct {
 	Creation string
-}
-
-// AllSnapshots structure
-type GetVolumeSnapshotsData struct {
-	Data  ResultEntries `jsom:"data"`
-	Error ErrorT        `json:"error"`
-}
-
-type GetAllSnapshotsData struct {
-	Data  ResultEntries `jsom:"data"`
-	Error ErrorT        `json:"error"`
 }
 
 // AllSnapshots structure
@@ -352,11 +308,6 @@ type DeleteSnapshot struct {
 	Recursively_dependents bool
 }
 
-// DeleteSnapshotData data
-type DeleteSnapshotData struct {
-	Error ErrorT
-}
-
 // DeleteSnapshotRCode success status code
 const DeleteSnapshotRCode = 204
 
@@ -380,12 +331,6 @@ type CreateCloneR struct {
 	Name     string `json:"name"`
 }
 
-// CreateCloneData data
-type CreateCloneData struct {
-	Data  CreateCloneR
-	Error ErrorT
-}
-
 // CreateCloneRCode success status code
 const CreateCloneRCode = 200
 
@@ -399,11 +344,6 @@ type DeleteClone struct {
 	ForceUmount           bool `json:"force_umount"`
 }
 
-// DeleteCloneData data
-type DeleteCloneData struct {
-	Error ErrorT
-}
-
 // DeleteCloneRCode success status code
 const DeleteCloneRCode = 204
 
@@ -413,11 +353,6 @@ const DeleteCloneRCode = 204
 // PromoteClone request
 type PromoteClone struct {
 	Poolname string `json:"poolname"`
-}
-
-// PromoteCloneData response data
-type PromoteCloneData struct {
-	Error ErrorT
 }
 
 // PromoteCloneRCode success status code
@@ -436,12 +371,6 @@ type Target struct {
 	DenyIP              []string `json:"deny_ip"`
 }
 
-// GetTargetData data
-type GetTargetData struct {
-	Data  Target
-	Error ErrorT
-}
-
 // GetTargetRCode success status code
 const GetTargetRCode = 200
 
@@ -456,11 +385,6 @@ type CreateTarget struct {
 	Name                string `json:"name"`
 	Active              bool   `json:"active"`
 	IncomingUsersActive bool   `json:"incoming_users_active"`
-}
-
-// CreateTargetData response data
-type CreateTargetData struct {
-	Error ErrorT
 }
 
 // CreateTargetRCode success status code
@@ -479,11 +403,6 @@ type AttachToTarget struct {
 	Mode string `json:"mode"`
 }
 
-// AttachToTargetData response data
-type AttachToTargetData struct {
-	Error ErrorT
-}
-
 // AttachToTargetRCode success status code
 const AttachToTargetRCode = 201
 
@@ -497,11 +416,6 @@ const DettachFromTargetRCode = 204
 type AddUserToTarget struct {
 	Name     string `json:"name"`
 	Password string `json:"password"`
-}
-
-// AddUserToTargetData data structure
-type AddUserToTargetData struct {
-	Error ErrorT
 }
 
 // AddUserToTargetRCode success status code

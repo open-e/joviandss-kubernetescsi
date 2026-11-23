@@ -56,30 +56,6 @@ type RestProxy struct {
 	timeout   int64
 }
 
-// restProxy - request client for any REST API
-type restProxy struct {
-	addrs         []string
-	active_addr   int
-	port          int
-	authToken     string
-	httpRestProxy *http.Client
-	l             *logrus.Entry
-	prot          string
-	user          string
-	pass          string
-	tries         int
-
-	mu        sync.Mutex
-	requestID int64
-	timeout   int64
-}
-
-// RestProxyInterface - request client interface
-type RestProxyInterface interface {
-	// Send(method, path string, data interface{}, ok int) (int, []byte, error)
-	Send(ctx context.Context, method string, path string, data interface{}, ok int) (int, []byte, RestError)
-}
-
 func (rp *RestProxy) Send(ctx context.Context, method string, path string, data interface{}, ok int) (int, []byte, RestError) {
 	var res *http.Response
 	// var err restError
@@ -162,18 +138,6 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 		return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, "Unable to process response"}
 	}
 	return res.StatusCode, bodyBytes, nil
-}
-
-type RestProxyCfg struct {
-	Addrs       string
-	ActiveAddr  int
-	Port        int
-	Prot        string
-	User        string
-	Pass        string
-	Pool        string
-	IdleTimeOut string // See time Duration
-	Tries       int
 }
 
 // TODO: implement sessions

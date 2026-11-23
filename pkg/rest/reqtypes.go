@@ -165,7 +165,6 @@ type TargetLunDescriptor struct {
 	LUN       *int    `json:"lun,omitempty"`
 	Mode      *string `json:"mode,omitempty"`
 	BlockSize *int    `json:"block_size,omitempty"`
-	EUI       *string `json:"eui,omitempty"`
 }
 
 type CreateShareDescriptor struct {
@@ -208,20 +207,18 @@ type DeleteShareDescriptor struct {
 }
 
 type CreateNASVolumeDescriptor struct {
-	Compression             *Compression  `json:"compression,omitempty"`
-	PrimaryCache            *CacheSetting `json:"primarycache,omitempty"`
-	LogBias                 *LogBias      `json:"logbias,omitempty"`
-	Dedup                   *DedupSetting `json:"dedup,omitempty"`
-	Copies                  *Copies       `json:"copies,omitempty"`
-	Sync                    *SyncSetting  `json:"sync,omitempty"`
-	Quota                   *string       `json:"quota,omitempty"`
-	RefReservation          *string       `json:"refreservation,omitempty"`
-	Reservation             *string       `json:"reservation,omitempty"`
-	ResWithDescendents      *bool         `json:"resWithDescendents,omitempty"`
-	RefquotaWithDescendents *bool         `json:"refquotaWithDescendents,omitempty"`
-	Atime                   *AtimeSetting `json:"atime,omitempty"`
-	SecondaryCache          *CacheSetting `json:"secondarycache,omitempty"`
-	Name                    string        `json:"name"`
+	Compression    *Compression  `json:"compression,omitempty"`
+	PrimaryCache   *CacheSetting `json:"primarycache,omitempty"`
+	LogBias        *LogBias      `json:"logbias,omitempty"`
+	Dedup          *DedupSetting `json:"dedup,omitempty"`
+	Copies         *Copies       `json:"copies,omitempty"`
+	Sync           *SyncSetting  `json:"sync,omitempty"`
+	Quota          *string       `json:"quota,omitempty"`
+	RefReservation *string       `json:"refreservation,omitempty"`
+	Reservation    *string       `json:"reservation,omitempty"`
+	Atime          *AtimeSetting `json:"atime,omitempty"`
+	SecondaryCache *CacheSetting `json:"secondarycache,omitempty"`
+	Name           string        `json:"name"`
 }
 
 type DeleteNASVolumeDescriptor struct {

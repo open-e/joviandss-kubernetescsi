@@ -29,8 +29,6 @@ import (
 	jcom "github.com/open-e/joviandss-kubernetescsi/pkg/common"
 )
 
-type GetResourceEntries func(ctx context.Context, pool string, page int64, dc int64, args interface{}) (ent *ResultEntries, err RestError)
-
 // ListPerPage is the page size sent with every list request. Without
 // per_page an appliance returns pages of its own default size, and
 // JovianDSS 2 ignores page and returns the first page again and again.
