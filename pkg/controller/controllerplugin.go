@@ -419,6 +419,7 @@ func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.Volu
 //
 // if volume with same name exists yet does not fall into requirments it fails with ALLREADY_EXISTS
 // if volume does not exists it fails with NOT_FOUND
+// if the volume cannot be read for any other reason it fails with INTERNAL
 // if volume do exists and fit requirmnets it will return csi volume struct and nil as error
 func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDesc, caprage *csi.CapacityRange, source *csi.VolumeContentSource) (*int64, error) {
 	l := jcom.LFC(ctx)
@@ -437,6 +438,13 @@ func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDe
 		if jerr.GetCode() == jrest.RestErrorResourceDNE {
 			return nil, status.Error(codes.NotFound, jerr.Error())
 		}
+		// Any other failure says nothing about the volume, and gives none to
+		// read: an appliance that cannot be reached, a certificate that does
+		// not verify, a failed login.
+		return nil, status.Error(codes.Internal, jerr.Error())
+	}
+	if vdata == nil {
+		return nil, status.Errorf(codes.Internal, "No data of volume %s", vd.Name())
 	}
 
 	s := vdata.GetSize()
@@ -795,6 +803,12 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 				return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
 			}
 			if snapList, ts, rErr := cp.d.ListVolumeSnapshots(ctx, cp.pool, vd, int(maxEnt), token); rErr != nil {
+				if jrest.ErrCode(rErr) == jrest.RestErrorResourceDNE {
+					// CSI: a source volume that does not exist is an empty
+					// list, not an error.
+					l.Debugf("Volume %s does not exist, it has no snapshots: %s", vd.Name(), rErr.Error())
+					return &resp, nil
+				}
 				return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error())
 			} else {
 				if ts != nil {

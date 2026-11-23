@@ -161,3 +161,29 @@ func TestListSnapshotsArguments(t *testing.T) {
 		t.Errorf("the driver got %s for %s, token %q; next_token %q", d.called, d.volume, d.token.Token(), rsp.NextToken)
 	}
 }
+
+// The snapshots of a source volume that does not exist are an empty list,
+// as CSI asks, not an error; any other failure of the list is one.
+func TestListSnapshotsOfAVolumeThatDoesNotExist(t *testing.T) {
+	cp, d := listController()
+	d.err = jrest.GetError(jrest.RestErrorResourceDNE, "Resource Pool-0/vp_gone not found.")
+	rsp, err := cp.ListSnapshots(context.Background(), &csi.ListSnapshotsRequest{SourceVolumeId: "vp_gone", MaxEntries: 5})
+	if err != nil || rsp == nil || len(rsp.Entries) != 0 || rsp.NextToken != "" {
+		t.Errorf("the snapshots of a volume that does not exist: %v, error %v; want an empty list", rsp, err)
+	}
+	if d.called != "ListVolumeSnapshots" || d.volume != "vp_gone" {
+		t.Errorf("the driver got %s for %s", d.called, d.volume)
+	}
+
+	for what, failure := range map[string]jrest.RestError{
+		"a missing pool":          jrest.GetError(jrest.RestErrorResourceDNEPool, "Pool Pool-0 not found."),
+		"a request without reply": jrest.GetError(jrest.RestErrorUnableToConnect, "connection refused"),
+		"an unknown reply":        jrest.GetError(jrest.RestErrorFailureUnknown, "status 500"),
+	} {
+		d.err = failure
+		rsp, err := cp.ListSnapshots(context.Background(), &csi.ListSnapshotsRequest{SourceVolumeId: "vp_a"})
+		if rsp != nil || status.Code(err) != codes.Internal {
+			t.Errorf("%s: %v, error %v; want Internal", what, rsp, err)
+		}
+	}
+}
