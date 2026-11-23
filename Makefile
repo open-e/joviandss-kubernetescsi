@@ -35,7 +35,7 @@ IMAGE_LATEST_UBUNTU_16=$(REGISTRY_NAME)/$(IMAGE_NAME)-u-16:latest
 
 
 
-.PHONY: default all bin dev prod cli plugin container clean
+.PHONY: default all bin dev prod cli plugin container clean vet test
 
 default: bin
 
@@ -75,3 +75,12 @@ container: plugin cli
 
 clean:
 	go clean -r -x
+
+# Keep the -a: with Go 1.26.0 the go command takes a vet result from its
+# build cache, and a package that was vetted before as a dependency of
+# another one then gets no report when it is vetted itself.
+vet:
+	$(GOCMD) vet -a ./pkg/rest/... ./pkg/driver/... ./pkg/controller/...
+
+test:
+	$(GOCMD) test ./pkg/rest/...

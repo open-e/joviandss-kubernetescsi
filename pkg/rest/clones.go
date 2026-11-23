@@ -27,7 +27,7 @@ import (
 )
 
 func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string, vds string, sds string) (clones []ResourceVolumeSnapshotClones, err RestError) {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones", pool, vds, sds)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s/snapshots/%s/clones", pool, vds, sds)
 
 	l := s.l.WithFields(log.Fields{
 		"func":    "GetVolumeSnapshotClones",
@@ -64,7 +64,7 @@ func (s *RestEndpoint) GetVolumeSnapshotClones(ctx context.Context, pool string,
 //   - *vid* physical volume id as it used by JovianDSS
 //   - *desc* data, including new volume name, that would be transfered to create clone
 func (s *RestEndpoint) CreateClone(ctx context.Context, pool string, vid string, desc CloneVolumeDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/clone", pool, vid)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s/clone", pool, vid)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -88,7 +88,7 @@ func (s *RestEndpoint) CreateClone(ctx context.Context, pool string, vid string,
 }
 
 func (s *RestEndpoint) DeleteClone(ctx context.Context, pool string, vds string, sds string, cds string, desc DeleteVolumeDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/volumes/%s/snapshots/%s/clones/%s", pool, vds, sds, cds)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/volumes/%s/snapshots/%s/clones/%s", pool, vds, sds, cds)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{

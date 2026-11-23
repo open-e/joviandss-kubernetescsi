@@ -90,7 +90,6 @@ var supportedVolumeCapabilities = []csi.VolumeCapability_AccessMode_Mode{
 type ControllerPlugin struct {
 	l                *log.Logger
 	le               *log.Entry
-	cfg              *ControllerCfg
 	iqnPrefix        string
 	snapReg          string
 	volumesAccess    sync.Mutex
@@ -124,14 +123,14 @@ func parseOrigin(or string) (*origin, error) {
 
 	if len(poolAndName) != 2 {
 		msg := fmt.Sprintf("Incorrecct origin %s", or)
-		return nil, status.Errorf(codes.Internal, msg)
+		return nil, status.Error(codes.Internal, msg)
 	}
 
 	out.Pool = poolAndName[0]
 	nameAndSnap := strings.Split(poolAndName[1], "@")
 	if len(poolAndName) != 2 {
 		msg := fmt.Sprintf("Incorrecct origin %s", or)
-		return nil, status.Errorf(codes.Internal, msg)
+		return nil, status.Error(codes.Internal, msg)
 	}
 
 	out.Volume = nameAndSnap[0]
@@ -374,16 +373,16 @@ func (cp *ControllerPlugin) createNewVolume(ctx context.Context, nvd *jdrvr.Volu
 		return 0, status.Error(codes.NotFound, err.Error())
 	case jrest.RestErrorResourceExists:
 		l.Warn("Specified volume already exists.")
-		return 0, status.Errorf(codes.AlreadyExists, err.Error())
+		return 0, status.Error(codes.AlreadyExists, err.Error())
 	case jrest.RestErrorOutOfSpace:
 		emsg := fmt.Sprintf("Unable to create volume %s, storage out of space", nvd.Name())
 		l.Warn(emsg)
-		return 0, status.Errorf(codes.ResourceExhausted, emsg)
+		return 0, status.Error(codes.ResourceExhausted, emsg)
 	case jrest.RestErrorOk:
 		l.Debugf("Volume %s created", nvd.Name())
 		return volumeSize, nil
 	default:
-		return 0, status.Errorf(codes.Internal, err.Error())
+		return 0, status.Error(codes.Internal, err.Error())
 	}
 }
 
@@ -407,7 +406,7 @@ func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDe
 
 	if jerr != nil {
 		if jerr.GetCode() == jrest.RestErrorResourceDNE {
-			return nil, status.Errorf(codes.NotFound, jerr.Error())
+			return nil, status.Error(codes.NotFound, jerr.Error())
 		}
 	}
 
@@ -415,11 +414,11 @@ func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDe
 
 	if caprage != nil {
 		if minSize := caprage.GetRequiredBytes(); minSize > 0 && minSize > vdata.GetSize() {
-			return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Existing volume %s have size %d that is less then minimal requested limit %d", vd.Name(), caprage.GetRequiredBytes(), minSize))
+			return nil, status.Errorf(codes.AlreadyExists, "Existing volume %s have size %d that is less then minimal requested limit %d", vd.Name(), caprage.GetRequiredBytes(), minSize)
 		}
 
 		if maxSize := caprage.GetLimitBytes(); maxSize > 0 && maxSize < vdata.GetSize() {
-			return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Existing volume %s have size %d that is more then upper limit %d", vd.Name(), caprage.GetRequiredBytes(), maxSize))
+			return nil, status.Errorf(codes.AlreadyExists, "Existing volume %s have size %d that is more then upper limit %d", vd.Name(), caprage.GetRequiredBytes(), maxSize)
 		}
 	}
 
@@ -428,21 +427,21 @@ func (cp *ControllerPlugin) VolumeComply(ctx context.Context, vd *jdrvr.VolumeDe
 		if sv := source.GetVolume(); sv != nil {
 			if ov := vdata.OriginVolume(); ov != sv.GetVolumeId() {
 				if len(ov) == 0 && len(sv.GetVolumeId()) > 0 {
-					return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Volume with name %s exists and it is not derived from any volume", vd.Name()))
+					return nil, status.Errorf(codes.AlreadyExists, "Volume with name %s exists and it is not derived from any volume", vd.Name())
 				}
-				return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Existing volume %s is derived from volume %s that is different from requested volume %s", vd.Name(), vdata.OriginVolume(), sv.GetVolumeId()))
+				return nil, status.Errorf(codes.AlreadyExists, "Existing volume %s is derived from volume %s that is different from requested volume %s", vd.Name(), vdata.OriginVolume(), sv.GetVolumeId())
 			}
 		}
 
 		if sv := source.GetSnapshot(); sv != nil {
 			if vol, err := jdrvr.NewVolumeDescFromVDS(vdata.OriginVolume()); err != nil {
-				return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Volume %s exists, but driver is not able to identify correctly its origin %s", vd.Name(), vdata.OriginVolume()))
+				return nil, status.Errorf(codes.AlreadyExists, "Volume %s exists, but driver is not able to identify correctly its origin %s", vd.Name(), vdata.OriginVolume())
 			} else {
 				if snap, err := jdrvr.NewSnapshotDescFromSDS(vol, vdata.OriginSnapshot()); err != nil {
-					return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Volume %s exists, but driver is not able to identify correctly its origin snapshot %s", vd.Name(), vdata.OriginSnapshot()))
+					return nil, status.Errorf(codes.AlreadyExists, "Volume %s exists, but driver is not able to identify correctly its origin snapshot %s", vd.Name(), vdata.OriginSnapshot())
 				} else {
 					if snap.CSIID() != sv.GetSnapshotId() {
-						return nil, status.Errorf(codes.AlreadyExists, fmt.Sprintf("Existing volume %s is derived from snapshot %s, not from requested one %s", vd.Name(), snap.CSIID(), sv.GetSnapshotId()))
+						return nil, status.Errorf(codes.AlreadyExists, "Existing volume %s is derived from snapshot %s, not from requested one %s", vd.Name(), snap.CSIID(), sv.GetSnapshotId())
 					}
 				}
 			}
@@ -476,7 +475,6 @@ func (cp *ControllerPlugin) CreateVolume(ctx context.Context, req *csi.CreateVol
 	/// Check capability
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME) {
 		err = status.Errorf(codes.Internal, "Capability is not supported.")
-		l.Warnf("Unable to create volume req: %v", req)
 		return nil, err
 	}
 	// vName := req.GetName()
@@ -543,7 +541,6 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	}
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_VOLUME) {
 		err := status.Errorf(codes.Internal, "Capability is not supported.")
-		cp.l.Warnf("Unable to delete volume req: %v", req)
 		return nil, err
 	}
 
@@ -562,7 +559,7 @@ func (cp *ControllerPlugin) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 				l.Warnf("Volume %s was deleted before", vd)
 				return &csi.DeleteVolumeResponse{}, nil
 			default:
-				return nil, status.Errorf(codes.Internal, err.Error())
+				return nil, status.Error(codes.Internal, err.Error())
 			}
 		}
 	} else {
@@ -584,7 +581,7 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("Request: %+v", req)
+	l.Debugf("ListVolumes: max entries %d, starting token %q", req.GetMaxEntries(), req.GetStartingToken())
 
 	maxEnt := int64(req.GetMaxEntries())
 	startingToken := req.GetStartingToken()
@@ -623,7 +620,7 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("request: %+v", *req)
+	l.Debugf("CreateSnapshot: name %s, source volume %s", req.GetName(), req.GetSourceVolumeId())
 	var err error
 
 	//////////////////////////////////////////////////////////////////////////////
@@ -631,7 +628,6 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT) {
 		err = status.Errorf(codes.Internal, "Capability is not supported.")
-		l.Warnf("Unable to create volume req: %v", req)
 		return nil, err
 	}
 
@@ -656,11 +652,11 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	case jrest.RestErrorOutOfSpace:
 		emsg := fmt.Sprintf("Unable to create snapshot %s for volume %s, storage out of space", sd.Name(), vd.Name())
 		l.Warn(emsg)
-		return nil, status.Errorf(codes.ResourceExhausted, emsg)
+		return nil, status.Error(codes.ResourceExhausted, emsg)
 	case jrest.RestErrorOk:
 		l.Debugf("Snapshot %s was created", sd.Name())
 	default:
-		return nil, status.Errorf(codes.Internal, rErr.Error())
+		return nil, status.Error(codes.Internal, rErr.Error())
 	}
 
 	snap, rErr := cp.d.GetSnapshot(ctx, cp.pool, vd, sd)
@@ -673,7 +669,7 @@ func (cp *ControllerPlugin) CreateSnapshot(ctx context.Context, req *csi.CreateS
 	case jrest.RestErrorOk:
 		l.Debugf("Got snapshot %s info %+v", sd.Name(), *snap)
 	default:
-		return nil, status.Errorf(codes.Internal, rErr.Error())
+		return nil, status.Error(codes.Internal, rErr.Error())
 	}
 	creationTime := &timestamppb.Timestamp{
 		Seconds: snap.Creation.Unix(),
@@ -700,14 +696,13 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("request: %+v", *req)
+	l.Debugf("DeleteSnapshot: snapshot %s", req.GetSnapshotId())
 	var err error
 
 	//////////////////////////////////////////////////////////////////////////////
 	/// Checks
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_CREATE_DELETE_SNAPSHOT) {
 		err = status.Errorf(codes.Internal, "Capability is not supported.")
-		l.Warnf("Unable to create volume req: %v", req)
 		return nil, err
 	}
 	//////////////////////////////////////////////////////////////////////////////
@@ -729,7 +724,7 @@ func (cp *ControllerPlugin) DeleteSnapshot(ctx context.Context, req *csi.DeleteS
 	case jrest.RestErrorOk:
 		l.Debugf("Snapshot %s deleted successfully ", sd.Name())
 	default:
-		return nil, status.Errorf(codes.Internal, rErr.Error())
+		return nil, status.Error(codes.Internal, rErr.Error())
 	}
 
 	return &csi.DeleteSnapshotResponse{}, nil
@@ -747,7 +742,7 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("Request: %+v", req)
+	l.Debugf("ListSnapshots: source volume %s, snapshot %s, max entries %d, starting token %q", req.GetSourceVolumeId(), req.GetSnapshotId(), req.GetMaxEntries(), req.GetStartingToken())
 
 	maxEnt := int64(req.GetMaxEntries())
 	sourceVolumeId := req.GetSourceVolumeId()
@@ -834,7 +829,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("Publish volume request %+v", req)
+	l.Debugf("ControllerPublishVolume: volume %s, node %s, read only %t, capability %+v", req.GetVolumeId(), req.GetNodeId(), req.GetReadonly(), req.GetVolumeCapability())
 	var err error
 
 	vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId())
@@ -854,7 +849,6 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 
 	if false == cp.capSupported(csi.ControllerServiceCapability_RPC_PUBLISH_UNPUBLISH_VOLUME) {
 		err = status.Errorf(codes.Internal, "Capability is not supported.")
-		l.Warnf("Unable to publish volume req: %v", req)
 		return nil, err
 	}
 
@@ -866,10 +860,10 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 	case jrest.RestErrorOk:
 		if jcom.PluginProtocol == jcom.ISCSI {
 
-			(*context)["addrs"] = fmt.Sprintf(strings.Join(cp.iscsiEndpointCfg.Addrs, ","))
+			(*context)["addrs"] = strings.Join(cp.iscsiEndpointCfg.Addrs, ",")
 			(*context)["port"] = fmt.Sprintf("%d", cp.iscsiEndpointCfg.Port)
 		} else if jcom.PluginProtocol == jcom.NFS {
-			(*context)["addrs"] = fmt.Sprintf(strings.Join(cp.nfsEndpointCfg.Addrs, ","))
+			(*context)["addrs"] = strings.Join(cp.nfsEndpointCfg.Addrs, ",")
 		}
 		resp := csi.ControllerPublishVolumeResponse{
 			PublishContext: *context,
@@ -881,7 +875,7 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 		// According to specification from
 		return nil, status.Error(codes.FailedPrecondition, rErr.Error())
 	case jrest.RestErrorFailureUnknown:
-		err = status.Errorf(codes.Internal, rErr.Error())
+		err = status.Error(codes.Internal, rErr.Error())
 		return nil, err
 	case jrest.RestErrorResourceExists:
 		// TODO: handle	FAILED_PRECONDITION
@@ -890,11 +884,11 @@ func (cp *ControllerPlugin) ControllerPublishVolume(ctx context.Context, req *cs
 		// TODO: handle ALREADY_EXISTS
 		// Indicates that a volume corresponding to the specified volume_id has already been published at the node corresponding to the specified node_id but is
 		// incompatible with the specified volume_capability or readonly flag .
-		err = status.Errorf(codes.AlreadyExists, rErr.Error())
+		err = status.Error(codes.AlreadyExists, rErr.Error())
 		return nil, err
 	case jrest.RestErrorResourceDNE, jrest.RestErrorResourceDNEVolume:
 		msg := fmt.Sprintf("Resource not found: %s", rErr.Error())
-		err = status.Errorf(codes.NotFound, msg)
+		err = status.Error(codes.NotFound, msg)
 		return nil, err
 
 	default:
@@ -911,7 +905,7 @@ func (cp *ControllerPlugin) ControllerUnpublishVolume(ctx context.Context, req *
 	})
 	ctx = jcom.WithLogger(ctx, l)
 
-	l.Debugf("UnpublishVolume req: %+v", req)
+	l.Debugf("ControllerUnpublishVolume: volume %s, node %s", req.GetVolumeId(), req.GetNodeId())
 
 	if vd, err := jdrvr.NewVolumeDescFromCSIID(req.GetVolumeId()); err != nil {
 		return nil, err
@@ -1007,6 +1001,15 @@ func (cp *ControllerPlugin) ControllerGetVolume(ctx context.Context, in *csi.Con
 
 // GetCapacity gets storage capacity
 func (cp *ControllerPlugin) GetCapacity(ctx context.Context, req *csi.GetCapacityRequest) (*csi.GetCapacityResponse, error) {
+	l := cp.l.WithFields(log.Fields{
+		"request": "GetCapacity",
+		"func":    "GetCapacity",
+		"section": "controller",
+	})
+	ctx = jcom.WithLogger(ctx, l)
+
+	l.Debugf("Received get capacity request with context %+v", ctx)
+
 	// TODO: add capability check
 	pool, rErr := cp.d.GetPool(ctx, cp.pool)
 	if rErr != nil {
@@ -1066,7 +1069,7 @@ func (cp *ControllerPlugin) ControllerGetCapabilities(ctx context.Context, req *
 	*csi.ControllerGetCapabilitiesResponse,
 	error,
 ) {
-	cp.l.WithField("func", "ControllerGetCapabilities()").Infof("request: '%+v'", req)
+	cp.l.WithField("func", "ControllerGetCapabilities()").Info("request")
 
 	var capabilities []*csi.ControllerServiceCapability
 	for _, c := range supportedControllerCapabilities {

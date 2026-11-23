@@ -319,7 +319,7 @@ func (d *CSINFSDriver) cleanIntermediateSnapshots(ctx context.Context, pool stri
 				// forceUmount := true
 				// snapdeldata := jrest.DeleteSnapshotDescriptor{ForceUmount: &forceUmount}
 
-				err = d.re.DeleteNASVolumeSnapshot(ctx, pool, vd.VDS(), snap.Name)
+				err = d.re.DeleteNASSnapshot(ctx, pool, vd.VDS(), snap.Name)
 				if err != nil {
 					return nil, err
 				}

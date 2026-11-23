@@ -26,7 +26,7 @@ import (
 )
 
 func (s *RestEndpoint) CreateShare(ctx context.Context, desc *CreateShareDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/shares")
+	addr := fmt.Sprintf(apiPrefix + "/shares")
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -51,37 +51,6 @@ func (s *RestEndpoint) CreateShare(ctx context.Context, desc *CreateShareDescrip
 
 	if stat == CodeOK || stat == CodeCreated {
 		return nil
-	}
-
-	return getError(ctx, body)
-}
-
-func (s *RestEndpoint) DeleteShare(ctx context.Context, snds string, data *DeleteShareDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/shares/%s", snds)
-
-	l := jcom.LFC(ctx)
-	l = l.WithFields(log.Fields{
-		"func":    "CreateShares",
-		"section": "rest",
-		"url":     addr,
-	})
-
-	var share ResourceShare
-	rsp := GeneralResponse{Data: &share}
-
-	stat, body, err := s.rp.Send(ctx, "DELETE", addr, nil, CodeNoContent)
-	if err != nil {
-		msg := fmt.Sprintf("Unable to delete share %s ", snds)
-		l.Warn(msg)
-		return GetError(RestErrorRequestMalfunction, msg)
-	}
-
-	if stat == CodeNoContent {
-		return nil
-	}
-
-	if errU := s.unmarshal(body, &rsp); errU != nil {
-		return errU
 	}
 
 	return getError(ctx, body)

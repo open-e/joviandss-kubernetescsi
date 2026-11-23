@@ -40,7 +40,7 @@ import (
 //   - *vid* physical nas volume id as it used by JovianDSS
 //   - *desc* data, including snapahot name, that would be transfered to create snapshot
 func (s *RestEndpoint) CreateNASSnapshot(ctx context.Context, pool string, nvid string, desc *CreateNASSnapshotDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots", pool, nvid)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots", pool, nvid)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -67,7 +67,7 @@ func (s *RestEndpoint) CreateNASSnapshot(ctx context.Context, pool string, nvid 
 func (s *RestEndpoint) DeleteNASSnapshot(ctx context.Context, pool string, nvid string, sname string) (err RestError) {
 	l := jcom.LFC(ctx)
 
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s/snapshots/%s", pool, nvid, sname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s/snapshots/%s", pool, nvid, sname)
 
 	l = l.WithFields(log.Fields{
 		"func":    "DeleteNASSnapshot",

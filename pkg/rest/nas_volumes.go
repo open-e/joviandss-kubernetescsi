@@ -29,7 +29,7 @@ func (s *RestEndpoint) GetNASVolume(ctx context.Context, pool string, vname stri
 	var resvol ResourceNASVolume
 	rsp := GeneralResponse{Data: &resvol}
 
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s", pool, vname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s", pool, vname)
 
 	l := s.l.WithFields(log.Fields{
 		"func":    "GetNASVolume",
@@ -56,7 +56,7 @@ func (s *RestEndpoint) GetNASVolume(ctx context.Context, pool string, vname stri
 }
 
 func (s *RestEndpoint) CreateNASVolume(ctx context.Context, pool string, desc *CreateNASVolumeDescriptor) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes", pool)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes", pool)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -87,7 +87,7 @@ func (s *RestEndpoint) CreateNASVolume(ctx context.Context, pool string, desc *C
 }
 
 func (s *RestEndpoint) DeleteNASVolume(ctx context.Context, pool string, nvds string) RestError {
-	addr := fmt.Sprintf("api/v3/pools/%s/nas-volumes/%s", pool, nvds)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/nas-volumes/%s", pool, nvds)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{

@@ -26,7 +26,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/http/httputil"
 	httpUrl "net/url"
 	"strings"
 	"sync"
@@ -57,65 +56,35 @@ type RestProxy struct {
 	timeout   int64
 }
 
-// restProxy - request client for any REST API
-type restProxy struct {
-	addrs         []string
-	active_addr   int
-	port          int
-	authToken     string
-	httpRestProxy *http.Client
-	l             *logrus.Entry
-	prot          string
-	user          string
-	pass          string
-	tries         int
-
-	mu        sync.Mutex
-	requestID int64
-	timeout   int64
-}
-
-// RestProxyInterface - request client interface
-type RestProxyInterface interface {
-	// Send(method, path string, data interface{}, ok int) (int, []byte, error)
-	Send(ctx context.Context, method string, path string, data interface{}, ok int) (int, []byte, RestError)
-}
-
 func (rp *RestProxy) Send(ctx context.Context, method string, path string, data interface{}, ok int) (int, []byte, RestError) {
 	var res *http.Response
 	// var err restError
 	l := jcom.LFC(ctx)
-	l.Debugf("Path %s", path)
-	// l.Debugf("proto %+v, addr %+v, port %+v, url %+v", )
 
 	url := fmt.Sprintf("%s://%s:%d/%s", rp.prot, rp.addrs[rp.active_addr], rp.port, path)
 
 	l = l.WithFields(logrus.Fields{
 		"func":    "Send",
 		"section": "rest",
-		"method":  method,
-		"url":     url,
 	})
-
-	l.Debugf("Available addrs %+v", rp.addrs)
 
 	// rp.mu.Lock()
 	// rp.requestID++
 	// rp.mu.Unlock()
 
 	// send request data as json
+	// Neither the body nor a header of a request is ever logged: the body
+	// can hold a CHAP password, and the Authorization header holds the REST
+	// password.
 	var reader io.Reader
 	if data == nil {
 		emptyJsonData := []byte("{}")
 		reader = bytes.NewBuffer(emptyJsonData)
-		l.Debug("sending with no data")
 	} else {
-		l.Debugf("sending data %+v", data)
 		jdata, err := json.Marshal(data)
 		if err != nil {
 			return 0, nil, &restError{RestErrorRequestMalfunction, err.Error()}
 		}
-		l.Debugf("sending marshaled data %s", jdata)
 		reader = strings.NewReader(string(jdata))
 	}
 
@@ -127,8 +96,6 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Kubernetes CSI Plugin")
-	dump, err := httputil.DumpRequestOut(req, true)
-	l.Debugf("Request:\n%v\nEnd request\n", string(dump))
 	res, err = rp.httpRestProxy.Do(req)
 	if err != nil {
 		if urlErr, ok := err.(*httpUrl.Error); ok {
@@ -160,26 +127,17 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 
 	defer res.Body.Close()
 
+	// The request log: one line for each reply, with the method, the path
+	// with its query string and the status.
+	l.Debugf("%s %s: %d", method, path, res.StatusCode)
+
 	// validate response body
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		l.Errorf("reading response failed: %s", err.Error())
 		return res.StatusCode, nil, &restError{RestErrorRequestMalfunction, "Unable to process response"}
 	}
-	l.Debugf("Request completed with code %d, obtained %d bytes", res.StatusCode, len(bodyBytes))
 	return res.StatusCode, bodyBytes, nil
-}
-
-type RestProxyCfg struct {
-	Addrs       string
-	ActiveAddr  int
-	Port        int
-	Prot        string
-	User        string
-	Pass        string
-	Pool        string
-	IdleTimeOut string // See time Duration
-	Tries       int
 }
 
 // TODO: implement sessions

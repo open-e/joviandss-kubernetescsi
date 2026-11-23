@@ -27,57 +27,15 @@ import (
 
 var vendorVersion = "dev"
 
-type StorageInterface interface {
-	// General information
-	GetAddress() (string, int)
-
-	// Pools
-	GetPool() (*ResourcePool, RestError)
-	// GetPools() ([]PoolShort, error)
-
-	// Volumes
-	CreateVolume(poolName string, vol ResourceVolume) RestError
-	GetVolume(vname string) (*ResourceVolume, RestError)
-	DeleteVolume(vname string, rSnapshots bool) RestError
-	ListVolumes(poolName string, vols *[]ResourceVolume) RestError
-
-	CreateSnapshot(vname string, sname string) RestError
-	GetSnapshot(vname string, sname string) (*ResourceSnapshot, RestError)
-	DeleteSnapshot(vname string, sname string) RestError
-	ListAllSnapshots(f func(string) bool) ([]ResourceSnapshotShort, RestError)
-	ListVolumeSnapshots(string, func(string) bool) ([]ResourceSnapshotShort, RestError)
-
-	GetTarget(tname string) (*Target, RestError)
-	CreateTarget(tname string) RestError
-	DeleteTarget(tname string) RestError
-
-	AttachToTarget(tname string, vname string, mode string) RestError
-	DettachFromTarget(tname string, vname string) RestError
-
-	AddUserToTarget(tname string, name string, pass string) RestError
-
-	CreateClone(vname string, sname string, cname string) RestError
-	// DeleteClone(vname string, sname string, cname string, rChildren bool, rDependent bool) RestError
-	PromoteClone(vname string, sname string, cname string) RestError
-}
+// apiPrefix is the one prefix of every path the plugin requests. The plugin
+// uses JovianDSS REST API v4 only: there is no setting for the version and
+// no fallback to an older one.
+const apiPrefix = "api/v4"
 
 type RestEndpoint struct {
 	rec jcom.RestEndpointCfg
 	rp  RestProxy
 	l   *logrus.Entry
-}
-
-type StorageCfg struct {
-	Name string
-	Addr string
-	Port int
-	User string
-	Pass string
-	Pool string
-
-	Prot        string
-	Tries       int
-	IdleTimeOut string
 }
 
 func (re *RestEndpoint) String() string {

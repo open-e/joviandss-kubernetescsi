@@ -10,6 +10,10 @@ That is needed as `plugin` does not contain mentioned iscsi tool yet relies on t
 Installation of this components is pretty straightforward on most of linux distribution and will not be coverer here except for `TalosOS`.
 Due to architecture and security policies [additional actions have to be take prior to following instructions provided below](talos.md).
 
+`Plugin` talks to JovianDSS through REST API v4 only.
+It needs a JovianDSS release that serves API v4: for JovianDSS 1 that is `1.0up33.65410` or newer.
+The appliance still serves API v3, but `plugin` no longer calls it.
+
 
 ## Installation
 

@@ -170,7 +170,7 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 					match := resourceDneMsgRegexp.FindStringSubmatch(*err.Message)
 					if len(match) > 1 {
 						msg := fmt.Sprintf("Resource %s not found", match[1])
-						l.Warnf(msg)
+						l.Warnf("%s", msg)
 						return &restError{code: RestErrorResourceDNE, msg: msg}
 					}
 					l.Warn("Resource not found")
@@ -262,7 +262,7 @@ func ErrorFromErrorT(ctx context.Context, err *ErrorT, le *logrus.Entry) *restEr
 				match := resourceDneMsgRegexp.FindStringSubmatch(*err.Message)
 				if len(match) > 1 {
 					msg := fmt.Sprintf("Resource %s not found", match[1])
-					l.Warnf(msg)
+					l.Warnf("%s", msg)
 					return &restError{code: RestErrorResourceDNE, msg: msg}
 				}
 				l.Warn("Resource not found")

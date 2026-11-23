@@ -28,7 +28,7 @@ import (
 
 func (s *RestEndpoint) GetTarget(ctx context.Context, pool string, tname string) (*ResourceTarget, RestError) {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets/%s", pool, tname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets/%s", pool, tname)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -42,7 +42,7 @@ func (s *RestEndpoint) GetTarget(ctx context.Context, pool string, tname string)
 	resTarget.OutgoingUser = &outUser
 	var rsp = GeneralResponse{Data: &resTarget}
 
-	l.Debugf(fmt.Sprintf("Getting target %s information", tname))
+	l.Debugf("Getting target %s information", tname)
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, CodeOK)
 
 	if err != nil {
@@ -64,7 +64,7 @@ func (s *RestEndpoint) GetTarget(ctx context.Context, pool string, tname string)
 
 func (s *RestEndpoint) CreateTarget(ctx context.Context, pool string, desc *CreateTargetDescriptor) RestError {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets", pool)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets", pool)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -73,7 +73,7 @@ func (s *RestEndpoint) CreateTarget(ctx context.Context, pool string, desc *Crea
 		"func":    "CreateTarget",
 	})
 
-	l.Debugf(fmt.Sprintf("Creating target %s", desc.Name))
+	l.Debugf("Creating target %s", desc.Name)
 	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, CodeCreated)
 
 	if err != nil {
@@ -101,7 +101,7 @@ func (s *RestEndpoint) CreateTarget(ctx context.Context, pool string, desc *Crea
 
 func (s *RestEndpoint) DeleteTarget(ctx context.Context, pool string, tname string) RestError {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets/%s", pool, tname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets/%s", pool, tname)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -133,7 +133,7 @@ func (s *RestEndpoint) DeleteTarget(ctx context.Context, pool string, tname stri
 
 func (s *RestEndpoint) AttachVolumeToTarget(ctx context.Context, pool string, tname string, desc *TargetLunDescriptor) (err RestError) {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets/%s/luns", pool, tname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets/%s/luns", pool, tname)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -147,7 +147,7 @@ func (s *RestEndpoint) AttachVolumeToTarget(ctx context.Context, pool string, tn
 
 	if stat == 404 {
 		msg := fmt.Sprintf("Target do not exists %s", tname)
-		l.Debugf(msg)
+		l.Debugf("%s", msg)
 		return getError(ctx, body)
 	}
 
@@ -166,7 +166,7 @@ func (s *RestEndpoint) AttachVolumeToTarget(ctx context.Context, pool string, tn
 
 func (s *RestEndpoint) DettachVolumeFromTarget(ctx context.Context, pool string, tname string, vname string) RestError {
 
-	addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets/%s/luns/%s", pool, tname, vname)
+	addr := fmt.Sprintf(apiPrefix+"/pools/%s/san/iscsi/targets/%s/luns/%s", pool, tname, vname)
 
 	l := jcom.LFC(ctx)
 	l = l.WithFields(log.Fields{
@@ -181,7 +181,7 @@ func (s *RestEndpoint) DettachVolumeFromTarget(ctx context.Context, pool string,
 
 	if stat == 404 {
 		msg := fmt.Sprintf("Target do not exists %s", tname)
-		l.Debugf(msg)
+		l.Debugf("%s", msg)
 		return GetError(RestErrorResourceDNETarget, msg)
 	}
 
@@ -196,65 +196,4 @@ func (s *RestEndpoint) DettachVolumeFromTarget(ctx context.Context, pool string,
 	}
 	// TODO: provide erroro handling for various cases
 	return getError(ctx, body)
-}
-
-func (s *RestEndpoint) AddUserToTarget(tname string,
-	name string,
-	pass string) RestError {
-
-	return nil
-
-	// tname = strings.ToLower(tname)
-
-	// l := s.l.WithFields(logrus.Fields{
-	// 	"func": "AddUserToTarget",
-	// })
-
-	// data := AddUserToTarget{
-	// 	Name:     name,
-	// 	Password: pass,
-	// }
-
-	// addr := fmt.Sprintf("api/v3/pools/%s/san/iscsi/targets/%s/incoming-users", s.pool, tname)
-
-	// l.Tracef("Set CHAP user for tartget: %s", tname)
-	// stat, body, err := s.rp.Send("POST", addr, data, AddUserToTargetRCode)
-
-	// if err != nil {
-	// 	msg := fmt.Sprintf("Internal failure in communication with storage %s.", s.addr)
-	// 	l.Warn(msg)
-	// 	return GetError(RestRequestMalfunction, msg)
-	// }
-
-	// // Request is OK, exiting
-	// if stat == AddUserToTargetRCode {
-	// 	return nil
-	// }
-
-	// // Extract error information
-	// if body == nil {
-	// 	msg := fmt.Sprintf("Unidentifiable error, code : %d.", stat)
-	// 	l.Warn(msg)
-	// 	return GetError(RestFailureUnknown, msg)
-	// }
-
-	// errData, er := s.getError(body)
-
-	// if er != nil {
-	// 	msg := fmt.Sprintf("Unable to extract err message %s", er)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestRequestMalfunction, msg)
-	// }
-
-	// switch (*errData).Errno {
-
-	// default:
-	// 	msg := fmt.Sprintf("Unknown error %d, %s",
-	// 		(*errData).Errno,
-	// 		(*errData).Message)
-	// 	s.l.Warn(msg)
-	// 	return GetError(RestStorageFailureUnknown, msg)
-
-	// }
-
 }
