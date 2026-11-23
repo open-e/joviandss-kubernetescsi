@@ -25,6 +25,7 @@ import (
 	//"encoding/json"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -138,6 +139,30 @@ func parseOrigin(or string) (*origin, error) {
 	return &out, nil
 }
 
+// The rule for the name of an iSCSI target: lower case only, which the
+// appliance does not require but the plugin keeps to, and 220 characters at
+// most, the longest name seen accepted.
+const maxTargetName = 220
+
+var targetNameRegexp = regexp.MustCompile(`^[a-z0-9]([a-z0-9.:-]*[a-z0-9])?$`)
+
+// checkIQNPrefix checks the iscsi.iqn setting once, at setup. The plugin
+// builds the name of a target as <prefix>:<hash>, where the hash is 64
+// lower-case hex digits, so the setting decides whether the name meets the
+// rule for target names.
+func checkIQNPrefix(prefix string) error {
+	if !targetNameRegexp.MatchString(prefix) {
+		return status.Errorf(codes.InvalidArgument,
+			"iscsi.iqn: %q is refused: the prefix of a target name holds only a-z, 0-9, '.', ':' and '-', and starts and ends with a letter or a digit", prefix)
+	}
+	if len(prefix)+1+64 > maxTargetName {
+		return status.Errorf(codes.InvalidArgument,
+			"iscsi.iqn: %q is refused: with ':' and the 64 characters of the hash a target name would have %d characters, and it has at most %d",
+			prefix, len(prefix)+1+64, maxTargetName)
+	}
+	return nil
+}
+
 // SetupControllerPlugin set controller plugin struct with proper values
 func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err error) {
 	// var vol csi_rest.Volume = csi_rest.Volume{Name: "test-1", Size: "1G"}
@@ -166,6 +191,10 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
 
 			if len(cfg.ISCSIEndpointCfg.Iqn) == 0 {
 				cfg.ISCSIEndpointCfg.Iqn = "iqn.csi.2019-04"
+			}
+			if err = checkIQNPrefix(cfg.ISCSIEndpointCfg.Iqn); err != nil {
+				cp.le.Errorf("%s", err.Error())
+				return err
 			}
 			cp.iqnPrefix = cfg.ISCSIEndpointCfg.Iqn
 		}
