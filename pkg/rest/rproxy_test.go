@@ -532,3 +532,93 @@ func TestRedirectIsNotFollowed(t *testing.T) {
 		t.Errorf("%d requests to the appliance and %d to the place it named, want 1 and 0", redirects, *followed)
 	}
 }
+
+// A reply larger than maxreplysize fails with an error that names the
+// limit, and one of exactly the limit is read whole.
+func TestReplySizeLimit(t *testing.T) {
+	app := newFakeAppliance(t)
+	app.ep.rp.maxReplySize = 1000
+	body := func(n int) []byte {
+		// a volume reply, padded to n bytes with a field the plugin does not read
+		head := `{"data": {"name": "v", "volsize": "1", "guid": "g", "default_scsi_id": "s", "comment": "`
+		tail := `"}}`
+		return []byte(head + strings.Repeat("x", n-len(head)-len(tail)) + tail)
+	}
+
+	app.answer(200, "application/json", body(1000))
+	if vol, err := app.ep.GetVolume(app.ctx, "Pool-0", "v"); err != nil || vol.Name != "v" {
+		t.Errorf("a reply of exactly the limit: %v", err)
+	}
+	app.answer(200, "application/json", body(1001))
+	vol, err := app.ep.GetVolume(app.ctx, "Pool-0", "v")
+	if vol != nil || err == nil || err.GetCode() != RestErrorRPM || !strings.Contains(err.Error(), "maxreplysize, 1000 bytes") {
+		t.Errorf("a reply one byte over the limit: volume %v, error %v", vol, err)
+	}
+	// an error reply over the limit is not read into memory either
+	app.answer(500, "application/json", body(5000))
+	if err := app.ep.DeleteVolume(app.ctx, "Pool-0", "v", DeleteVolumeDescriptor{}); err == nil || !strings.Contains(err.Error(), "maxreplysize") {
+		t.Errorf("an error reply over the limit: %v", err)
+	}
+}
+
+// A reply without an end is read no further than the limit: the call
+// returns, and the appliance is not listened to any longer.
+func TestReplyWithoutAnEndIsNotReadWhole(t *testing.T) {
+	written := make(chan int, 1)
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		chunk := []byte(strings.Repeat("x", 64*1024))
+		n := 0
+		for n < 1<<30 { // a gigabyte, unless the client hangs up
+			if _, err := w.Write(chunk); err != nil {
+				break
+			}
+			n += len(chunk)
+		}
+		written <- n
+	}))
+	defer srv.Close()
+	ep, ctx := endpointFor(t, srv.URL, "30s")
+	done := make(chan RestError, 1)
+	go func() {
+		_, err := ep.GetPool(ctx, "Pool-0")
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if err == nil || err.GetCode() != RestErrorRPM || !strings.Contains(err.Error(), "maxreplysize, 1048576 bytes") {
+			t.Errorf("a reply without an end: %v", err)
+		}
+	case <-time.After(20 * time.Second):
+		t.Fatal("the call is still reading the reply")
+	}
+	select {
+	case n := <-written:
+		if n > 64<<20 {
+			t.Errorf("the appliance sent %d bytes before the plugin hung up", n)
+		}
+	case <-time.After(20 * time.Second):
+		t.Error("the appliance is still sending: the connection was not closed")
+	}
+}
+
+// maxreplysize is 1 MiB when the configuration does not set it, and a
+// negative value is refused by its name.
+func TestMaxReplySizeSetting(t *testing.T) {
+	l, _ := testLogger()
+	cfg := jcom.RestEndpointCfg{Addrs: []string{"192.0.2.1"}, Port: 82, IdleTimeOut: "30s"}
+	var rp RestProxy
+	if err := SetupRestProxy(&rp, &cfg, l); err != nil || rp.maxReplySize != 1<<20 {
+		t.Errorf("without the setting: %d bytes, error %v; want 1048576", rp.maxReplySize, err)
+	}
+	cfg.MaxReplySize = 4096
+	rp = RestProxy{}
+	if err := SetupRestProxy(&rp, &cfg, l); err != nil || rp.maxReplySize != 4096 {
+		t.Errorf("maxreplysize 4096 is read as %d, error %v", rp.maxReplySize, err)
+	}
+	cfg.MaxReplySize = -1
+	rp = RestProxy{}
+	if err := SetupRestProxy(&rp, &cfg, l); err == nil || !strings.HasPrefix(err.Error(), "maxreplysize:") {
+		t.Errorf("maxreplysize -1: error %v, want one that names the setting", err)
+	}
+}

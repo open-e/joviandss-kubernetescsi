@@ -73,6 +73,9 @@ type RestEndpointCfg struct {
 	// RetryDelay is the pause before such a GET is sent again, a duration
 	// written like idletimeout: 1s when it is not set.
 	RetryDelay string `json:"retrydelay,omitempty" yaml:"retrydelay"`
+	// MaxReplySize is the largest reply the plugin reads, in bytes: 1 MiB
+	// when it is not set. A larger reply fails its call.
+	MaxReplySize int64 `json:"maxreplysize,omitempty" yaml:"maxreplysize"`
 }
 
 // ISCSIEndpointCfg is the iscsi section of the configuration.

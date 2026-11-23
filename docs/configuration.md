@@ -54,6 +54,7 @@ iscsi:
     - `idletimeout` time to wait for one REST request to complete before considering it as failed, such as `30s`.
     - `tries` how many times a `GET` request that the storage answers without data (status 204) is sent in all: `3` means the first request and two more, `1` means no second request. `3` when the key is not set. No other request is sent again: not a `DELETE` answered 204, which is a success, and not a request that failed.
     - `retrydelay` the pause before such a `GET` is sent again, written like `idletimeout`. `1s` when the key is not set.
+    - `maxreplysize` the largest reply of the storage that the plugin reads, in bytes. A larger reply makes its request fail with an error that names the limit. `1048576` (1 MiB) when the key is not set, about five times the largest reply the plugin asks for.
 - `iscsi` is a section of config file containing information on how to connect to JovianDSS iscsi targets.
     - `iqn` iqn prefix that would be used for target creation. It may hold lower case letters, digits, `.`, `:` and `-`, has to start and end with a letter or a digit, and may have 155 characters at most: the plugin adds `:` and 64 characters to it, and a target name has 220 at most. `iqn.csi.2019-04` when the key is not set.
     - `addrs` list of addresses that would be used to connect targets

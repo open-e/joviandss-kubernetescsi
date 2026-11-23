@@ -41,8 +41,9 @@ const sessionTimeout = 30 * time.Second
 
 // The settings a configuration may leave out.
 const (
-	defaultTries      = 3 // the first request and two more
-	defaultRetryDelay = time.Second
+	defaultTries        = 3 // the first request and two more
+	defaultRetryDelay   = time.Second
+	defaultMaxReplySize = 1 << 20 // 1 MiB
 )
 
 // RestProxy - request client for any REST API
@@ -59,6 +60,7 @@ type RestProxy struct {
 	pass          string
 	tries         int           // how many times a GET answered 204 is sent in all
 	retryDelay    time.Duration // the pause before it is sent again
+	maxReplySize  int64         // the largest reply read, in bytes
 
 	mu        sync.Mutex
 	requestID int64
@@ -66,8 +68,8 @@ type RestProxy struct {
 }
 
 // Send sends one request and reads its reply. It returns a RestError only
-// when it has no reply to give back: no client, or no reply. A reply of any
-// status comes back with its body.
+// when it has no reply to give back: no client, no reply, or one over
+// maxreplysize. A reply of any status comes back with its body.
 func (rp *RestProxy) Send(ctx context.Context, method string, path string, data interface{}, ok int) (int, []byte, RestError) {
 	if rp.httpRestProxy == nil {
 		msg := "REST client not configured"
@@ -108,9 +110,16 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 	jcom.LFC(ctx).WithFields(logrus.Fields{"func": "Send", "section": "rest"}).
 		Debugf("%s %s: %d", method, path, res.StatusCode)
 
-	reply, err := io.ReadAll(res.Body)
+	// No more of a reply is read than one byte past maxreplysize: that byte
+	// tells a reply over the limit from one of exactly the limit, which a
+	// reader that only stops at the limit would cut short without an error.
+	reply, err := io.ReadAll(io.LimitReader(res.Body, rp.maxReplySize+1))
 	if err != nil {
 		return res.StatusCode, nil, GetError(RestErrorRequestMalfunction, "reading the reply: "+err.Error())
+	}
+	if int64(len(reply)) > rp.maxReplySize {
+		return res.StatusCode, nil, GetError(RestErrorRPM,
+			fmt.Sprintf("reply larger than maxreplysize, %d bytes", rp.maxReplySize))
 	}
 	return res.StatusCode, reply, nil
 }
@@ -183,6 +192,9 @@ func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) e
 			return fmt.Errorf("retrydelay: %w", err)
 		}
 	}
+	if cfg.MaxReplySize < 0 {
+		return fmt.Errorf("maxreplysize: %d is refused, it is a number of bytes", cfg.MaxReplySize)
+	}
 
 	// The certificate of the appliance is checked unless insecure is set,
 	// and nothing below TLS 1.2 is spoken.
@@ -226,6 +238,10 @@ func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) e
 		rp.tries = defaultTries
 	}
 	rp.retryDelay = retryDelay
+	rp.maxReplySize = cfg.MaxReplySize
+	if rp.maxReplySize == 0 {
+		rp.maxReplySize = defaultMaxReplySize
+	}
 
 	return nil
 }
