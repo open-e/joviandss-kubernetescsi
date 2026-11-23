@@ -23,7 +23,8 @@ func isOneOf(status int, ok []int) bool {
 }
 
 // request sends a request whose reply holds nothing the plugin reads. A
-// status of ok is its success.
+// status of ok is its success. The three functions after it send a GET,
+// through getWithData: the one way a GET of the plugin is sent.
 func (s *RestEndpoint) request(ctx context.Context, method, path string, data interface{},
 	entries []errorEntry, ok ...int,
 ) RestError {
@@ -39,7 +40,7 @@ func readObject[T any, PT interface {
 	*T
 	replyType
 }](ctx context.Context, s *RestEndpoint, path string, entries []errorEntry, ok ...int) (*T, RestError) {
-	status, body, err := s.rp.Send(ctx, "GET", path, nil, ok[0])
+	status, body, err := s.rp.getWithData(ctx, path)
 	if err == nil && isOneOf(status, ok) {
 		v := new(T)
 		if err = decodeData(body, PT(v)); err == nil {
@@ -54,7 +55,7 @@ func readEntries[T any, PT interface {
 	*T
 	replyType
 }](ctx context.Context, s *RestEndpoint, path string, entries []errorEntry) (*ResultEntries, RestError) {
-	status, body, err := s.rp.Send(ctx, "GET", path, nil, CodeOK)
+	status, body, err := s.rp.getWithData(ctx, path)
 	if err == nil && (status == CodeOK || status == CodeCreated) {
 		var page []T
 		var results int64
@@ -70,7 +71,7 @@ func readItems[T any, PT interface {
 	*T
 	replyType
 }](ctx context.Context, s *RestEndpoint, path string, entries []errorEntry) ([]T, RestError) {
-	status, body, err := s.rp.Send(ctx, "GET", path, nil, CodeOK)
+	status, body, err := s.rp.getWithData(ctx, path)
 	if err == nil && status == CodeOK {
 		var items []T
 		if items, err = decodeItems[T, PT](body); err == nil {

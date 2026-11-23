@@ -56,25 +56,33 @@ type fakeAppliance struct {
 	ctx context.Context
 	log *logRecorder
 
-	mu          sync.Mutex
+	mu       sync.Mutex
+	replies  []fakeReply // answered in turn; the last one stays
+	requests []seenRequest
+}
+
+// fakeReply is one reply of the fake appliance.
+type fakeReply struct {
 	status      int
 	contentType string
 	body        []byte
-	requests    []seenRequest
 }
 
 func newFakeAppliance(t *testing.T) *fakeAppliance {
 	t.Helper()
-	app := &fakeAppliance{t: t, status: http.StatusOK, contentType: "application/json"}
+	app := &fakeAppliance{t: t, replies: []fakeReply{{http.StatusOK, "application/json", nil}}}
 	app.srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		got, _ := io.ReadAll(r.Body)
 		app.mu.Lock()
 		app.requests = append(app.requests, seenRequest{Method: r.Method, Path: r.URL.RequestURI(), Header: r.Header.Clone(), Body: got})
-		status, contentType, body := app.status, app.contentType, app.body
+		reply := app.replies[0]
+		if len(app.replies) > 1 {
+			app.replies = app.replies[1:]
+		}
 		app.mu.Unlock()
-		w.Header().Set("Content-Type", contentType)
-		w.WriteHeader(status)
-		w.Write(body)
+		w.Header().Set("Content-Type", reply.contentType)
+		w.WriteHeader(reply.status)
+		w.Write(reply.body)
 	}))
 	t.Cleanup(app.srv.Close)
 
@@ -95,6 +103,7 @@ func newFakeAppliance(t *testing.T) *fakeAppliance {
 		User:        "admin",
 		Pass:        testRestPassword,
 		IdleTimeOut: "30s",
+		RetryDelay:  "1ms", // a GET answered 204 is sent again at once
 	}
 	if err := SetupEndpoint(&app.ep, &cfg, l); err != nil {
 		t.Fatal(err)
@@ -109,9 +118,15 @@ const testRestPassword = "rest-password-not-for-the-log"
 
 // answer sets the reply to every request from now on.
 func (app *fakeAppliance) answer(status int, contentType string, body []byte) {
+	app.answers(fakeReply{status, contentType, body})
+}
+
+// answers sets the replies to the next requests, one each; the last one
+// answers every request after them.
+func (app *fakeAppliance) answers(replies ...fakeReply) {
 	app.mu.Lock()
 	defer app.mu.Unlock()
-	app.status, app.contentType, app.body = status, contentType, body
+	app.replies = replies
 }
 
 // seen returns the requests got so far and forgets them.
