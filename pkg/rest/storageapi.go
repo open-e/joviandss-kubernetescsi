@@ -48,9 +48,9 @@ func getError(ctx context.Context, body []byte) RestError {
 
 	var edata ErrorData
 	if err := json.Unmarshal(body, &edata); err != nil {
-		bs := fmt.Sprintf(string(body[:]))
+		bs := string(body)
 		msg := fmt.Sprintf("Unable to extract json output from error message: %s", bs)
-		l.Warnf(msg)
+		l.Warnf("%s", msg)
 		return &restError{RestErrorRequestMalfunction, msg}
 	} else {
 		return ErrorFromErrorT(ctx, &edata.Error, l)

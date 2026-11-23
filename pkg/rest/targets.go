@@ -42,7 +42,7 @@ func (s *RestEndpoint) GetTarget(ctx context.Context, pool string, tname string)
 	resTarget.OutgoingUser = &outUser
 	var rsp = GeneralResponse{Data: &resTarget}
 
-	l.Debugf(fmt.Sprintf("Getting target %s information", tname))
+	l.Debugf("Getting target %s information", tname)
 	stat, body, err := s.rp.Send(ctx, "GET", addr, nil, CodeOK)
 
 	if err != nil {
@@ -73,7 +73,7 @@ func (s *RestEndpoint) CreateTarget(ctx context.Context, pool string, desc *Crea
 		"func":    "CreateTarget",
 	})
 
-	l.Debugf(fmt.Sprintf("Creating target %s", desc.Name))
+	l.Debugf("Creating target %s", desc.Name)
 	stat, body, err := s.rp.Send(ctx, "POST", addr, desc, CodeCreated)
 
 	if err != nil {
@@ -147,7 +147,7 @@ func (s *RestEndpoint) AttachVolumeToTarget(ctx context.Context, pool string, tn
 
 	if stat == 404 {
 		msg := fmt.Sprintf("Target do not exists %s", tname)
-		l.Debugf(msg)
+		l.Debugf("%s", msg)
 		return getError(ctx, body)
 	}
 
@@ -181,7 +181,7 @@ func (s *RestEndpoint) DettachVolumeFromTarget(ctx context.Context, pool string,
 
 	if stat == 404 {
 		msg := fmt.Sprintf("Target do not exists %s", tname)
-		l.Debugf(msg)
+		l.Debugf("%s", msg)
 		return GetError(RestErrorResourceDNETarget, msg)
 	}
 
