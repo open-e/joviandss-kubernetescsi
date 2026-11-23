@@ -21,12 +21,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -116,10 +118,15 @@ func (rp *RestProxy) Send(ctx context.Context, method string, path string, data 
 // transportError names the kind of failure of a request that got no reply.
 // It never reads the reply that did not come.
 func transportError(err error) RestError {
+	var certErr *tls.CertificateVerificationError
 	var dnsErr *net.DNSError
 	var netErr net.Error
 	var opErr *net.OpError
 	switch {
+	case errors.As(err, &certErr):
+		return GetError(RestErrorUnableToConnect, fmt.Sprintf(
+			"certificate of the appliance not verified: %s; set cafile to the certificate or its CA, or set insecure",
+			certErr.Err))
 	case errors.As(err, &dnsErr):
 		return GetError(RestErrorUnableToConnect, "address does not resolve: "+dnsErr.Error())
 	case errors.As(err, &netErr) && netErr.Timeout(): // the client's own timeout too
@@ -177,15 +184,34 @@ func SetupRestProxy(rp *RestProxy, cfg *jcom.RestEndpointCfg, l *logrus.Entry) e
 		}
 	}
 
+	// The certificate of the appliance is checked unless insecure is set,
+	// and nothing below TLS 1.2 is spoken.
+	tc := &tls.Config{MinVersion: tls.VersionTLS12}
+	switch {
+	case cfg.Insecure:
+		tc.InsecureSkipVerify = true // no check at all; cafile is not read
+	case cfg.CAFile != "":
+		pem, err := os.ReadFile(cfg.CAFile)
+		if err != nil {
+			return fmt.Errorf("cafile: %w", err)
+		}
+		roots, err := x509.SystemCertPool()
+		if err != nil || roots == nil {
+			roots = x509.NewCertPool()
+		}
+		if !roots.AppendCertsFromPEM(pem) {
+			return fmt.Errorf("cafile: %s holds no PEM certificate", cfg.CAFile)
+		}
+		// the appliance's own certificate, or the CA that signed it; the
+		// certificate must still be within its dates and list the address
+		tc.RootCAs = roots
+	}
 	rp.httpRestProxy = &http.Client{
-		Transport: &http.Transport{
-			IdleConnTimeout: sessionTimeout,
-			TLSClientConfig: &tls.Config{
-				// Connect without checking certificate
-				InsecureSkipVerify: true,
-			},
-		},
-		Timeout: timeout,
+		Transport: &http.Transport{IdleConnTimeout: sessionTimeout, TLSClientConfig: tc},
+		Timeout:   timeout,
+		// The API has no reason to redirect: a redirect means that something
+		// else answered, and its reply is returned as it came.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
 
 	rp.prot = "https"

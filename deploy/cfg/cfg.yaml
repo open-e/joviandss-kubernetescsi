@@ -7,6 +7,10 @@ endpoint :
   port: 82
   user: admin # JovianDSS Web/REST user name
   pass: admin # JovianDSS Web/REST user passowrd
+  # The certificate of the storage is checked. For a storage with a
+  # self-signed certificate set one of these (docs/configuration.md):
+  # cafile: /config/ca.pem # the certificate of the storage, or of its CA
+  # insecure: true         # no check at all
   idletimeout: 30s
   tries: 3        # a GET answered without data is sent this many times in all
   retrydelay: 1s  # the pause before it is sent again

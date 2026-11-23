@@ -103,6 +103,7 @@ func newFakeAppliance(t *testing.T) *fakeAppliance {
 	app.cfg = jcom.RestEndpointCfg{
 		Addrs: []string{u.Hostname()}, Port: port, Prot: "https",
 		User: "admin", Pass: "admin", IdleTimeOut: "30s", RetryDelay: "1ms",
+		Insecure: true, // the test server's certificate is its own
 	}
 	app.ctx = jcom.WithLogger(context.Background(), app.logger)
 	return app

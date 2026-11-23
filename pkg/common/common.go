@@ -59,6 +59,11 @@ type RestEndpointCfg struct {
 	Prot string `json:"prot,omitempty" yaml:"prot"`
 	User string `json:"user,omitempty" yaml:"user"`
 	Pass string `json:"pass,omitempty" yaml:"pass"`
+	// Insecure turns the check of the appliance's certificate off.
+	Insecure bool `json:"insecure,omitempty" yaml:"insecure"`
+	// CAFile names a file of PEM certificates to trust beside the system's:
+	// the appliance's own certificate, or the CA that signed it.
+	CAFile string `json:"cafile,omitempty" yaml:"cafile"`
 	// IdleTimeOut is how long the plugin waits for the reply to one request,
 	// a duration such as 30s.
 	IdleTimeOut string `json:"idletimeout,omitempty" yaml:"idletimeout"`

@@ -48,6 +48,9 @@ iscsi:
     - `port` port that would be used to connect to storage
     - `user` name of the JovianDSS Web/REST user
     - `pass` password of that user
+    - `cafile` path of a file with one or more PEM certificates that the plugin trusts beside the certificates of the system: the certificate of the storage itself, or of the CA that signed it. See [Certificate of the storage](#certificate-of-the-storage).
+    - `insecure` set it to `true` to turn the check of the storage's certificate off. Not set, the certificate is checked.
+    - `prot` is no longer needed: the plugin always uses `https`. Any other value is refused.
     - `idletimeout` time to wait for one REST request to complete before considering it as failed, such as `30s`.
     - `tries` how many times a `GET` request that the storage answers without data (status 204) is sent in all: `3` means the first request and two more, `1` means no second request. `3` when the key is not set. No other request is sent again: not a `DELETE` answered 204, which is a success, and not a request that failed.
     - `retrydelay` the pause before such a `GET` is sent again, written like `idletimeout`. `1s` when the key is not set.
@@ -57,3 +60,28 @@ iscsi:
     - `port` iscsi port provided by JovianDSS storage
 
 Keys that the plugin does not read, such as `name` in the `endpoint` section, are ignored.
+
+## Certificate of the storage
+
+The plugin talks to the storage over HTTPS only, with TLS 1.2 or newer, and checks the storage's certificate: it has to be signed by a CA the plugin trusts, be within its dates, and list the address given in `addrs`. A storage that still presents the self-signed certificate it was installed with does not pass this check, and every request fails with an error that says `certificate of the appliance not verified`.
+
+There are two ways to make it pass:
+
+1. Import a certificate on the storage that lists the address the plugin connects to, and give the plugin the certificate, or the CA that signed it, with `cafile`. The file has to reach the controller container. Add it to the same `secret` as the config file, under a name of its own:
+
+    ```bash
+    kubectl create secret -n joviandss-csi generic jdss-controller-cfg \
+        --from-file ./deploy/cfg/cfg.yaml \
+        --from-file ca.pem=./storage-ca.pem
+    ```
+
+    The controller manifest mounts that `secret` at `/config`, so the file is `/config/ca.pem` in the container:
+
+    ```
+    endpoint:
+      cafile: /config/ca.pem
+    ```
+
+    `cafile` cannot make up for a certificate that is out of its dates or does not list the address in `addrs`.
+
+2. Turn the check off with `insecure: true`. The connection is still encrypted, but the plugin no longer knows that it talks to the storage, so anyone on the network path can read the REST password. Use it only on a network you trust.

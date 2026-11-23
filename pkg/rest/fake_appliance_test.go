@@ -104,6 +104,7 @@ func newFakeAppliance(t *testing.T) *fakeAppliance {
 		Pass:        testRestPassword,
 		IdleTimeOut: "30s",
 		RetryDelay:  "1ms", // a GET answered 204 is sent again at once
+		Insecure:    true,  // the test server's certificate is its own
 	}
 	if err := SetupEndpoint(&app.ep, &cfg, l); err != nil {
 		t.Fatal(err)

@@ -19,12 +19,16 @@ package rest
 
 import (
 	"context"
+	"crypto/tls"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"syscall"
@@ -201,7 +205,7 @@ func endpointFor(t *testing.T, serverURL string, timeout string) (*RestEndpoint,
 	}
 	l, _ := testLogger()
 	cfg := jcom.RestEndpointCfg{Addrs: []string{u.Hostname()}, Port: port, User: "admin", Pass: testRestPassword,
-		IdleTimeOut: timeout, RetryDelay: "1ms"}
+		IdleTimeOut: timeout, RetryDelay: "1ms", Insecure: true}
 	var ep RestEndpoint
 	if err := SetupEndpoint(&ep, &cfg, l); err != nil {
 		t.Fatal(err)
@@ -369,5 +373,162 @@ func TestEndpointString(t *testing.T) {
 	ep := RestEndpoint{rec: jcom.RestEndpointCfg{Addrs: []string{"192.0.2.1", "192.0.2.2"}, Port: 82}}
 	if got := ep.String(); got != "addrs: 192.0.2.1,192.0.2.2 port: 82" {
 		t.Errorf("an endpoint formats as %q", got)
+	}
+}
+
+// tlsEndpoint sets up an endpoint for a TLS test server with the settings a
+// test changes.
+func tlsEndpoint(t *testing.T, srv *httptest.Server, change func(cfg *jcom.RestEndpointCfg)) (*RestEndpoint, context.Context, error) {
+	t.Helper()
+	u, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	port, _ := strconv.Atoi(u.Port())
+	l, _ := testLogger()
+	cfg := jcom.RestEndpointCfg{Addrs: []string{u.Hostname()}, Port: port, User: "admin", Pass: testRestPassword, IdleTimeOut: "30s"}
+	if change != nil {
+		change(&cfg)
+	}
+	var ep RestEndpoint
+	serr := SetupEndpoint(&ep, &cfg, l)
+	return &ep, withTestLogger(context.Background(), l), serr
+}
+
+// poolServer answers every request with a recorded pool reply.
+func poolServer(t *testing.T) (*httptest.Server, *int) {
+	t.Helper()
+	body := successBody(t, "GetPool")
+	requests := 0
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests++
+		w.Header().Set("Content-Type", "application/json")
+		w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv, &requests
+}
+
+// The certificate of the appliance is checked by default. With neither
+// setting, an appliance whose certificate does not verify is refused with
+// an error that names the certificate problem and the two settings; with
+// cafile naming the certificate, or with insecure, the call succeeds.
+func TestCertificateIsCheckedByDefault(t *testing.T) {
+	srv, requests := poolServer(t) // its certificate is signed by no known CA
+
+	ep, ctx, err := tlsEndpoint(t, srv, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, rerr := ep.GetPool(ctx, "Pool-0")
+	if rerr == nil || rerr.GetCode() != RestErrorUnableToConnect {
+		t.Fatalf("a certificate that does not verify: error %v", rerr)
+	}
+	for _, part := range []string{"certificate", "not verified", "cafile", "insecure"} {
+		if !strings.Contains(rerr.Error(), part) {
+			t.Errorf("the error %q does not say %q", rerr.Error(), part)
+		}
+	}
+	if *requests != 0 {
+		t.Errorf("%d requests reached an appliance whose certificate did not verify", *requests)
+	}
+
+	// cafile: the certificate of the appliance itself
+	cafile := filepath.Join(t.TempDir(), "appliance.pem")
+	pemBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: srv.Certificate().Raw})
+	if err := os.WriteFile(cafile, pemBytes, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ep, ctx, err = tlsEndpoint(t, srv, func(cfg *jcom.RestEndpointCfg) { cfg.CAFile = cafile })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, rerr := ep.GetPool(ctx, "Pool-0"); rerr != nil {
+		t.Errorf("with cafile naming the certificate: %s", rerr.Error())
+	}
+
+	// insecure: no check
+	ep, ctx, err = tlsEndpoint(t, srv, func(cfg *jcom.RestEndpointCfg) { cfg.Insecure = true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, rerr := ep.GetPool(ctx, "Pool-0"); rerr != nil {
+		t.Errorf("with insecure: %s", rerr.Error())
+	}
+	// insecure wins: cafile is not read
+	if _, _, err = tlsEndpoint(t, srv, func(cfg *jcom.RestEndpointCfg) { cfg.Insecure, cfg.CAFile = true, "/no/such/file" }); err != nil {
+		t.Errorf("insecure with a cafile that does not exist: %v", err)
+	}
+
+	// cafile cannot make up for an address the certificate does not list
+	other := filepath.Join(t.TempDir(), "other.pem")
+	otherSrv, _ := poolServer(t)
+	otherPEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: otherSrv.Certificate().Raw})
+	os.WriteFile(other, otherPEM, 0o600)
+	ep, ctx, _ = tlsEndpoint(t, srv, func(cfg *jcom.RestEndpointCfg) {
+		cfg.CAFile = other
+		cfg.Addrs = []string{"localhost"} // the test certificate lists 127.0.0.1 and example.com
+	})
+	if _, rerr := ep.GetPool(ctx, "Pool-0"); rerr == nil || !strings.Contains(rerr.Error(), "not verified") {
+		t.Errorf("an address the certificate does not list: error %v", rerr)
+	}
+}
+
+// A cafile that cannot be read, or holds no certificate, is refused by its
+// name at setup.
+func TestCAFileThatCannotBeUsed(t *testing.T) {
+	srv, _ := poolServer(t)
+	empty := filepath.Join(t.TempDir(), "empty.pem")
+	os.WriteFile(empty, []byte("not a certificate\n"), 0o600)
+	for what, file := range map[string]string{"a file that does not exist": "/no/such/file.pem", "a file without a certificate": empty} {
+		ep, ctx, err := tlsEndpoint(t, srv, func(cfg *jcom.RestEndpointCfg) { cfg.CAFile = file })
+		if err == nil || !strings.HasPrefix(err.Error(), "cafile:") {
+			t.Errorf("%s: setup error %v, want one that names cafile", what, err)
+		}
+		if _, rerr := ep.GetPool(ctx, "Pool-0"); rerr == nil || !strings.Contains(rerr.Error(), "cafile") {
+			t.Errorf("%s: a call returns %v", what, rerr)
+		}
+	}
+}
+
+// A server that offers less than TLS 1.2 is refused, with insecure too.
+func TestTLSBelow12IsRefused(t *testing.T) {
+	requests := 0
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { requests++ }))
+	srv.TLS = &tls.Config{MinVersion: tls.VersionTLS10, MaxVersion: tls.VersionTLS11}
+	srv.StartTLS()
+	defer srv.Close()
+	ep, ctx, err := tlsEndpoint(t, srv, func(cfg *jcom.RestEndpointCfg) { cfg.Insecure = true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, rerr := ep.GetPool(ctx, "Pool-0"); rerr == nil || requests != 0 {
+		t.Errorf("a server of TLS 1.1 at most: error %v, %d requests served", rerr, requests)
+	}
+	if ep.rp.httpRestProxy.Transport.(*http.Transport).TLSClientConfig.MinVersion != tls.VersionTLS12 {
+		t.Error("the client's minimum is not TLS 1.2")
+	}
+}
+
+// A redirect is not followed: the API has no reason to redirect, so the
+// reply is returned as it came, and is an error of the call.
+func TestRedirectIsNotFollowed(t *testing.T) {
+	target, followed := poolServer(t)
+	redirects := 0
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		redirects++
+		http.Redirect(w, r, target.URL+"/api/v4/pools/Pool-0", http.StatusFound)
+	}))
+	defer srv.Close()
+	ep, ctx, err := tlsEndpoint(t, srv, func(cfg *jcom.RestEndpointCfg) { cfg.Insecure = true })
+	if err != nil {
+		t.Fatal(err)
+	}
+	pool, rerr := ep.GetPool(ctx, "Pool-0")
+	if pool != nil || rerr == nil || !strings.Contains(rerr.Error(), "status 302") {
+		t.Errorf("a redirect: pool %v, error %v", pool, rerr)
+	}
+	if redirects != 1 || *followed != 0 {
+		t.Errorf("%d requests to the appliance and %d to the place it named, want 1 and 0", redirects, *followed)
 	}
 }

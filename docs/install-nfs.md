@@ -60,6 +60,8 @@ Check this [guide on configuration](configuration.md) and [nfs specifci guide](c
 kubectl create secret -n joviandss-csi generic jdss-controller-cfg --from-file ./deploy/cfg/cfg.yaml 
 ```
 
+The plugin checks the certificate of the storage. A storage that presents a self-signed certificate needs `cafile` or `insecure` in the `endpoint` section of the config file, and the file that `cafile` names has to be added to the same `secret`: see [Certificate of the storage](configuration.md#certificate-of-the-storage).
+
 Please keep in mind that config file name and secret name are both referenced in `./deploy/joviandss/joviandss-csi-controller.yaml`.
 
 [TODO]: # Provide detailed description of how config name and secret name affects controller config

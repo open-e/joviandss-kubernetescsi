@@ -46,6 +46,13 @@ Everything on `master` after v1.1.0, including the `nfs-support` branch
   calls it. The oldest supported JovianDSS 1 release is `1.0up33.65410`; an
   older release, or one that serves a different API v4, stops working after
   the upgrade.
+- **The certificate of the storage is checked by default.** A JovianDSS that
+  presents a self-signed certificate, as it does until an administrator
+  imports one, is refused after the upgrade until the `endpoint` section of
+  the configuration sets `cafile`, to the certificate or its CA, or `insecure:
+  true` (`docs/configuration.md`, "Certificate of the storage"). The plugin
+  uses HTTPS only, with TLS 1.2 or newer, and follows no redirect; `prot` is
+  no longer needed, and a value other than `https` is refused.
 - Node plugin reworked: new stage and publish code on `k8s.io/mount-utils`, and
   a different error code when a volume cannot be attached.
 - Container images are built from CentOS Stream 9 instead of Ubuntu.
