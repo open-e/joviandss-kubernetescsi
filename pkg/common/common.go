@@ -47,31 +47,42 @@ const (
 	NFS   StorageAccessProtocolType = "nfs"
 )
 
+// RestEndpointCfg is the endpoint section of the configuration: how the
+// plugin reaches the REST API of the appliance. Every key has a yaml tag
+// with the name the configuration guide gives it.
 type RestEndpointCfg struct {
-	Addrs       []string `json:"addrs,omitempty"`
-	Port        int      `json:"port,omitempty"`
-	Prot        string   `json:"prot,omitempty"`
-	User        string   `json:"user,omitempty"`
-	Pass        string   `json:"pass,omitempty"`
-	IdleTimeOut string   `json:"idletimeout,omitempty"`
+	// Addrs holds the addresses of the appliance. Only the first is used.
+	Addrs []string `json:"addrs,omitempty" yaml:"addrs"`
+	Port  int      `json:"port,omitempty" yaml:"port"`
+	// Prot is no longer needed: the plugin uses https only, and any other
+	// value is refused.
+	Prot string `json:"prot,omitempty" yaml:"prot"`
+	User string `json:"user,omitempty" yaml:"user"`
+	Pass string `json:"pass,omitempty" yaml:"pass"`
+	// IdleTimeOut is how long the plugin waits for the reply to one request,
+	// a duration such as 30s.
+	IdleTimeOut string `json:"idletimeout,omitempty" yaml:"idletimeout"`
 	// Tries is how many times a GET answered 204, without data, is sent in
 	// all: 3 when it is not set, 1 for no second request.
-	Tries int `json:"tries,omitempty"`
+	Tries int `json:"tries,omitempty" yaml:"tries"`
 	// RetryDelay is the pause before such a GET is sent again, a duration
 	// written like idletimeout: 1s when it is not set.
-	RetryDelay string `json:"retrydelay,omitempty"`
+	RetryDelay string `json:"retrydelay,omitempty" yaml:"retrydelay"`
 }
 
+// ISCSIEndpointCfg is the iscsi section of the configuration.
 type ISCSIEndpointCfg struct {
-	Vnamelen int      `json:"namelen,omitempty"`
-	Vpasslen int      `json:"passlen,omitempty"`
-	Iqn      string   `json:"iqn,omitempty"`
-	Addrs    []string `json:"addrs,omitempty"`
-	Port     int      `json:"port,omitempty"`
+	Vnamelen int `json:"namelen,omitempty" yaml:"namelen"`
+	Vpasslen int `json:"passlen,omitempty" yaml:"passlen"`
+	// Iqn is the beginning of the name of every target the plugin makes.
+	Iqn   string   `json:"iqn,omitempty" yaml:"iqn"`
+	Addrs []string `json:"addrs,omitempty" yaml:"addrs"`
+	Port  int      `json:"port,omitempty" yaml:"port"`
 }
 
+// NFSEndpointCfg is the nfs section of the configuration.
 type NFSEndpointCfg struct {
-	Addrs []string `json:"addrs,omitempty"`
+	Addrs []string `json:"addrs,omitempty" yaml:"addrs"`
 }
 
 // ControllerCfg stores configaration properties of controller instance

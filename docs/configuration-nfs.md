@@ -13,25 +13,24 @@ If you change config file user have to restart controller service as well.
 Here is example config file:
 
 ```
-loglevel  : Debug
-logpath   : /tmp/csi-log
+loglevel: Info
+# logfile: /tmp/csi-log
+pool: Pool-0
 endpoint:
-  name: MainStorage
   addrs:
     - 192.168.0.100
   port: 82
   user: admin
   pass: admin
-  prot: https
-  pool: Pool-0
+  idletimeout: 30s
   tries: 3
-  idletimeout: 5s
+  retrydelay: 1s
 nfs:
   addrs:
     - 192.168.0.100
 ```
 
-Read about top level configuration options and `endpoint` section in [configuration guide](configuration.md).
+Read about top level configuration options, `pool` among them, and `endpoint` section in [configuration guide](configuration.md).
 
 - `nfs` is a section of config file containing information on how to connect to JovianDSS nfs resources.
     - `addrs` list of addresses that would be used to connect shares
