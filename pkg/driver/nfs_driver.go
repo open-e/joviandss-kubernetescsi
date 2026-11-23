@@ -118,26 +118,39 @@ func (d *CSINFSDriver) CreateVolume(ctx context.Context, pool string, nvd *Volum
 		return err
 	}
 
-	enable_NFS := true
-	all_squash_NFS := true
-	active_share := true
+	return d.createShare(ctx, pool, name)
+}
 
+// createShare makes the NFS share of the NAS volume name, with the path
+// <pool>/<name>/<name>. When the appliance answers that a share of that
+// name exists, the share is read, and it is taken as this volume's own only
+// when its path is the one sent: a repeated create then succeeds. A share
+// with another path fails the create.
+func (d *CSINFSDriver) createShare(ctx context.Context, pool string, name string) jrest.RestError {
+	enabled, allSquash, active := true, true, true
 	path := fmt.Sprintf("%s/%s/%s", pool, name, name)
-	l.Debugf("Create share with path %s", path)
 
-	nfs := jrest.ShareNFSDescriptor{
-		Enabled:   &enable_NFS,
-		AllSquash: &all_squash_NFS,
-	}
-
-	sd := jrest.CreateShareDescriptor{
+	desc := jrest.CreateShareDescriptor{
 		Name:   name,
-		Active: &active_share,
+		Active: &active,
 		Path:   path,
-		NFS:    &nfs,
+		NFS:    &jrest.ShareNFSDescriptor{Enabled: &enabled, AllSquash: &allSquash},
 	}
 
-	return d.re.CreateShare(ctx, &sd)
+	err := d.re.CreateShare(ctx, &desc)
+	if jrest.ErrCode(err) != jrest.RestErrorResourceExists {
+		return err
+	}
+
+	share, rerr := d.re.GetShare(ctx, name)
+	if rerr != nil {
+		return rerr
+	}
+	if share.Path != path {
+		return jrest.GetError(jrest.RestErrorResourceExists,
+			fmt.Sprintf("share %s exists with the path %s, and the volume needs %s", name, share.Path, path))
+	}
+	return nil
 }
 
 func (d *CSINFSDriver) CreateVolumeFromSnapshot(ctx context.Context, pool string, sd *SnapshotDesc, nvd *VolumeDesc) jrest.RestError {
@@ -162,23 +175,7 @@ func (d *CSINFSDriver) CreateVolumeFromSnapshot(ctx context.Context, pool string
 		l.Debugf("Unable to create nas volume %s, error had happaned %+v", nvd.Name(), err.Error())
 		return err
 	}
-	enable_NFS := true
-	all_squash_NFS := true
-	active_share := true
-	path := fmt.Sprintf("%s/%s/%s", pool, nvd.VDS(), nvd.VDS())
-
-	nfs := jrest.ShareNFSDescriptor{
-		Enabled:   &enable_NFS,
-		AllSquash: &all_squash_NFS,
-	}
-	shareDesc := jrest.CreateShareDescriptor{
-		Name:   nvd.VDS(),
-		Active: &active_share,
-		Path:   path,
-		NFS:    &nfs,
-	}
-
-	return d.re.CreateShare(ctx, &shareDesc)
+	return d.createShare(ctx, pool, nvd.VDS())
 }
 
 func (d *CSINFSDriver) deleteIntermediateSnapshot(ctx context.Context, pool string, vds string, sds string) jrest.RestError {
@@ -247,24 +244,7 @@ func (d *CSINFSDriver) CreateVolumeFromVolume(ctx context.Context, pool string, 
 		return err
 	}
 
-	enable_NFS := true
-	all_squash_NFS := true
-	active_share := true
-	path := fmt.Sprintf("%s/%s/%s", pool, nvd.VDS(), nvd.VDS())
-
-	nfs := jrest.ShareNFSDescriptor{
-		Enabled:   &enable_NFS,
-		AllSquash: &all_squash_NFS,
-	}
-
-	sd := jrest.CreateShareDescriptor{
-		Name:   nvd.VDS(),
-		Active: &active_share,
-		Path:   path,
-		NFS:    &nfs,
-	}
-
-	return d.re.CreateShare(ctx, &sd)
+	return d.createShare(ctx, pool, nvd.VDS())
 }
 
 // cleanIntermediateSnapshots request list of snapshots related to particular volume and check if there are intermediate one that can be deleted
