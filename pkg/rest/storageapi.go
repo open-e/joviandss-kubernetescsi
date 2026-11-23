@@ -54,13 +54,12 @@ func readObject[T any, PT interface {
 func readEntries[T any, PT interface {
 	*T
 	replyType
-}](ctx context.Context, s *RestEndpoint, path string, entries []errorEntry) (*ResultEntries, RestError) {
+}](ctx context.Context, s *RestEndpoint, path string, entries []errorEntry) ([]T, RestError) {
 	status, body, err := s.rp.getWithData(ctx, path)
 	if err == nil && (status == CodeOK || status == CodeCreated) {
 		var page []T
-		var results int64
-		if page, results, err = decodeEntries[T, PT](body); err == nil {
-			return &ResultEntries{Results: results, Entries: &page}, nil
+		if page, _, err = decodeEntries[T, PT](body); err == nil {
+			return page, nil
 		}
 	}
 	return nil, s.failedReply(ctx, "GET", path, entries, status, body, err)

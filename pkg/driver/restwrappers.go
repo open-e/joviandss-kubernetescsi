@@ -18,44 +18,10 @@ under the License.
 package driver
 
 import (
-	//"fmt"
-	//"strings"
 	"context"
-	"encoding/base64"
-	"fmt"
 
 	jrest "github.com/open-e/joviandss-kubernetescsi/pkg/rest"
 )
-
-func RestVolumeEntryBasedID(entry jrest.ResourceVolume) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
-
-func RestSnapshotEntryBasedID(entry jrest.ResourceSnapshotShort) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
-
-func RestSnapshotShortEntryBasedID(entry jrest.ResourceSnapshotShort) string {
-	basedid := fmt.Sprintf("%s_%s", base64.StdEncoding.EncodeToString([]byte(entry.Parent.Name)), base64.StdEncoding.EncodeToString([]byte(entry.Parent.Name)))
-	return basedid
-}
-
-func RestNASVolumeEntryBasedID(entry jrest.ResourceNASVolume) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
-
-func RestNASVolumeSnapshotEntryBasedID(entry jrest.ResourceNASSnapshotShort) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
-
-func RestNASSnapshotShortEntryBasedID(entry jrest.ResourceNASSnapshotShort) string {
-	basedid := base64.StdEncoding.EncodeToString([]byte(entry.Name))
-	return basedid
-}
 
 // keptSnapshot is a snapshot that the cleanup of intermediate snapshots left
 // on a volume, with the clones that were read for it.

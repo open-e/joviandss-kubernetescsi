@@ -97,7 +97,7 @@ func TestGetAnswered204EveryTime(t *testing.T) {
 	if clones != nil || err == nil {
 		t.Errorf("the clones of a snapshot answered 204: clones %v, error %v", clones, err)
 	}
-	page, err := app.ep.GetVolumesEntries(app.ctx, "Pool-0", 0, 0)
+	page, err := app.ep.GetVolumesEntries(app.ctx, "Pool-0", 0, 100)
 	if page != nil || err == nil {
 		t.Errorf("a list answered 204: page %v, error %v", page, err)
 	}

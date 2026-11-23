@@ -585,17 +585,19 @@ func (cp *ControllerPlugin) ListVolumes(ctx context.Context, req *csi.ListVolume
 
 	maxEnt := int64(req.GetMaxEntries())
 	startingToken := req.GetStartingToken()
-	token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken)
 
+	if maxEnt < 0 {
+		return nil, status.Errorf(codes.InvalidArgument, "Number of Entries must not be negative.")
+	}
+
+	// A token that does not parse, has another version or was issued for
+	// another list is answered Aborted, as CSI prescribes.
+	token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken, jdrvr.VolumesList())
 	if rErr != nil {
 		return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
 	}
 
-	if maxEnt < 0 {
-		return nil, status.Errorf(codes.Internal, "Number of Entries must not be negative.")
-	}
-	l.Debugf("Driver %+v", cp.d)
-	if volList, ts, rErr := cp.d.ListAllVolumes(ctx, cp.pool, int(maxEnt), *token); rErr != nil {
+	if volList, ts, rErr := cp.d.ListAllVolumes(ctx, cp.pool, int(maxEnt), token); rErr != nil {
 		l.Debugf("Unable to comlete listing %s", rErr.Error())
 		return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error())
 	} else {
@@ -748,11 +750,6 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 	sourceVolumeId := req.GetSourceVolumeId()
 	snapshotId := req.GetSnapshotId()
 	startingToken := req.GetStartingToken()
-	token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken)
-
-	if rErr != nil {
-		return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
-	}
 
 	if maxEnt < 0 {
 		return nil, status.Errorf(codes.InvalidArgument, "Number of Entries must not be negative.")
@@ -763,7 +760,12 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		if vd, err := jdrvr.NewVolumeDescFromCSIID(sourceVolumeId); err != nil {
 			return nil, err
 		} else {
-			if snapList, ts, rErr := cp.d.ListVolumeSnapshots(ctx, cp.pool, vd, int(maxEnt), *token); rErr != nil {
+			// the token of the list of this volume's snapshots, and of no other
+			token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken, jdrvr.VolumeSnapshotsList(vd.VDS()))
+			if rErr != nil {
+				return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
+			}
+			if snapList, ts, rErr := cp.d.ListVolumeSnapshots(ctx, cp.pool, vd, int(maxEnt), token); rErr != nil {
 				return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error())
 			} else {
 				if ts != nil {
@@ -805,7 +807,11 @@ func (cp *ControllerPlugin) ListSnapshots(ctx context.Context, req *csi.ListSnap
 		l.Debugf("get snapshot %s", snapshotId)
 	} else {
 		l.Debugln("listing all snapshots")
-		if snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, int(maxEnt), *token); rErr != nil {
+		token, rErr = jdrvr.NewCSIListingTokenFromTokenString(startingToken, jdrvr.SnapshotsList())
+		if rErr != nil {
+			return nil, status.Errorf(codes.Aborted, "Unable to operate with token %s Err: %s", startingToken, rErr.Error())
+		}
+		if snapList, ts, rErr := cp.d.ListAllSnapshots(ctx, cp.pool, int(maxEnt), token); rErr != nil {
 			return nil, status.Errorf(codes.Internal, "Unable to complete listing request: %s", rErr.Error())
 		} else {
 			if ts != nil {

@@ -150,7 +150,7 @@ func (app *fakeAppliance) calls() map[string]func() RestError {
 			return ep.CreateVolume(ctx, "Pool-0", CreateVolumeDescriptor{Name: "v", Size: "1073741824"})
 		},
 		"DeleteVolume":      func() RestError { return ep.DeleteVolume(ctx, "Pool-0", "v", DeleteVolumeDescriptor{}) },
-		"GetVolumesEntries": func() RestError { _, e := ep.GetVolumesEntries(ctx, "Pool-0", 0, 0); return e },
+		"GetVolumesEntries": func() RestError { _, e := ep.GetVolumesEntries(ctx, "Pool-0", 3, 100); return e },
 		"GetVolumeSnapshot": func() RestError { _, e := ep.GetVolumeSnapshot(ctx, "Pool-0", "v", "s"); return e },
 		"CreateSnapshot": func() RestError {
 			return ep.CreateSnapshot(ctx, "Pool-0", "v", &CreateSnapshotDescriptor{SnapshotName: "s"})
@@ -158,9 +158,9 @@ func (app *fakeAppliance) calls() map[string]func() RestError {
 		"DeleteSnapshot": func() RestError {
 			return ep.DeleteSnapshot(ctx, "Pool-0", "v", "s", DeleteSnapshotDescriptor{})
 		},
-		"GetSnapshotsEntries": func() RestError { _, e := ep.GetSnapshotsEntries(ctx, "Pool-0", 0, 0); return e },
+		"GetSnapshotsEntries": func() RestError { _, e := ep.GetSnapshotsEntries(ctx, "Pool-0", 3, 100); return e },
 		"GetVolumeSnapshotsEntries": func() RestError {
-			_, e := ep.GetVolumeSnapshotsEntries(ctx, "Pool-0", "v", 0, 0)
+			_, e := ep.GetVolumeSnapshotsEntries(ctx, "Pool-0", "v", 3, 100)
 			return e
 		},
 		"GetVolumeSnapshotClones": func() RestError { _, e := ep.GetVolumeSnapshotClones(ctx, "Pool-0", "v", "s"); return e },
@@ -184,12 +184,12 @@ func (app *fakeAppliance) calls() map[string]func() RestError {
 		"GetNASVolume":         func() RestError { _, e := ep.GetNASVolume(ctx, "Pool-0", "d"); return e },
 		"CreateNASVolume":      func() RestError { return ep.CreateNASVolume(ctx, "Pool-0", &CreateNASVolumeDescriptor{Name: "d"}) },
 		"DeleteNASVolume":      func() RestError { return ep.DeleteNASVolume(ctx, "Pool-0", "d") },
-		"GetNASVolumesEntries": func() RestError { _, e := ep.GetNASVolumesEntries(ctx, "Pool-0", 0, 0); return e },
+		"GetNASVolumesEntries": func() RestError { _, e := ep.GetNASVolumesEntries(ctx, "Pool-0", 3, 100); return e },
 		"GetNASVolumeSnapshotsEntries": func() RestError {
-			_, e := ep.GetNASVolumeSnapshotsEntries(ctx, "Pool-0", "d", 0, 0)
+			_, e := ep.GetNASVolumeSnapshotsEntries(ctx, "Pool-0", "d", 3, 100)
 			return e
 		},
-		"GetNASSnapshotsEntries": func() RestError { _, e := ep.GetNASSnapshotsEntries(ctx, "Pool-0", 0, 0); return e },
+		"GetNASSnapshotsEntries": func() RestError { _, e := ep.GetNASSnapshotsEntries(ctx, "Pool-0", 3, 100); return e },
 		"CreateNASSnapshot": func() RestError {
 			return ep.CreateNASSnapshot(ctx, "Pool-0", "d", &CreateNASSnapshotDescriptor{Name: "s"})
 		},
