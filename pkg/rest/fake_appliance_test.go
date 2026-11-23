@@ -204,5 +204,6 @@ func (app *fakeAppliance) calls() map[string]func() RestError {
 		},
 		"DeleteNASClone": func() RestError { return ep.DeleteNASClone(ctx, "Pool-0", "d", "s", "c") },
 		"CreateShare":    func() RestError { return ep.CreateShare(ctx, &CreateShareDescriptor{Name: "d", Path: "Pool-0/d/d"}) },
+		"GetShare":       func() RestError { _, e := ep.GetShare(ctx, "d"); return e },
 	}
 }

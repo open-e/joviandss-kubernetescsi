@@ -237,7 +237,8 @@ func TestErrorFixturesThroughTheCalls(t *testing.T) {
 	for _, f := range loadErrorFixtures(t) {
 		call, ok := calls[f.Call]
 		if !ok {
-			continue // a call of the catalogue that this package does not make yet
+			t.Errorf("%s: this package has no call %s", f.File, f.Call)
+			continue
 		}
 		tested[f.Call] = true
 		contentType := "application/json"

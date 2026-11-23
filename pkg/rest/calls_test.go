@@ -69,6 +69,7 @@ var callRequests = map[string]struct {
 	"CreateNASClone":               {"POST", "/api/v4/pools/Pool-0/nas-volumes/d/snapshots/s/clones", []int{200, 201}},
 	"DeleteNASClone":               {"DELETE", "/api/v4/pools/Pool-0/nas-volumes/d/snapshots/s/clones/c", []int{204}},
 	"CreateShare":                  {"POST", "/api/v4/shares", []int{201, 200}},
+	"GetShare":                     {"GET", "/api/v4/shares/d", []int{200}},
 }
 
 // successBody gives a body that is a success of the call: the first

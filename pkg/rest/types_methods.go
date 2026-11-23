@@ -233,7 +233,7 @@ func clonesNames(clones *string) (names []string) {
 // Volumes
 
 func (v *ResourceVolume) checkRequired(keys map[string]json.RawMessage) (err error) {
-	if err = requireKeys(keys, "name", "volsize"); err != nil {
+	if err = requireKeys(keys, "name", "volsize", "guid", "default_scsi_id"); err != nil {
 		return err
 	}
 	v.size, err = parseNumber("volsize", v.VolSize)
@@ -287,14 +287,23 @@ func (s *ResourceSnapshot) ClonesNames() []string {
 	return clonesNames(s.Clones)
 }
 
+// The kind of the parent of a snapshot list entry, its parent.type. Both
+// lists of all snapshots return the snapshots of zvols and of NAS volumes
+// together, and a list of one volume's snapshots answers for a volume of
+// the other kind too, so a reader tells them apart by this.
+const (
+	SnapshotParentNASVolume = 1
+	SnapshotParentVolume    = 4
+)
+
 func (s *ResourceSnapshotShort) checkRequired(keys map[string]json.RawMessage) error {
 	if err := requireKeys(keys, "name"); err != nil {
 		return err
 	}
-	if err := requireNested(keys, "parent", "name"); err != nil {
+	if err := requireNested(keys, "parent", "name", "type"); err != nil {
 		return err
 	}
-	return requireNested(keys, "properties", "creation")
+	return requireNested(keys, "properties", "creation", "guid")
 }
 
 // GetCreation returns the time the snapshot was created.
@@ -332,9 +341,8 @@ func (t *ResourceTarget) checkRequired(keys map[string]json.RawMessage) error {
 ///////////////////////////////////////////////////////////////////////////////
 // Share
 
-// Nothing reads a field of a share yet, so none is required.
 func (s *ResourceShare) checkRequired(keys map[string]json.RawMessage) error {
-	return nil
+	return requireKeys(keys, "path")
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -402,10 +410,10 @@ func (s *ResourceNASSnapshotShort) checkRequired(keys map[string]json.RawMessage
 	if err := requireKeys(keys, "name"); err != nil {
 		return err
 	}
-	if err := requireNested(keys, "parent", "name"); err != nil {
+	if err := requireNested(keys, "parent", "name", "type"); err != nil {
 		return err
 	}
-	return requireNested(keys, "properties", "creation")
+	return requireNested(keys, "properties", "creation", "guid")
 }
 
 // GetCreation returns the time the snapshot was created.

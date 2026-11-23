@@ -112,15 +112,15 @@ var replyTypes = map[string]struct {
 	converted []string
 }{
 	"ResourcePool":                 {decoderOf[ResourcePool](), []string{"available"}, []string{"available"}},
-	"ResourceVolume":               {decoderOf[ResourceVolume](), []string{"name", "volsize"}, []string{"volsize"}},
+	"ResourceVolume":               {decoderOf[ResourceVolume](), []string{"name", "volsize", "guid", "default_scsi_id"}, []string{"volsize"}},
 	"ResourceSnapshot":             {decoderOf[ResourceSnapshot](), []string{"volsize", "creation"}, []string{"volsize", "creation"}},
-	"ResourceSnapshotShort":        {decoderOf[ResourceSnapshotShort](), []string{"name", "parent.name", "properties.creation"}, nil},
+	"ResourceSnapshotShort":        {decoderOf[ResourceSnapshotShort](), []string{"name", "parent.name", "parent.type", "properties.creation", "properties.guid"}, nil},
 	"ResourceVolumeSnapshotClones": {decoderOf[ResourceVolumeSnapshotClones](), []string{"name"}, nil},
 	"ResourceTarget":               {decoderOf[ResourceTarget](), []string{"active"}, nil},
 	"ResourceNASVolume":            {decoderOf[ResourceNASVolume](), []string{"name"}, nil},
 	"ResourceNASVolumeSnapshot":    {decoderOf[ResourceNASVolumeSnapshot](), []string{"name", "creation"}, []string{"creation"}},
-	"ResourceNASSnapshotShort":     {decoderOf[ResourceNASSnapshotShort](), []string{"name", "parent.name", "properties.creation"}, nil},
-	"ResourceShare":                {decoderOf[ResourceShare](), nil, nil},
+	"ResourceNASSnapshotShort":     {decoderOf[ResourceNASSnapshotShort](), []string{"name", "parent.name", "parent.type", "properties.creation", "properties.guid"}, nil},
+	"ResourceShare":                {decoderOf[ResourceShare](), []string{"path"}, nil},
 }
 
 // decodeFixture decodes a body as the fixture's type and shape, and returns
@@ -363,8 +363,17 @@ func TestReplyAccessors(t *testing.T) {
 				t.Errorf("%s: available %d from %v", f.File, r.GetAvailable(), sent["available"])
 			}
 		case *ResourceVolume:
-			if r.GetSize() <= 0 || r.Name == "" {
-				t.Errorf("%s: name %q, size %d", f.File, r.Name, r.GetSize())
+			if r.GetSize() <= 0 || r.Name == "" || r.Guid == "" || r.DefaultScsiId == "" {
+				t.Errorf("%s: name %q, size %d, guid %q, default_scsi_id %q", f.File, r.Name, r.GetSize(), r.Guid, r.DefaultScsiId)
+			}
+			if r.IsClone == nil || *r.IsClone != (sent["origin"] != nil) {
+				t.Errorf("%s: is_clone %v read as %v", f.File, sent["is_clone"], r.IsClone)
+			}
+			// is_clone is optional by decision: a volume without it decodes
+			body, _ := changed(t, f, "is_clone", true, nil)
+			var without ResourceVolume
+			if err := decodeData(body, &without); err != nil || without.IsClone != nil {
+				t.Errorf("%s without is_clone: error %v, is_clone %v", f.File, err, without.IsClone)
 			}
 			isClone := sent["origin"] != nil
 			if (r.OriginVolume() != "") != isClone || (r.OriginSnapshot() != "") != isClone {
@@ -392,6 +401,10 @@ func TestReplyAccessors(t *testing.T) {
 			if _, has := sent["clones"]; has != (len(r.ClonesNames()) > 0) {
 				t.Errorf("%s: clones %v read as %v", f.File, sent["clones"], r.ClonesNames())
 			}
+		case *ResourceShare:
+			if r.Path == "" || sent["path"] != r.Path {
+				t.Errorf("%s: path %v read as %q", f.File, sent["path"], r.Path)
+			}
 		case *ResourceTarget:
 			if sent["active"] != r.Active {
 				t.Errorf("%s: active %v read as %v", f.File, sent["active"], r.Active)
@@ -412,8 +425,11 @@ func TestReplyAccessors(t *testing.T) {
 			t.Errorf("%s: results %d, %d entries", f.File, results, len(page))
 		}
 		for _, e := range page {
-			if e.Name == "" || e.Parent.Name == "" || e.Properties.GetCreation().Year() < 2020 {
-				t.Errorf("%s: entry %q of parent %q created %s", f.File, e.Name, e.Parent.Name, e.Properties.GetCreation())
+			if e.Name == "" || e.Parent.Name == "" || e.Properties.Guid == "" || e.Properties.GetCreation().Year() < 2020 {
+				t.Errorf("%s: entry %q of parent %q, guid %q, created %s", f.File, e.Name, e.Parent.Name, e.Properties.Guid, e.Properties.GetCreation())
+			}
+			if e.Parent.Type != SnapshotParentVolume && e.Parent.Type != SnapshotParentNASVolume {
+				t.Errorf("%s: entry %q has a parent of the kind %d", f.File, e.Name, e.Parent.Type)
 			}
 		}
 	}

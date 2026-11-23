@@ -44,9 +44,12 @@ import (
 // keeps a zvol and a clone as two alternatives; a field that one of them
 // sends as null is optional here.
 type ResourceVolume struct {
-	Name    string  `json:"name"`    // required
-	Origin  *string `json:"origin"`  // optional: null on a zvol, pool/volume@snapshot on a clone
-	VolSize string  `json:"volsize"` // required: a number sent as a string, read through GetSize
+	DefaultScsiId string  `json:"default_scsi_id"` // required
+	Guid          string  `json:"guid"`            // required: with default_scsi_id and is_clone it tells two entries of one name in a list apart
+	IsClone       *bool   `json:"is_clone"`        // optional by decision (ADR 0002, question 65): false on a zvol, true on a clone, in every recording
+	Name          string  `json:"name"`            // required
+	Origin        *string `json:"origin"`          // optional: null on a zvol, pool/volume@snapshot on a clone
+	VolSize       string  `json:"volsize"`         // required: a number sent as a string, read through GetSize
 
 	// Not read: kept as sent, so that no type of theirs can fail.
 	Aclinherit           json.RawMessage `json:"aclinherit"`
@@ -64,7 +67,6 @@ type ResourceVolume struct {
 	Createtxg            json.RawMessage `json:"createtxg"`
 	Creation             json.RawMessage `json:"creation"`
 	Dedup                json.RawMessage `json:"dedup"`
-	DefaultScsiId        json.RawMessage `json:"default_scsi_id"`
 	Defcontext           json.RawMessage `json:"defcontext"`
 	DeferDestroy         json.RawMessage `json:"defer_destroy"`
 	Devices              json.RawMessage `json:"devices"`
@@ -76,8 +78,6 @@ type ResourceVolume struct {
 	FilesystemLimit      json.RawMessage `json:"filesystem_limit"`
 	Fscontext            json.RawMessage `json:"fscontext"`
 	FullName             json.RawMessage `json:"full_name"`
-	Guid                 json.RawMessage `json:"guid"`
-	IsClone              json.RawMessage `json:"is_clone"`
 	Keyformat            json.RawMessage `json:"keyformat"`
 	Keylocation          json.RawMessage `json:"keylocation"`
 	Keystatus            json.RawMessage `json:"keystatus"`
@@ -179,10 +179,8 @@ type ResourceSnapshot struct {
 // ResourceSnapshotShortProperties is the properties object of a zvol snapshot
 // list entry, from pools/+poolname+/volumes/snapshots.yaml.
 type ResourceSnapshotShortProperties struct {
-	Creation int64 `json:"creation"` // required: seconds since the epoch, read through GetCreation
-
-	// Not read: kept as sent, so that no type of theirs can fail.
-	Guid json.RawMessage `json:"guid"`
+	Creation int64  `json:"creation"` // required: seconds since the epoch, read through GetCreation
+	Guid     string `json:"guid"`     // required: tells two snapshots of one name in a list apart
 }
 
 // ResourceSnapshotParent is the parent object of a zvol snapshot list entry,
@@ -190,10 +188,10 @@ type ResourceSnapshotShortProperties struct {
 // belongs to.
 type ResourceSnapshotParent struct {
 	Name string `json:"name"` // required
+	Type int64  `json:"type"` // required: SnapshotParentVolume for a zvol, SnapshotParentNASVolume for a NAS volume
 
 	// Not read: kept as sent, so that no type of theirs can fail.
 	Properties json.RawMessage `json:"properties"`
-	Type       json.RawMessage `json:"type"`
 }
 
 // ResourceSnapshotShort is a short entry of a zvol snapshot list: an entry of
@@ -201,8 +199,8 @@ type ResourceSnapshotParent struct {
 // pools/+poolname+/volumes/snapshots.yaml.
 type ResourceSnapshotShort struct {
 	Name       string                          `json:"name"`       // required
-	Parent     ResourceSnapshotParent          `json:"parent"`     // required: its name is read
-	Properties ResourceSnapshotShortProperties `json:"properties"` // required: its creation is read
+	Parent     ResourceSnapshotParent          `json:"parent"`     // required: its name and its type are read
+	Properties ResourceSnapshotShortProperties `json:"properties"` // required: its creation and its guid are read
 }
 
 // ResourceVolumeSnapshotClones is one clone of a snapshot: an item of
@@ -384,8 +382,10 @@ type ShareSMB struct {
 }
 
 // ResourceShare is a share: the reply of GET shares/<share>, from the path file
-// shares/+sharename+.yaml. Nothing reads it yet.
+// shares/+sharename+.yaml.
 type ResourceShare struct {
+	Path string `json:"path"` // required: the path the share was made with, <pool>/<dataset>/<directory>
+
 	// Not read: kept as sent, so that no type of theirs can fail.
 	Active               json.RawMessage `json:"active"`
 	ActiveFlag           json.RawMessage `json:"active_flag"`
@@ -396,7 +396,6 @@ type ResourceShare struct {
 	MissingDirectory     json.RawMessage `json:"missing_directory"`
 	Name                 json.RawMessage `json:"name"`
 	Nfs                  json.RawMessage `json:"nfs"`
-	Path                 json.RawMessage `json:"path"`
 	RealPath             json.RawMessage `json:"real_path"`
 	Smb                  json.RawMessage `json:"smb"`
 }
@@ -491,10 +490,8 @@ type ResourceNASVolumeSnapshot struct {
 // ResourceNASSnapshotShortProperties is the properties object of a NAS snapshot
 // list entry, from pools/+poolname+/nas-volumes/snapshots.yaml.
 type ResourceNASSnapshotShortProperties struct {
-	Creation int64 `json:"creation"` // required: seconds since the epoch, read through GetCreation
-
-	// Not read: kept as sent, so that no type of theirs can fail.
-	Guid json.RawMessage `json:"guid"`
+	Creation int64  `json:"creation"` // required: seconds since the epoch, read through GetCreation
+	Guid     string `json:"guid"`     // required: tells two snapshots of one name in a list apart
 }
 
 // ResourceNASSnapshotParent is the parent object of a NAS snapshot list entry,
@@ -502,10 +499,10 @@ type ResourceNASSnapshotShortProperties struct {
 // snapshot belongs to.
 type ResourceNASSnapshotParent struct {
 	Name string `json:"name"` // required
+	Type int64  `json:"type"` // required: SnapshotParentVolume for a zvol, SnapshotParentNASVolume for a NAS volume
 
 	// Not read: kept as sent, so that no type of theirs can fail.
 	Properties json.RawMessage `json:"properties"`
-	Type       json.RawMessage `json:"type"`
 }
 
 // ResourceNASSnapshotShort is a short entry of a NAS snapshot list: an entry of
@@ -513,6 +510,6 @@ type ResourceNASSnapshotParent struct {
 // pools/+poolname+/nas-volumes/snapshots.yaml.
 type ResourceNASSnapshotShort struct {
 	Name       string                             `json:"name"`       // required
-	Parent     ResourceNASSnapshotParent          `json:"parent"`     // required: its name is read
-	Properties ResourceNASSnapshotShortProperties `json:"properties"` // required: its creation is read
+	Parent     ResourceNASSnapshotParent          `json:"parent"`     // required: its name and its type are read
+	Properties ResourceNASSnapshotShortProperties `json:"properties"` // required: its creation and its guid are read
 }
