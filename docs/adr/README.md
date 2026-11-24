@@ -806,35 +806,28 @@ have clear understanding of the matter that particular ADR addresses.
 
 ### Options considered
 
-- **The Options considered section holds the ways the problem in the
-  Problem statement could be solved, at the architectural and strategic
-  level.**
-  - **Answers:** "which ways were there, and what does each cost?"
-  - **Why:** a decision is understood by what was given up for it.
-- **The options come in groups, one for each part of the problem; the
-  options of a group stand together. A part whose fix follows from the
-  evidence has no group, and its decisions are recorded as questions in
-  the Decisions table. Decisions on how a chosen way is carried out are
-  recorded as questions too, never as options.**
-  - **Why:** a fix that follows from the evidence is not one of several
-    ways, and how a way is carried out is below the architectural and
-    strategic level.
-- **For each group the section shows what was evaluated: two or three real
-  contenders, their trade-offs stated honestly against the priorities, each
-  under its name, `aopt_<area>_<slug>`, as a heading
-  ([Names, not IDs](#names-not-ids)). Where only one option was considered,
-  its text says so and explains why, with the price that option carries.**
-  - **Why:** an option told fairly enough that someone who prefers it would
-    recognise it lets a later reader, whose priorities have changed, reopen
-    the choice without doing the work again.
-  - **Not:** an option set up to lose; an alternative nobody weighed,
-    written up to fill the list; the adopted option without a
-    disadvantage.
-- **Each option says what distinguishes it and the limits of its scope:
-  which modules and systems it changes and which it leaves alone. It does
-  not describe the mechanism, which belongs to the implementation item.**
-  - **Why:** how far the work reaches differs from option to option
-    ([One problem, one record, one at a time](#one-problem-one-record-one-at-a-time)).
+The Options considered section list aproaches to address problem statement on the architectural and strategic levels.
+Options expected to be mutualy exclusive.
+If they are not, it most likely the scope question.
+It should be clear what aspects are mutualy exclusive.
+For scope related issues assesment of time and number of changes that will be required to acomplish specific part or component.
+
+The options are mutualy exclusive.
+Within single option assesment have to be given along side with scoped components and systems.
+
+Each option shows its context and strategy to address problem statement.
+
+Trade-offs stated honestly against the priorities.
+Options under its name, `aopt_<area>_<slug>`, as a heading ([Names, not IDs](#names-not-ids)).
+Where only one option was considered, its text says so and explains why, with the price that option carries.
+Why: an option told fairly enough that someone who prefers it would recognise it lets a later reader, whose priorities have changed, reopen the choice without doing the work again.
+Bad practive is to make an option set up to lose.
+The one an alternative nobody weighed, written up to fill the list.
+Having option without a disadvantage is a bad sing as well
+
+Each option says what distinguishes it and the limits of its scope: which modules and systems it changes and which it leaves alone.
+It does not go in detail on what exactly being changed or implemented, rather brushed general direction and highlites what differs it from the other options.
+([One problem, one record, one at a time](#one-problem-one-record-one-at-a-time)).
 
 ### Decision
 
