@@ -1,21 +1,13 @@
 # Architecture decision records
 
-This folder holds the decision records of the JovianDSS Kubernetes CSI
-plugin, one file per problem. This file describes the format of a record and
-how one is written and maintained. It does not list the records: the folder
-does, and the records themselves are the worked examples.
+This document describes architectural decisio record file format, it purpouse and the way it have to e treated and used, how one is written and maintained.
+Document does not list the records, recrds themselves are the worked examples.
 
-A record treats one problem: what is wrong, the facts it rests on, what we
-care about, the options weighed, the decision and its reasons, what changes,
-what follows, and how it is checked. Where a problem needs a full design, the
-record is that design, from the problem to the last implementation item. A
-design that predates this form stays in [`../design/`](../design/README.md)
-until it is reworked into a record.
+A record treats one problem, it might be what is wrong, the facts it rests on, what we care about, the options weighed, the decision and its reasons, what changes, what follows, and how it is checked.
+Where a problem needs a full design, the record is that design, from the problem to the last implementation item.
 
-Writing the record is half its value: it forces the reasoning into the open
-where it can be disagreed with. The other half is history: a reader years
-later can see why the system is the way it is and how long each decision
-governed the work.
+Writing the record is half its value: it forces the reasoning into the open where it can be disagreed with.
+The other half is history: a reader years later can see why the system is the way it is and how long each decision governed the work.
 
 ## Rules
 
@@ -34,10 +26,8 @@ Each rule is an entry in a `yaml` block. Its keys:
 - any other key, such as `parts` or `areas`, for data that only that rule
   has.
 
-A short value stands on the line of its key; a longer one, or one that
-YAML would not take as plain text, such as one that begins with a quotation
-mark, is a `|` block. A mapping holds definitions; a rule stated inside a
-definition has no `desc` of its own.
+A short value stands on the line of its key; a longer one, or one that YAML would not take as plain text, such as one that begins with a quotation mark, is a `|` block.
+A mapping holds definitions; a rule stated inside a definition has no `desc` of its own.
 
 ### One problem, one record, one at a time
 
@@ -81,28 +71,50 @@ definition has no `desc` of its own.
 
 - name: rule_adr_scope_limits_stated_in_options_and_decision
   rule: |
-    Problem statement formalizes the scope and what has to be done. Scope
-    limitations and explicit mentions of what will not be done or
-    accomplished in given ADR are listed in Options considered and
-    accepted in Decision section.
+    Problem statement defines the challange.
+    Problem statement is concise and minimalistic, it might include scope, time limitation complexity limitation if that is critical aspect of problem.
+    Options considered section weights strategies that supposed to address given Problem.
+    Depending on complexity of a problem, it might and will limit scope.
+    It might list directions or aproches that will not be taken and motivation behind it.
+    Decision section formalize and confirms one of considered options.
   desc: |
-    different solutions change, create or delete different components or
-    systems, and take different effort, so how far the work reaches is
-    known only when the options are weighed.
+    Problem statement aims to be as minimalistic as possible.
+    Problem that is defined by problem statement might be addressed in multiple ways.
+    This aproaches may vary on technology, time, affected components and etc...
+    Overcrouding problem statement will confuse reader and agent.
+    To make ADR clear and streightforward the scope aspects have to be layed down in Options Considered unless author explicetly states that feature or bug have to be addressed with specific time limit or resources.
+    Some problem might touch multiple components and implementation might stretch to significant amount of time.
+    Considering such cases is making decision on the best aproach to pick is a part of Option considered and Decision sections.
   example: |
-    for the move to API v4, the Problem statement does not say how much
-    of the other modules is touched. Whether the controller, the node or
-    the driver changes is covered in Options considered and finalized in
-    Decision.
+        ## Problem statement
+        [Problem_statement](#problem-statement)
+        
+        The plugin uses JovianDSS REST API v3, which is deprecated, through a client
+        that follows documentation and assumptions rather than what the appliance
+        serves, and it pages its CSI lists in a way that crashes the controller or
+        returns entries twice or never. It has to use API v4 through a client that
+        complies with the API as served, down to the way the appliance pages its
+        lists.
+        
+        ...
+        
+        ## Options considered
+        [Options_considered](#options-considered)
+        ...                
+        How far it reaches: the move itself changes the paths of `pkg/rest`, the
+        documentation and the changelog; the driver, the controller and the node
+        stay as they are ([Stage 1](#stage-1-move-to-api-v4)).
+        ...
+         
   wrong: |
-    the exclusion defined in Problem statement:
-
-    The plugin uses JovianDSS REST API v3, which is deprecated, through a client
-    that follows documentation and assumptions rather than what the appliance
-    serves, and it pages its CSI lists in a way that crashes the controller or
-    returns entries twice or never. It has to use API v4 through a client that
-    complies with the API as served, down to the way the appliance pages its
-    lists. JovianDSS 2 will not be supported within this iteration.
+        ## Problem statement
+        [Problem_statement](#problem-statement)
+        The plugin uses JovianDSS REST API v3, which is deprecated, through a client
+        that follows documentation and assumptions rather than what the appliance
+        serves, and it pages its CSI lists in a way that crashes the controller or
+        returns entries twice or never. It has to use API v4 through a client that
+        complies with the API as served, down to the way the appliance pages its
+        lists. JovianDSS 2 will not be supported within this iteration.
 
     Redundant part: `JovianDSS 2 will not be supported within this iteration.`
 ```
