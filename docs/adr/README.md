@@ -1035,42 +1035,34 @@ It does not go in detail on what exactly being changed or implemented, rather br
     and carries lab details.
 ```
 
-### Open questions
+### Tactical concerns
 
-- **The Open questions section holds what the author, often an agent,
-  cannot settle from the code and the evidence, and a person has to explain
-  or decide.**
-  - **Answers:** "what is still undecided, and between which choices?"
-  - **Why:** an author who guesses writes an assumption into the design,
-    where nobody looks for it. A question is the visible place where the
-    record waits for a person.
-  - **Not:** a question the code or the evidence answers, since answering
-    it is the author's work; an assumption made in silence in place of a
-    question.
-- **An open question holds what is asked, why it is still open and, where
-  there are some, the choices it is between, and nothing of its answer.
-  Once answered, it moves to the Decisions table with its answer, the
-  choices the answer was made between and who decided it.**
-  - **Why:** the reader who has to answer must see where the question ends;
-    an answer, or the way to one, written into it reads as part of what is
-    asked, or as if it were answered already.
-  - **Example:** "Which code does a missing parent get? Its error reads like
-    a missing pool's. Two ways are open: tell the two apart by the names in
-    the message, or give both one code."
-  - **Not:** the way to the answer run into the explanation, with nothing to
-    mark where the question ends: "Which TLS versions does the appliance
-    offer? No recording shows one, and its certificate has not been read.
-    Answered by a handshake check and a read of the certificate, before the
-    record is accepted."
-- **The Decisions subsection is a table of the decided questions, with
-  their numbers kept: one line of decision each, with the choices it was
-  made between where there were some, who decided it, and a link to the
-  section that argues it.**
-  - **Answers:** "what was decided along the way, by whom, and where is it
-    argued?"
-  - **Why:** the table keeps who decided what, so that a decision is
-    neither taken for a fact nor reopened by accident. It indexes the
-    decisions and does not restate their arguments.
+The Tactical concernts section holds what the author, often an agent, cannot settle from the code and the evidence,
+And require explain or decide from the human.
+
+It stores open question, ambiguities that have to be address in sub section `Open questions`.
+And questions with answers in section `Tactical decisions`.
+
+It provides common place for agents and humans to record various question regarding ADR.
+So that they do not overlap, do not get scatered around code base and it is easy to find and trac decisions regarding each individual problem.
+This aproach is expected to help agents avoid question duplication and improve comprehention of ADR.
+If question is trivial and can be clearly derived from options considered and problem statement, it should not get into a tactical concerns, unless it is added by user.
+Agents are alowed to write answers to questions if user asks them to do it.
+
+An open question holds what is asked, why it is still open and, where there are some, the choices it is between, and nothing of its answer.
+  Once answered, it moves to the `Tactical decisions` section with its answer, the choices the answer was made between and who decided it.
+
+The one answering question must clearly see what questions are undecided and require attention.
+The one reviewing ADR and analising internal logic of decision making, have to see what was asked, and what was the decision.
+
+The `Tactical decisions` subsection contains records of questions and answers to them with their numbers kept.
+
+Each answered question gets heading starting with number and the referensable name starting with `td` in a same format as `impl` or `bug`.
+
+One sub-sub-section for each question, with the choices it was made between where there were some, who decided it, and a link to the section that argues it.
+It answers what was decided along the way, by whom, where is was discussed, what code blocks or other asses are related to it.
+Section keeps who decided what, so that a decision is neither taken for a fact nor reopened by accident.
+It indexes the decisions and does not restate their arguments.
 
 ### Relationship to other designs
 
@@ -1193,8 +1185,9 @@ It does not go in detail on what exactly being changed or implemented, rather br
 - [Risks](#risks)
 - [Affected_systems_and_files](#affected-systems-and-files)
 - [Testing](#testing)
-- [Open_questions](#open-questions)
-  - [Decisions](#decisions)
+- [Tactical_concerns](#tactical-concerns)
+  - [Open_questions](#open-questions)
+  - [Tactical_decisions](#tactical-decisions)
 - [Relationship_to_other_designs](#relationship-to-other-designs)
   - [Future_work_<slug>](#future-work-<slug>)
 - [Advice](#advice)
@@ -1352,7 +1345,10 @@ Re-evaluate when ...
    in one place alone. One sentence for a simple case, the sequence and the
    timing for a scenario.>
 
-## Open questions
+## Tactical concerns
+[Tactical_concerns](#Tactical-concerns)
+
+### Open questions
 [Open_questions](#open-questions)
 
 <List of questions that are not clear to agent and require explicit
@@ -1362,13 +1358,25 @@ made by human, the question with answer moves to `Decisions`.>
 - **1. <question>?** <why it is still open; the choices it is between,
   where there are some>
 
-### Decisions
-[Decisions](#decisions)
+### Tactical decisions
+[Tactical_decisions](#tactical-decisions)
 
-**Table n — <Title>** · `tbl_<tag>`
+#### 1 `td_<slug>`
 
-| # | Question | Decision | Decided by | Where it is argued |
-|---|---|---|---|---|
+**Question**
+<actual question text>
+
+**Decision**
+<actual decision text>
+
+**Original decision**
+<If decision was made through agent, place here actula users text>
+
+**Decided by**
+<Who made decision>
+
+**Referecies**
+<Where it is argued>
 
 ## Relationship to other designs
 [Relationship_to_other_designs](#relationship-to-other-designs)
