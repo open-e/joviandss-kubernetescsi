@@ -1,7 +1,7 @@
 # Architecture decision records
 
-This document describes architectural decisio record file format, it purpouse and the way it have to e treated and used, how one is written and maintained.
-Document does not list the records, recrds themselves are the worked examples.
+This document describes architectural decision record file format, its purpose and the way it has to be treated and used, how one is written and maintained.
+Document does not list the records, records themselves are the worked examples.
 
 A record treats one problem, it might be what is wrong, the facts it rests on, what we care about, the options weighed, the decision and its reasons, what changes, what follows, and how it is checked.
 Where a problem needs a full design, the record is that design, from the problem to the last implementation item.
@@ -71,20 +71,20 @@ A mapping holds definitions; a rule stated inside a definition has no `desc` of 
 
 - name: rule_adr_scope_limits_stated_in_options_and_decision
   rule: |
-    Problem statement defines the challange.
+    Problem statement defines the challenge.
     Problem statement is concise and minimalistic, it might include scope, time limitation complexity limitation if that is critical aspect of problem.
-    Options considered section weights strategies that supposed to address given Problem.
+    Options considered section weighs strategies that supposed to address given Problem.
     Depending on complexity of a problem, it might and will limit scope.
-    It might list directions or aproches that will not be taken and motivation behind it.
+    It might list directions or approaches that will not be taken and motivation behind it.
     Decision section formalize and confirms one of considered options.
   desc: |
     Problem statement aims to be as minimalistic as possible.
     Problem that is defined by problem statement might be addressed in multiple ways.
-    This aproaches may vary on technology, time, affected components and etc...
-    Overcrouding problem statement will confuse reader and agent.
-    To make ADR clear and streightforward the scope aspects have to be layed down in Options Considered unless author explicetly states that feature or bug have to be addressed with specific time limit or resources.
+    These approaches may vary on technology, time, affected components and etc...
+    Overcrowding problem statement will confuse reader and agent.
+    To make ADR clear and straightforward the scope aspects have to be laid down in Options Considered unless author explicitly states that feature or bug have to be addressed with specific time limit or resources.
     Some problem might touch multiple components and implementation might stretch to significant amount of time.
-    Considering such cases is making decision on the best aproach to pick is a part of Option considered and Decision sections.
+    Considering such cases is making decision on the best approach to pick is a part of Option considered and Decision sections.
   example: |
         ## Problem statement
         [Problem_statement](#problem-statement)
@@ -372,8 +372,9 @@ A mapping holds definitions; a rule stated inside a definition has no `desc` of 
   areas: |
     `jdss_rest` (what the appliance's REST API does), `plugin_rest`
     (`pkg/rest`), `rest` (the API as the contract between the two: the
-    compliance rules, and what fails to comply with the spec),
-    `plugin_driver`, `plugin_ctrl`, `plugin_node`, `plugin_cli`, `plugin`
+    compliance rules, and what fails to comply with the spec), `csi` (the
+    CSI specification as the contract between the CO and the plugin: its
+    compliance rules), `plugin_driver`, `plugin_ctrl`, `plugin_node`, `plugin_cli`, `plugin`
     (several packages), `lab`, `spec`, `docs`, `adr` (the rules of this
     file), `build`. A new concern adds a new area word; nothing existing
     changes.
@@ -806,14 +807,14 @@ have clear understanding of the matter that particular ADR addresses.
 
 ### Options considered
 
-The Options considered section list aproaches to address problem statement on the architectural and strategic levels.
-Options expected to be mutualy exclusive.
+The Options considered section list approaches to address problem statement on the architectural and strategic levels.
+Options expected to be mutually exclusive.
 If they are not, it most likely the scope question.
-It should be clear what aspects are mutualy exclusive.
-For scope related issues assesment of time and number of changes that will be required to acomplish specific part or component.
+It should be clear what aspects are mutually exclusive.
+For scope related issues assessment of time and number of changes that will be required to accomplish specific part or component.
 
-The options are mutualy exclusive.
-Within single option assesment have to be given along side with scoped components and systems.
+The options are mutually exclusive.
+Within single option assessment have to be given alongside with scoped components and systems.
 
 Each option shows its context and strategy to address problem statement.
 
@@ -821,12 +822,12 @@ Trade-offs stated honestly against the priorities.
 Options under its name, `aopt_<area>_<slug>`, as a heading ([Names, not IDs](#names-not-ids)).
 Where only one option was considered, its text says so and explains why, with the price that option carries.
 Why: an option told fairly enough that someone who prefers it would recognise it lets a later reader, whose priorities have changed, reopen the choice without doing the work again.
-Bad practive is to make an option set up to lose.
+Bad practice is to make an option set up to lose.
 The one an alternative nobody weighed, written up to fill the list.
-Having option without a disadvantage is a bad sing as well
+Having option without a disadvantage is a bad sign as well
 
 Each option says what distinguishes it and the limits of its scope: which modules and systems it changes and which it leaves alone.
-It does not go in detail on what exactly being changed or implemented, rather brushed general direction and highlites what differs it from the other options.
+It does not go in detail on what exactly being changed or implemented, rather brushed general direction and highlights what differs it from the other options.
 ([One problem, one record, one at a time](#one-problem-one-record-one-at-a-time)).
 
 ### Decision
@@ -1037,30 +1038,30 @@ It does not go in detail on what exactly being changed or implemented, rather br
 
 ### Tactical concerns
 
-The Tactical concernts section holds what the author, often an agent, cannot settle from the code and the evidence,
+The Tactical concerns section holds what the author, often an agent, cannot settle from the code and the evidence,
 And require explain or decide from the human.
 
-It stores open question, ambiguities that have to be address in sub section `Open questions`.
+It stores open question, ambiguities that have to be addressed in sub section `Open questions`.
 And questions with answers in section `Tactical decisions`.
 
 It provides common place for agents and humans to record various question regarding ADR.
-So that they do not overlap, do not get scatered around code base and it is easy to find and trac decisions regarding each individual problem.
-This aproach is expected to help agents avoid question duplication and improve comprehention of ADR.
+So that they do not overlap, do not get scattered around code base and it is easy to find and track decisions regarding each individual problem.
+This approach is expected to help agents avoid question duplication and improve comprehension of ADR.
 If question is trivial and can be clearly derived from options considered and problem statement, it should not get into a tactical concerns, unless it is added by user.
-Agents are alowed to write answers to questions if user asks them to do it.
+Agents are allowed to write answers to questions if user asks them to do it.
 
 An open question holds what is asked, why it is still open and, where there are some, the choices it is between, and nothing of its answer.
   Once answered, it moves to the `Tactical decisions` section with its answer, the choices the answer was made between and who decided it.
 
 The one answering question must clearly see what questions are undecided and require attention.
-The one reviewing ADR and analising internal logic of decision making, have to see what was asked, and what was the decision.
+The one reviewing ADR and analysing internal logic of decision making, have to see what was asked, and what was the decision.
 
 The `Tactical decisions` subsection contains records of questions and answers to them with their numbers kept.
 
-Each answered question gets heading starting with number and the referensable name starting with `td` in a same format as `impl` or `bug`.
+Each answered question gets heading starting with number and the referenceable name starting with `td` in a same format as `impl` or `bug`.
 
 One sub-sub-section for each question, with the choices it was made between where there were some, who decided it, and a link to the section that argues it.
-It answers what was decided along the way, by whom, where is was discussed, what code blocks or other asses are related to it.
+It answers what was decided along the way, by whom, where it was discussed, what code blocks or other assets are related to it.
 Section keeps who decided what, so that a decision is neither taken for a fact nor reopened by accident.
 It indexes the decisions and does not restate their arguments.
 
@@ -1346,7 +1347,7 @@ Re-evaluate when ...
    timing for a scenario.>
 
 ## Tactical concerns
-[Tactical_concerns](#Tactical-concerns)
+[Tactical_concerns](#tactical-concerns)
 
 ### Open questions
 [Open_questions](#open-questions)
@@ -1370,12 +1371,12 @@ made by human, the question with answer moves to `Decisions`.>
 <actual decision text>
 
 **Original decision**
-<If decision was made through agent, place here actula users text>
+<If decision was made through agent, place here actual users text>
 
 **Decided by**
 <Who made decision>
 
-**Referecies**
+**References**
 <Where it is argued>
 
 ## Relationship to other designs
