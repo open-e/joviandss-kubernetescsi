@@ -1,13 +1,101 @@
 # Architecture decision records
 
-This document describes the file format of an architecture decision record, its purpose, how a record is to be treated and used, and how one is written and maintained.
-It does not list the records: the records themselves are the worked examples.
+This document describes architectural decisio record file format, it purpouse and the way it have to e treated and used, how one is written and maintained.
+Document does not list the records, recrds themselves are the worked examples.
 
-A record treats one problem. It may hold what is wrong, the facts it rests on, what we care about, the options weighed, the decision and its reasons, what changes, what follows, and how it is checked.
+A record treats one problem, it might be what is wrong, the facts it rests on, what we care about, the options weighed, the decision and its reasons, what changes, what follows, and how it is checked.
 Where a problem needs a full design, the record is that design, from the problem to the last implementation item.
 
 Writing the record is half its value: it forces the reasoning into the open where it can be disagreed with.
 The other half is history: a reader years later can see why the system is the way it is and how long each decision governed the work.
+
+## Wording
+
+### Bad habits
+
+There is set of poor habbits that manifested themselves during writing this document and ADR's derived from it.
+
+##### Long sentences held together by commas and semicolons
+```
+Every CSI call passes one shared step, the gRPC server's interceptor, and it only logs; the checks of the request, the reading of
+    its IDs and the choice of the answer are written out again inside each call.
+```
+
+##### Nouns where verbs would do
+"the reading of its IDs"
+"the choice of the answer"
+"the price that is accepted".
+##### Abstract phrases standing for concrete facts
+"the finding meets no step of the operational stage" means Kubernetes never sends this request
+"a price that falls on operation" means every snapshot create gets slower
+
+##### Definitions squeezed into the sentence
+"the repair this document decides, each call of the iSCSI build fixed where it fails, …".
+##### Terms of the record used as if the reader knew them
+"the repair", "later work", "fault of operation", "the plugin's form".
+##### Flat, formal phrasing
+"a request after a slow publish can meet a connection reset"
+"an ID of the call is empty in two ways".
+
+### Examples
+
+#### Open question on snapshot creation bug
+Old version:
+````
+  - **28. Does the repair this document decides, each call of the iSCSI build
+    fixed where it fails
+    ([aopt_plugin_iscsi_repair_each_call_in_place](#aopt_plugin_iscsi_repair_each_call_in_place)), take
+    [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok),
+    or is that finding a third exception to compatibility with CSI v1.9.0?**
+    [Question 2](#2-td_plugin_scope_every_finding_but_later_work) takes every finding, this one among them, but the
+    finding meets no step of the operational stage: csi-snapshotter names each
+    snapshot `snapshot-<UID>` of its VolumeSnapshot, whose source cannot
+    change, so Kubernetes never sends one name with two source volumes; only
+    csi-sanity's test of it (csi-test v5.6.0, `pkg/sanity/controller.go:1388`)
+    or another CO does. Its fix has a price that falls on operation:
+    JovianDSS keeps a snapshot's name within its volume, so CreateSnapshot
+    would read every snapshot of the pool before each create
+    ([risk 12](#risks)). The choices:
+    - the repair takes it: CreateSnapshot answers AlreadyExists to a name
+      taken on another volume, csi-sanity's test passes, and every snapshot
+      create reads the snapshots of the pool, with risk 12, Testing step 22
+      and the commit and about 50 lines of Table 6 that come with it;
+    - a third exception, a fault left to later work as those of
+      [questions 10](#10-td_plugin_rest_connections_kept_alive_reset_fix_later) and [20](#20-td_plugin_ctrl_publish_node_not_checked) are: CreateSnapshot goes on
+      making a second snapshot and answering OK, csi-sanity's test fails, the
+      finding goes to later work, and risk 12, Testing step 22 and that cost
+      go.
+
+````
+
+Reworked version:
+```
+- **28. Should CreateSnapshot refuse a snapshot name that another volume
+  already uses?** The finding is
+  [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok).
+  Today CreateSnapshot makes a second snapshot under the new volume and
+  answers OK; the specification and csi-sanity (csi-test v5.6.0,
+  `pkg/sanity/controller.go:1388`) expect AlreadyExists.
+  [Question 2](#2-td_plugin_scope_every_finding_but_later_work) puts every finding in the repair, this one too. The
+  question is open for two reasons:
+  - Kubernetes never sends such a request. csi-snapshotter names each
+    snapshot `snapshot-<UID>` of its VolumeSnapshot, and a VolumeSnapshot's
+    source cannot change. Only csi-sanity or another CO sends one name with
+    two volumes.
+  - The fix costs every snapshot create. JovianDSS keeps a snapshot's name
+    within its volume, so CreateSnapshot would have to read every snapshot
+    of the pool before it makes one ([risk 12](#risks)).
+
+  The choices:
+  - fix it: CreateSnapshot answers AlreadyExists, csi-sanity's test
+    passes, and every create pays for the read of the pool (risk 12,
+    Testing step 22, one commit and about 50 lines in Table 6);
+  - leave it as a third exception to compatibility with CSI v1.9.0, a
+    fault left to later work like those of
+    [questions 10](#10-td_plugin_rest_connections_kept_alive_reset_fix_later) and [20](#20-td_plugin_ctrl_publish_node_not_checked): csi-sanity's test
+    ↪ keeps failing,
+    and risk 12, Testing step 22 and that cost are dropped.
+```
 
 ## Rules
 
@@ -59,8 +147,8 @@ A mapping holds definitions; a rule stated inside a definition has no `desc` of 
 
 - name: rule_adr_scope_editorial_choice_gets_no_record
   rule: |
-    An editorial choice gets no record; it is one entry in a record's
-    Tactical decisions.
+    An editorial choice gets no record; it is one line in a record's
+    Decisions table.
   desc: |
     a record is for a problem, and a choice of tense or of where release
     notes live has no problem behind it.
@@ -71,20 +159,20 @@ A mapping holds definitions; a rule stated inside a definition has no `desc` of 
 
 - name: rule_adr_scope_limits_stated_in_options_and_decision
   rule: |
-    The Problem statement defines the challenge.
-    It is concise and minimal; it includes a limit of scope, time or complexity only where that limit is a critical aspect of the problem.
-    The Options considered section weighs the strategies meant to address the problem.
-    Depending on the complexity of the problem, it may, and often will, limit the scope.
-    It may list the directions or approaches that will not be taken, and the reasons for leaving them.
-    The Decision section formalises and confirms one of the options considered.
+    Problem statement defines the challange.
+    Problem statement is concise and minimalistic, it might include scope, time limitation complexity limitation if that is critical aspect of problem.
+    Options considered section weights strategies that supposed to address given Problem.
+    Depending on complexity of a problem, it might and will limit scope.
+    It might list directions or aproches that will not be taken and motivation behind it.
+    Decision section formalize and confirms one of considered options.
   desc: |
-    The Problem statement aims to be as minimal as possible.
-    The problem it defines might be addressed in several ways.
-    These approaches may differ in technology, time, the components affected and so on.
-    An overcrowded Problem statement confuses the reader and the agent.
-    To keep a record clear and straightforward, the aspects of scope are laid out in Options considered, unless the author states explicitly that a feature or a bug has to be addressed within a given time or with given resources.
-    A problem may touch several components, and its implementation may stretch over a significant amount of time.
-    In such cases, deciding which approach is best is part of the Options considered and Decision sections.
+    Problem statement aims to be as minimalistic as possible.
+    Problem that is defined by problem statement might be addressed in multiple ways.
+    This aproaches may vary on technology, time, affected components and etc...
+    Overcrouding problem statement will confuse reader and agent.
+    To make ADR clear and streightforward the scope aspects have to be layed down in Options Considered unless author explicetly states that feature or bug have to be addressed with specific time limit or resources.
+    Some problem might touch multiple components and implementation might stretch to significant amount of time.
+    Considering such cases is making decision on the best aproach to pick is a part of Option considered and Decision sections.
   example: |
         ## Problem statement
         [Problem_statement](#problem-statement)
@@ -116,7 +204,7 @@ A mapping holds definitions; a rule stated inside a definition has no `desc` of 
         complies with the API as served, down to the way the appliance pages its
         lists. JovianDSS 2 will not be supported within this iteration.
 
-        The redundant part: `JovianDSS 2 will not be supported within this iteration.`
+    Redundant part: `JovianDSS 2 will not be supported within this iteration.`
 ```
 
 ### File name and status
@@ -196,7 +284,7 @@ A mapping holds definitions; a rule stated inside a definition has no `desc` of 
     Options carry the alternatives and their price; What changes carries
     the mechanism; the Appendix carries the catalogue; Context carries
     the claims and links to the catalogue; the Problem statement says the
-    problem and leaves the evidence to Context; Tactical decisions
+    problem and leaves the evidence to Context; the Decisions table
     indexes the decisions and does not restate their arguments.
 
 - name: rule_adr_text_plain_language_jargon_in_terms
@@ -372,9 +460,8 @@ A mapping holds definitions; a rule stated inside a definition has no `desc` of 
   areas: |
     `jdss_rest` (what the appliance's REST API does), `plugin_rest`
     (`pkg/rest`), `rest` (the API as the contract between the two: the
-    compliance rules, and what fails to comply with the spec), `csi` (the
-    CSI specification as the contract between the CO and the plugin: its
-    compliance rules), `plugin_driver`, `plugin_ctrl`, `plugin_node`, `plugin_cli`, `plugin`
+    compliance rules, and what fails to comply with the spec),
+    `plugin_driver`, `plugin_ctrl`, `plugin_node`, `plugin_cli`, `plugin`
     (several packages), `lab`, `spec`, `docs`, `adr` (the rules of this
     file), `build`. A new concern adds a new area word; nothing existing
     changes.
@@ -492,8 +579,8 @@ A mapping holds definitions; a rule stated inside a definition has no `desc` of 
     renumbers the rest, so the numbers a reader saw would not be the ones
     written.
   example: |
-    the open questions, once some are decided and moved to Tactical
-    decisions.
+    the open questions, once some are decided and moved to the Decisions
+    table.
   wrong: |
     `30.` as an ordered-list item, which renders with the number of its
     position: 24 for the third item of a list that starts at 22.
@@ -559,7 +646,7 @@ before a review, and frozen once Accepted.
       a name, a heading in the Appendix, a row in the registry, and links
       from where it matters
     a new question: |
-      the next number; when decided, it moves to Tactical decisions with
+      the next number; when decided, it moves to the Decisions table with
       its number kept
     a new risk: the next number, at the end of the list
     a Testing step folded into another, or moved to the testing repository: |
@@ -581,7 +668,7 @@ before a review, and frozen once Accepted.
     links: |
       - every `](#anchor)` resolves to a heading;
       - every `##` and `###` heading has its anchor line under it, such as
-        `[Tactical_decisions](#tactical-decisions)`;
+        `[Decisions](#decisions)`;
       - every entry in the Table of Contents and the List of Tables
         matches a heading or a caption;
       - every "Table n" reference is within range;
@@ -591,15 +678,15 @@ before a review, and frozen once Accepted.
       - no link points to the section it sits in. Exception: a section
         that numbers or catalogues its entries, where an entry is cited
         through the section's own anchor: Key observations, What changes,
-        Risks, Testing, Open questions, Tactical decisions, the Appendix and its
+        Risks, Testing, Open questions, Decisions, the Appendix and its
         Evidence gaps.
     numbering: |
       - risks, steps, stages, key observations, priorities and tables are
         numbered without gaps or duplicates;
       - no question number appears twice, within or across the open list
-        and Tactical decisions;
+        and the Decisions table;
       - the open questions are bullets with the number in bold;
-      - a question keeps its number when it moves to Tactical decisions.
+      - a question keeps its number when it moves to the Decisions table.
     names: |
       - every name is unique, and every linked name has a heading;
       - every name is registered in the registry;
@@ -702,25 +789,25 @@ description, each as an entry of its own.
 
 ### Problem statement
 
-The **Problem statement** defines
-  - the problem or issue that the record addresses;
-  - the goal the record has to reach;
-  - the new feature or improvement the record introduces.
+**Problem statement** defines
+  - the problem or issue that the record addresses
+  - goal that needs to be reached by the record
+  - new feature or improvement that is introduced by the record
 
-It must be succinct, clear and on topic.
+It must be succinct and clear on topic.
 
 **Answers**
-  - what is wrong;
-  - what is missing;
-  - what change in the system's behaviour is wanted;
-  - what the desired operation or capability looks like.
+  - what is wrong
+  - what is missing
+  - what change in the system's behaviour is wanted
+  - what desired operation / capability looks like
 
 **Why**
 
-It is the core section, which defines all the sections after it.
-Every later section is written to answer the challenge it defines.
-An AI agent and a human reader must be able to hold the whole of it in mind,
-with a clear understanding of the matter the record addresses.
+Core section that defines all following sections.
+Every later section is made to answer challenge defined in it.
+AI agent and human reader must be able to hold the whole of it in mind and
+have clear understanding of the matter that particular ADR addresses.
 
 **Examples**
   - cluster prefix
@@ -754,20 +841,19 @@ with a clear understanding of the matter the record addresses.
     ```
 
 **Wrong**
-  - a list of answers to the questions above, a bullet or a bold sentence
-    per question.
-    That is wrong because it blurs the definitions, and the context becomes
-    unclear.
-  - a list of the tests that will prove success.
-    A record is built around features and problems, not around passing
-    particular tests.
-  - a list of the issues the record leaves out.
-    The Problem statement describes what the record is about; bringing in
-    what the record does not touch only confuses the user or the agent.
-    Where the scope has to be narrowed, that is done in the
+  - list of answers to all questions provided above in form of bullet or a
+    bold sentence per question.
+    That is wrong because it blurs definitions and context becomes unclear.
+  - list of the tests that will prove success.
+    ADR is built around features and problems, not passing specific tests.
+  - list of the issues the record leaves out.
+    ADR's problem statement describes the things that ADR is focused on,
+    bringing things that are not touched in the given ADR will only confuse
+    user or agent.
+    If there is a need to narrow down the scope, it should be done in
     `Options considered` and `Decision` sections.
   - the Context repeated with its evidence.
-    Saying the same thing twice is bad practice and should be avoided.
+    Repeating same things over is a bad practice and should be avoided.
   - the instances of the problem, such as the calls that fail, where the
     problem itself is meant.
 
@@ -808,26 +894,28 @@ with a clear understanding of the matter the record addresses.
 
 ### Options considered
 
-The Options considered section lists the approaches that could address the Problem statement, at the architectural and strategic level.
-The options are mutually exclusive.
-Where they are not, that is most likely a question of scope.
-It should be clear in which aspects they exclude one another.
-For a question of scope, each option estimates the time and the number of changes needed to deliver each part or component.
+The Options considered section list aproaches to address problem statement on the architectural and strategic levels.
+Options expected to be mutualy exclusive.
+If they are not, it most likely the scope question.
+It should be clear what aspects are mutualy exclusive.
+For scope related issues assesment of time and number of changes that will be required to acomplish specific part or component.
 
-Within a single option, the assessment is given together with the components and systems in its scope.
+The options are mutualy exclusive.
+Within single option assesment have to be given along side with scoped components and systems.
 
-Each option shows its context and its strategy for the Problem statement.
+Each option shows its context and strategy to address problem statement.
 
-The trade-offs are stated honestly against the priorities.
-Each option stands under its name, `aopt_<area>_<slug>`, as a heading ([Names, not IDs](#names-not-ids)).
+Trade-offs stated honestly against the priorities.
+Options under its name, `aopt_<area>_<slug>`, as a heading ([Names, not IDs](#names-not-ids)).
 Where only one option was considered, its text says so and explains why, with the price that option carries.
 Why: an option told fairly enough that someone who prefers it would recognise it lets a later reader, whose priorities have changed, reopen the choice without doing the work again.
-It is bad practice to write an option set up to lose, or an alternative nobody weighed, written up to fill the list.
-An option without a disadvantage is a bad sign as well.
+Bad practive is to make an option set up to lose.
+The one an alternative nobody weighed, written up to fill the list.
+Having option without a disadvantage is a bad sing as well
 
-Each option says what distinguishes it and the limits of its scope: which modules and systems it changes and which it leaves alone
+Each option says what distinguishes it and the limits of its scope: which modules and systems it changes and which it leaves alone.
+It does not go in detail on what exactly being changed or implemented, rather brushed general direction and highlites what differs it from the other options.
 ([One problem, one record, one at a time](#one-problem-one-record-one-at-a-time)).
-It does not go into detail on what exactly is changed or implemented; it sketches the general direction and highlights what sets it apart from the other options.
 
 ### Decision
 
@@ -854,7 +942,7 @@ It does not go into detail on what exactly is changed or implemented; it sketche
     options, and a price that is stated was accepted, not overlooked.
   - **Not:** a rationale of benefits only.
 - **Where question decisions shape the delivery, a paragraph names them
-  with their question numbers and links them in Tactical decisions.**
+  with their question numbers and links the Decisions table.**
   - **Why:** a reader of this section alone would otherwise miss decisions
     that shape the delivery.
 
@@ -934,7 +1022,7 @@ It does not go into detail on what exactly is changed or implemented; it sketche
     numbered steps from the cheapest to the live one, and at the end what
     the tests cannot reach.
   answers: |
-    "which corner cases have to be tested, and what negative scenarios may follow from them?"
+    "which corner cases have to be tested, and what potential negative scenario can follow?"
   desc: |
     what is delivered unchecked is part of the decision, and a reader has
     to be able to see it.
@@ -1037,31 +1125,31 @@ It does not go into detail on what exactly is changed or implemented; it sketche
 
 ### Tactical concerns
 
-The Tactical concerns section holds what the author, often an agent, cannot settle from the code and the evidence,
-and what a human has to explain or decide.
+The Tactical concernts section holds what the author, often an agent, cannot settle from the code and the evidence,
+And require explain or decide from the human.
 
-Its subsection `Open questions` holds the open questions and the ambiguities still to be addressed;
-its subsection `Tactical decisions` holds the questions with their answers.
+It stores open question, ambiguities that have to be address in sub section `Open questions`.
+And questions with answers in section `Tactical decisions`.
 
-It gives agents and humans one place to record their questions about the record,
-so that the questions do not overlap or get scattered around the code base, and the decisions on each problem are easy to find and track.
-This is expected to help agents avoid asking a question twice, and to understand the record better.
-A question that is trivial, and follows clearly from the Options considered and the Problem statement, does not go into Tactical concerns, unless the user adds it.
-Agents may write the answers to questions when the user asks them to.
+It provides common place for agents and humans to record various question regarding ADR.
+So that they do not overlap, do not get scatered around code base and it is easy to find and trac decisions regarding each individual problem.
+This aproach is expected to help agents avoid question duplication and improve comprehention of ADR.
+If question is trivial and can be clearly derived from options considered and problem statement, it should not get into a tactical concerns, unless it is added by user.
+Agents are alowed to write answers to questions if user asks them to do it.
 
 An open question holds what is asked, why it is still open and, where there are some, the choices it is between, and nothing of its answer.
-Once answered, it moves to the `Tactical decisions` subsection with its answer, the choices the answer was made between and who decided it.
+  Once answered, it moves to the `Tactical decisions` section with its answer, the choices the answer was made between and who decided it.
 
-Whoever answers the questions must see clearly which of them are undecided and need attention.
-Whoever reviews the record and the internal logic of its decisions has to see what was asked, and what was decided.
+The one answering question must clearly see what questions are undecided and require attention.
+The one reviewing ADR and analising internal logic of decision making, have to see what was asked, and what was the decision.
 
-The `Tactical decisions` subsection holds the questions and their answers, with their numbers kept.
+The `Tactical decisions` subsection contains records of questions and answers to them with their numbers kept.
 
-Each answered question gets a heading that starts with its number, followed by a name to refer to it by, starting with `td`, in the same format as `impl` or `bug`.
+Each answered question gets heading starting with number and the referensable name starting with `td` in a same format as `impl` or `bug`.
 
-There is one `####` subsection for each question, with the choices it was made between where there were some, who decided it, and a link to the section that argues it.
-It answers what was decided along the way, by whom, where it was discussed, and which code blocks or other assets relate to it.
-The subsection keeps who decided what, so that a decision is neither taken for a fact nor reopened by accident.
+One sub-sub-section for each question, with the choices it was made between where there were some, who decided it, and a link to the section that argues it.
+It answers what was decided along the way, by whom, where is was discussed, what code blocks or other asses are related to it.
+Section keeps who decided what, so that a decision is neither taken for a fact nor reopened by accident.
 It indexes the decisions and does not restate their arguments.
 
 ### Relationship to other designs
@@ -1287,7 +1375,7 @@ Rationale: ... (priority 1) ... (priority 2). A reader who puts <other
 priority> first would choose [aopt_<area>_<slug>](#aopt_<area>_<slug>).
 
 <where question decisions shape the delivery: the paragraph naming them, with
-their question numbers and links to them in Tactical decisions>
+their question numbers and a link to the Decisions table>
 
 ## What changes
 [What_changes](#what-changes)
@@ -1346,14 +1434,14 @@ Re-evaluate when ...
    timing for a scenario.>
 
 ## Tactical concerns
-[Tactical_concerns](#tactical-concerns)
+[Tactical_concerns](#Tactical-concerns)
 
 ### Open questions
 [Open_questions](#open-questions)
 
-<The questions that are not clear to the agent and need an explicit
-explanation from a human. Once a question has a clear answer, or a human has
-decided it, the question moves with its answer to `Tactical decisions`.>
+<List of questions that are not clear to agent and require explicit
+explanation from human. Once question gets clear answer, or decision being
+made by human, the question with answer moves to `Decisions`.>
 
 - **1. <question>?** <why it is still open; the choices it is between,
   where there are some>
@@ -1364,19 +1452,19 @@ decided it, the question moves with its answer to `Tactical decisions`.>
 #### 1 `td_<slug>`
 
 **Question**
-<the text of the question>
+<actual question text>
 
 **Decision**
-<the text of the decision>
+<actual decision text>
 
 **Original decision**
-<where the decision came through an agent, the user's own words>
+<If decision was made through agent, place here actula users text>
 
 **Decided by**
-<who made the decision>
+<Who made decision>
 
-**References**
-<where it is argued>
+**Referecies**
+<Where it is argued>
 
 ## Relationship to other designs
 [Relationship_to_other_designs](#relationship-to-other-designs)
