@@ -11,90 +11,163 @@ The other half is history: a reader years later can see why the system is the wa
 
 ## Wording
 
-### Bad habits
+A set of poor habits showed up while this document and the records derived
+from it were written. The rules below, entries of the form described under
+[Rules](#rules), name one habit each: `wrong` shows the habit, and `example`
+says the same thing plainly. Together they apply
+`rule_adr_text_plain_language_jargon_in_terms` to the words themselves.
 
-There is set of poor habbits that manifested themselves during writing this document and ADR's derived from it.
+```yaml
+- name: rule_adr_wording_one_point_per_sentence
+  rule: |
+    A sentence makes one point. A sentence that needs a semicolon, or a
+    phrase inserted between commas, to hold together is split.
+  desc: |
+    a long sentence makes the reader hold several clauses in mind before
+    its point arrives, and a reader who skims takes only the first clause.
+  example: |
+    "Every CSI call passes through the gRPC server's interceptor, the one
+    step all calls share. The interceptor only logs. Each call checks its
+    own request, reads its own IDs and chooses its own answer."
+  wrong: |
+    "Every CSI call passes one shared step, the gRPC server's interceptor,
+    and it only logs; the checks of the request, the reading of its IDs and
+    the choice of the answer are written out again inside each call."
 
-##### Long sentences held together by commas and semicolons
-```
-Every CSI call passes one shared step, the gRPC server's interceptor, and it only logs; the checks of the request, the reading of
-    its IDs and the choice of the answer are written out again inside each call.
-```
+- name: rule_adr_wording_actions_as_verbs
+  rule: |
+    An action is written as a verb, with whoever acts as its subject, not
+    as a noun made from the verb.
+  desc: |
+    a noun made from a verb hides who does what: "the reading of its IDs"
+    does not say what reads them.
+  example: |
+    "the call reads its IDs"; "the call chooses its answer"; "this
+    document accepts the cost".
+  wrong: |
+    "the reading of its IDs"; "the choice of the answer"; "the price that
+    is accepted".
 
-##### Nouns where verbs would do
-"the reading of its IDs"
-"the choice of the answer"
-"the price that is accepted".
-##### Abstract phrases standing for concrete facts
-"the finding meets no step of the operational stage" means Kubernetes never sends this request
-"a price that falls on operation" means every snapshot create gets slower
+- name: rule_adr_wording_concrete_facts
+  rule: |
+    A fact is stated as what happens, not as an abstract phrase that
+    stands for it.
+  desc: |
+    a reader can check a concrete fact against the code or the lab; an
+    abstract phrase has to be decoded first, and two readers decode it
+    differently.
+  example: |
+    "Kubernetes never sends this request"; "every snapshot create gets
+    slower".
+  wrong: |
+    "the finding meets no step of the operational stage"; "a price that
+    falls on operation".
 
-##### Definitions squeezed into the sentence
-"the repair this document decides, each call of the iSCSI build fixed where it fails, …".
-##### Terms of the record used as if the reader knew them
-"the repair", "later work", "fault of operation", "the plugin's form".
-##### Flat, formal phrasing
-"a request after a slow publish can meet a connection reset"
-"an ID of the call is empty in two ways".
+- name: rule_adr_wording_no_definition_inside_a_sentence
+  rule: |
+    A term is defined in Terms, or in a sentence of its own before it is
+    used, never as a phrase inserted into the sentence that uses it.
+  desc: |
+    an inserted definition makes the sentence twice as long and pushes its
+    point to the end.
+  example: |
+    "Should the repair fix this finding?", with Terms holding "repair: the
+    work this document decides, each call of the iSCSI build fixed where
+    it fails".
+  wrong: |
+    "Does the repair this document decides, each call of the iSCSI build
+    fixed where it fails, take this finding?"
 
-### Examples
+- name: rule_adr_wording_plain_phrase_over_coined_term
+  rule: |
+    Where a plain phrase says the same, it is written instead of a term the
+    record coins. A coined term that stays is in Terms.
+  desc: |
+    the author lives with the record's own terms; a reader who opens the
+    record at one section does not know them, and Terms is a detour even
+    when it holds them.
+  example: |
+    "Should CreateSnapshot refuse it?" in place of "Does the repair take
+    it?"; "a name the plugin makes (Table 1)" in place of "the plugin's
+    form".
+  wrong: |
+    "the repair", "later work", "a fault of operation" and "the plugin's
+    form" in sentences that could say what they mean.
 
-#### Open question on snapshot creation bug
-Old version:
-````
-  - **28. Does the repair this document decides, each call of the iSCSI build
-    fixed where it fails
-    ([aopt_plugin_iscsi_repair_each_call_in_place](#aopt_plugin_iscsi_repair_each_call_in_place)), take
-    [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok),
-    or is that finding a third exception to compatibility with CSI v1.9.0?**
-    [Question 2](#2-td_plugin_scope_every_finding_but_later_work) takes every finding, this one among them, but the
-    finding meets no step of the operational stage: csi-snapshotter names each
-    snapshot `snapshot-<UID>` of its VolumeSnapshot, whose source cannot
-    change, so Kubernetes never sends one name with two source volumes; only
-    csi-sanity's test of it (csi-test v5.6.0, `pkg/sanity/controller.go:1388`)
-    or another CO does. Its fix has a price that falls on operation:
-    JovianDSS keeps a snapshot's name within its volume, so CreateSnapshot
-    would read every snapshot of the pool before each create
-    ([risk 12](#risks)). The choices:
-    - the repair takes it: CreateSnapshot answers AlreadyExists to a name
-      taken on another volume, csi-sanity's test passes, and every snapshot
-      create reads the snapshots of the pool, with risk 12, Testing step 22
-      and the commit and about 50 lines of Table 6 that come with it;
-    - a third exception, a fault left to later work as those of
-      [questions 10](#10-td_plugin_rest_connections_kept_alive_reset_fix_later) and [20](#20-td_plugin_ctrl_publish_node_not_checked) are: CreateSnapshot goes on
-      making a second snapshot and answering OK, csi-sanity's test fails, the
-      finding goes to later work, and risk 12, Testing step 22 and that cost
-      go.
+- name: rule_adr_wording_plain_phrasing
+  rule: |
+    A thing is said the way one would say it to a colleague.
+  desc: |
+    formal phrasing reads as precise, but it makes the reader translate
+    it, and the translation can go wrong.
+  example: |
+    "a request sent soon after a slow publish can be answered 'connection
+    reset by peer'"; "a request can lack the volume ID, the node ID, or
+    both".
+  wrong: |
+    "a request after a slow publish can meet a connection reset"; "an ID of
+    the call is empty in two ways".
 
-````
+- name: rule_adr_wording_question_asks_about_behaviour
+  rule: |
+    A question put to a person for a decision asks about what the system
+    does, in one plain sentence. The rest follows it: what happens today
+    and what is expected; the reasons the question is open, as separate
+    bullets, each opening with its claim; and the choices, each opening
+    with a verb and ending with what it costs.
+  desc: |
+    the person who decides thinks about what the system does. A question
+    about the record's bookkeeping, such as which list a finding goes in,
+    cannot be answered without the whole record in mind.
+  example: |
+    - **28. Should CreateSnapshot refuse a snapshot name that another volume
+      already uses?** The finding is
+      [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok).
+      Today CreateSnapshot makes a second snapshot under the new volume and
+      answers OK; the specification and csi-sanity (csi-test v5.6.0,
+      `pkg/sanity/controller.go:1388`) expect AlreadyExists.
+      [Question 2](#2-td_plugin_scope_every_finding_but_later_work) puts every finding in the repair, this one too. The
+      question is open for two reasons:
+      - Kubernetes never sends such a request. csi-snapshotter names each
+        snapshot `snapshot-<UID>` of its VolumeSnapshot, and a VolumeSnapshot's
+        source cannot change. Only csi-sanity or another CO sends one name with
+        two volumes.
+      - The fix costs every snapshot create. JovianDSS keeps a snapshot's name
+        within its volume, so CreateSnapshot would have to read every snapshot
+        of the pool before it makes one ([risk 12](#risks)).
 
-Reworked version:
-```
-- **28. Should CreateSnapshot refuse a snapshot name that another volume
-  already uses?** The finding is
-  [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok).
-  Today CreateSnapshot makes a second snapshot under the new volume and
-  answers OK; the specification and csi-sanity (csi-test v5.6.0,
-  `pkg/sanity/controller.go:1388`) expect AlreadyExists.
-  [Question 2](#2-td_plugin_scope_every_finding_but_later_work) puts every finding in the repair, this one too. The
-  question is open for two reasons:
-  - Kubernetes never sends such a request. csi-snapshotter names each
-    snapshot `snapshot-<UID>` of its VolumeSnapshot, and a VolumeSnapshot's
-    source cannot change. Only csi-sanity or another CO sends one name with
-    two volumes.
-  - The fix costs every snapshot create. JovianDSS keeps a snapshot's name
-    within its volume, so CreateSnapshot would have to read every snapshot
-    of the pool before it makes one ([risk 12](#risks)).
-
-  The choices:
-  - fix it: CreateSnapshot answers AlreadyExists, csi-sanity's test
-    passes, and every create pays for the read of the pool (risk 12,
-    Testing step 22, one commit and about 50 lines in Table 6);
-  - leave it as a third exception to compatibility with CSI v1.9.0, a
-    fault left to later work like those of
-    [questions 10](#10-td_plugin_rest_connections_kept_alive_reset_fix_later) and [20](#20-td_plugin_ctrl_publish_node_not_checked): csi-sanity's test
-    ↪ keeps failing,
-    and risk 12, Testing step 22 and that cost are dropped.
+      The choices:
+      - fix it: CreateSnapshot answers AlreadyExists, csi-sanity's test
+        passes, and every create pays for the read of the pool (risk 12,
+        Testing step 22, one commit and about 50 lines in Table 6);
+      - leave it as a third exception to compatibility with CSI v1.9.0, a
+        fault left to later work like those of
+        [questions 10](#10-td_plugin_rest_connections_kept_alive_reset_fix_later) and [20](#20-td_plugin_ctrl_publish_node_not_checked): csi-sanity's test keeps failing,
+        and risk 12, Testing step 22 and that cost are dropped.
+  wrong: |
+    - **28. Does the repair this document decides, each call of the iSCSI build
+      fixed where it fails
+      ([aopt_plugin_iscsi_repair_each_call_in_place](#aopt_plugin_iscsi_repair_each_call_in_place)), take
+      [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok),
+      or is that finding a third exception to compatibility with CSI v1.9.0?**
+      [Question 2](#2-td_plugin_scope_every_finding_but_later_work) takes every finding, this one among them, but the
+      finding meets no step of the operational stage: csi-snapshotter names each
+      snapshot `snapshot-<UID>` of its VolumeSnapshot, whose source cannot
+      change, so Kubernetes never sends one name with two source volumes; only
+      csi-sanity's test of it (csi-test v5.6.0, `pkg/sanity/controller.go:1388`)
+      or another CO does. Its fix has a price that falls on operation:
+      JovianDSS keeps a snapshot's name within its volume, so CreateSnapshot
+      would read every snapshot of the pool before each create
+      ([risk 12](#risks)). The choices:
+      - the repair takes it: CreateSnapshot answers AlreadyExists to a name
+        taken on another volume, csi-sanity's test passes, and every snapshot
+        create reads the snapshots of the pool, with risk 12, Testing step 22
+        and the commit and about 50 lines of Table 6 that come with it;
+      - a third exception, a fault left to later work as those of
+        [questions 10](#10-td_plugin_rest_connections_kept_alive_reset_fix_later) and [20](#20-td_plugin_ctrl_publish_node_not_checked) are: CreateSnapshot goes on
+        making a second snapshot and answering OK, csi-sanity's test fails, the
+        finding goes to later work, and risk 12, Testing step 22 and that cost
+        go.
 ```
 
 ## Rules
