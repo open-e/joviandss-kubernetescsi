@@ -1260,26 +1260,63 @@ It indexes the decisions and does not restate their arguments.
     way, and one who doubts a claim finds its entry in one known place.
   - **Not:** a finding described in Context and again in the Appendix; an
     argument for the decision that exists only in the Appendix.
-- **Its parts come in this order, and a part the record does not need is
-  left out.**
-  - **Why:** the order goes from what the record rests on, through what was
-    found and the code the work turns on, to what helps to read it, and is
-    the same in every record.
+- **Its parts come in alphabetical order of their headings, and a part the
+  record does not need is left out.**
+  - **Why:** a reader finds a part by its name, without knowing an order,
+    and the order is the same in every record.
+  - **Example:** a finding catalogue takes its place by its own heading:
+    `Crashes` comes after `Compliance matrix` and before `Dead code`. A
+    reference repository takes its place by its name.
 
   | Part | Holds | Form |
   |---|---|---|
+  | Code segments | the implementation of the important parts of the code, such as a critical algorithm; for a REST client, the paging: how the pages are loaded and how several pages are merged | one fenced code block per segment, each under a bold line that says what it implements and links to its implementation item, with a sentence or two on what it does |
+  | Compliance matrix | where the code stands on each rule | a numbered table with one row per checked unit, such as a call, and a second with one row per rule |
+  | Dead code | where the record has the part: the code it considers dead, each item with the explanation of why, what becomes of it, and its code | a bullet list by kind (files, functions, fields, keys); each item with its place, why it is dead, what becomes of it, and its code under it: as it is, for an item that stays, or as the diff that removes it, for an item that goes |
   | Evidence | the sources the facts come from, how they were checked, and what the check cannot show | a numbered table, one row per source: Source, What it is, Use; then one sentence on which source wins when two disagree |
   | Evidence gaps | what no source shows | one `gap_` heading per gap with a field table; then what the attempts to close them covered, and how the rest would be closed |
-  | Reference repositories | a repository the record measures against: what it holds, and the rules for using it | prose and numbered tables; only where the record depends on one |
-  | What "compliant" means | the rules the code is checked against | one `rule_` heading per rule with a field table |
-  | Compliance matrix | where the code stands on each rule | a numbered table with one row per checked unit, such as a call, and a second with one row per rule |
   | Finding catalogues | the findings, one catalogue per subject | one `###` section per catalogue, one finding heading per entry with a field table |
-  | Dead code | what nothing uses and a commit would remove | a bullet list by kind: functions, types, keys |
-  | Measurements | the counts and sizes the record quotes | numbered tables, each under a bold line saying what was measured and on which commit |
-  | Code segments | the implementation of the important parts of the code, such as a critical algorithm; for a REST client, the paging: how the pages are loaded and how several pages are merged | one fenced code block per segment, each under a bold line that says what it implements and links to its implementation item, with a sentence or two on what it does |
   | ID sources | where the names and every foreign numbering in the record come from | a numbered table: Names and IDs, Meaning, Source |
+  | Measurements | the counts and sizes the record quotes | numbered tables, each under a bold line saying what was measured and on which commit |
+  | Reference repositories | a repository the record measures against: what it holds, and the rules for using it | prose and numbered tables; only where the record depends on one |
   | Terms | the jargon | a numbered table: Term, Meaning |
+  | What "compliant" means | the rules the code is checked against | one `rule_` heading per rule with a field table |
 
+- **Where a record has a Dead code part, it holds the code the record
+  considers dead, each item with the explanation of why.** The part says how
+  it was checked that nothing reaches the code, and that the check shows
+  only today's use. Each item then says what becomes of it: the work uses
+  it, later work may need it, or it is removed.
+  - **Why:** "dead" is a claim. A reader has to see what shows that nothing
+    reaches the code, and that it says nothing about later use.
+  - **Not:** an item listed as dead without the check behind it; code the
+    CLI or a test still calls; a promise to remove code that no decision
+    takes.
+- **Each item of a Dead code part shows its code right under it, from the
+  commit named in Metadata.** An item that stays shows its code as it is. An
+  item to remove shows the diff that removes it and nothing else, with the
+  imports only it uses. Each diff applies alone and with the others in any
+  order, so its context is kept short enough not to reach into another
+  item's lines. Code longer than about forty lines is abridged to its
+  signature and the lines that matter, with a comment that names the lines
+  left out.
+  - **Why:** a reader judges "dead" from the code itself, not from its name,
+    and a diff per item lets the record keep or drop one item without the
+    others.
+  - **Example:** a constant to remove, under its bullet:
+
+    ```diff
+    --- a/pkg/driver/lunid.go
+    +++ b/pkg/driver/lunid.go
+    @@ -31,4 +31,2 @@
+     
+    -const MaxVolumeNameLength int = 248
+    -
+     const allowedSymbolsPattern = `^[-\w]+$`
+    ```
+  - **Not:** one diff for every item, which cannot be taken in part; a diff
+    whose context reaches into another item's lines, so that the two apply
+    in one order only; a list of names without their code.
 - **A catalogue opens with one or two sentences: what its entries have in
   common, and anything that holds for all of them.**
   - **Why:** what is true of the whole group is said once, not in every
@@ -1353,17 +1390,17 @@ It indexes the decisions and does not restate their arguments.
   - [Future_work_<slug>](#future-work-<slug>)
 - [Advice](#advice)
 - [Appendix](#appendix)
-  - [Evidence](#evidence)
-  - [Evidence_gaps](#evidence-gaps)
-  - [<repository>](#<repository>)
-  - [What_compliant_means](#what-compliant-means)
+  - [Code_segments](#code-segments)
   - [Compliance_matrix](#compliance-matrix)
   - [<catalogue>](#<catalogue>)
   - [Dead_code](#dead-code)
-  - [Measurements](#measurements)
-  - [Code_segments](#code-segments)
+  - [Evidence](#evidence)
+  - [Evidence_gaps](#evidence-gaps)
   - [ID_sources](#id-sources)
+  - [Measurements](#measurements)
+  - [<repository>](#<repository>)
   - [Terms](#terms)
+  - [What_compliant_means](#what-compliant-means)
 
 ## List of Tables
 [List_of_Tables](#list-of-tables)
@@ -1555,36 +1592,19 @@ decided it, the question moves with its answer to `Tactical decisions`.>
 ## Appendix
 [Appendix](#appendix)
 
-### Evidence
-[Evidence](#evidence)
+<the parts in alphabetical order of their headings; a catalogue and a
+reference repository go where their own headings fall>
 
-### Evidence gaps
-[Evidence_gaps](#evidence-gaps)
+### Code segments
+[Code_segments](#code-segments)
 
-#### gap_<area>_<slug>
+**<what the segment implements>**
+([impl_<area>_<slug>](#impl_<area>_<slug>)). <what it does, in a sentence
+or two>
 
-| | |
-|---|---|
-| Kind | <a request sent differently, or a situation never recorded> |
-| Situation | ... |
-| Why it matters | ... |
-| Result | ... |
-
-### <reference repository>
-[<repository>](#<repository>)
-
-<only where the document measures against a repository: what it holds and
-the rules for using it>
-
-### What "compliant" means
-[What_compliant_means](#what-compliant-means)
-
-#### rule_<area>_<slug>
-
-| | |
-|---|---|
-| Requirement | ... |
-| Checked against | ... |
+```<language>
+<the code of the critical algorithm>
+```
 
 ### Compliance matrix
 [Compliance_matrix](#compliance-matrix)
@@ -1607,29 +1627,64 @@ the rules for using it>
 ### Dead code
 [Dead_code](#dead-code)
 
-<what nothing uses, and the commit that removes it>
+<only where the record has dead code: how it was checked that nothing
+reaches it, and what becomes of each item: used by the work, needed by later
+work, or removed>
 
-- **Functions:** ...
-- **Types:** ...
-- **Keys:** ...
+**Functions**
 
-### Measurements
-[Measurements](#measurements)
+- <name> (`file:line`): <why it is dead>; <what becomes of it>
 
-### Code segments
-[Code_segments](#code-segments)
+  ```go
+  <its code, for an item that stays>
+  ```
 
-**<what the segment implements>**
-([impl_<area>_<slug>](#impl_<area>_<slug>)). <what it does, in a sentence
-or two>
+- <name> (`file:line`): <why it is dead>; removed (<the question or item that
+  decides it>)
 
-```<language>
-<the code of the critical algorithm>
-```
+  ```diff
+  <the diff that removes it and nothing else>
+  ```
+
+**Types**, **Fields**, **Keys**: the same.
+
+### Evidence
+[Evidence](#evidence)
+
+### Evidence gaps
+[Evidence_gaps](#evidence-gaps)
+
+#### gap_<area>_<slug>
+
+| | |
+|---|---|
+| Kind | <a request sent differently, or a situation never recorded> |
+| Situation | ... |
+| Why it matters | ... |
+| Result | ... |
 
 ### ID sources
 [ID_sources](#id-sources)
 
+### Measurements
+[Measurements](#measurements)
+
+### <reference repository>
+[<repository>](#<repository>)
+
+<only where the document measures against a repository: what it holds and
+the rules for using it>
+
 ### Terms
 [Terms](#terms)
+
+### What "compliant" means
+[What_compliant_means](#what-compliant-means)
+
+#### rule_<area>_<slug>
+
+| | |
+|---|---|
+| Requirement | ... |
+| Checked against | ... |
 ````

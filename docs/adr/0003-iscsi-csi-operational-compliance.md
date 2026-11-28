@@ -37,23 +37,23 @@
   - [Future_work_features_the_plugin_does_not_offer](#future-work-features-the-plugin-does-not-offer)
 - [Advice](#advice)
 - [Appendix](#appendix)
+  - [Compliance_matrix](#compliance-matrix)
+  - [Connections_and_time](#connections-and-time)
+  - [Crashes](#crashes)
+  - [CSI_answers](#csi-answers)
+  - [Data_loss_and_corruption](#data-loss-and-corruption)
+  - [Dead_code](#dead-code)
   - [Evidence](#evidence)
   - [Evidence_gaps](#evidence-gaps)
-  - [What_compliant_means](#what-compliant-means)
-  - [Compliance_matrix](#compliance-matrix)
-  - [Crashes](#crashes)
   - [False_success](#false-success)
-  - [Data_loss_and_corruption](#data-loss-and-corruption)
-  - [CSI_answers](#csi-answers)
-  - [Names_and_IDs](#names-and-ids)
-  - [Leftovers_and_concurrent_calls](#leftovers-and-concurrent-calls)
-  - [Node](#node)
-  - [Connections_and_time](#connections-and-time)
-  - [Security_findings](#security-findings)
-  - [Dead_code](#dead-code)
-  - [Measurements](#measurements)
   - [ID_sources](#id-sources)
+  - [Leftovers_and_concurrent_calls](#leftovers-and-concurrent-calls)
+  - [Measurements](#measurements)
+  - [Names_and_IDs](#names-and-ids)
+  - [Node](#node)
+  - [Security_findings](#security-findings)
   - [Terms](#terms)
+  - [What_compliant_means](#what-compliant-means)
 
 ## List of Tables
 [List_of_Tables](#list-of-tables)
@@ -65,19 +65,19 @@
 5. `tbl_sidecars` — **Sidecars shipped and current**
 6. `tbl_option_costs` — **What each option costs, by part**
 7. `tbl_systems_affected` — **Affected systems**
-8. `tbl_evidence_sources` — **Evidence sources**
-9. `tbl_compliance_by_call` — **Findings by part and call**
-10. `tbl_compliance_by_rule` — **Findings by rule**
-11. `tbl_package_sizes` — **Size of the packages**
-12. `tbl_appliance_request_times` — **Request times of the appliance**
-13. `tbl_id_sources` — **Where the names and IDs come from**
+8. `tbl_compliance_by_call` — **Findings by part and call**
+9. `tbl_compliance_by_rule` — **Findings by rule**
+10. `tbl_evidence_sources` — **Evidence sources**
+11. `tbl_id_sources` — **Where the names and IDs come from**
+12. `tbl_package_sizes` — **Size of the packages**
+13. `tbl_appliance_request_times` — **Request times of the appliance**
 14. `tbl_terms` — **Terms**
 
 ## Metadata
 [Metadata](#metadata)
 
 Date: decision taken 2026-11-24 ([question 4](#4-td_plugin_option_repair_each_call_in_place)); written down 2026-11-24 to
-2026-11-27
+2026-11-28
 Driver: Andrei Perepiolkin
 Approver: andrei.perepiolkin
 Code: commit `03fc012`, called "the current code" below; line numbers refer to it, and the code is the same at `bdae8d7`: the commits after `03fc012` change only `docs/adr/README.md`
@@ -348,9 +348,9 @@ Findings:
 [Time_and_connections_of_the_appliance](#time-and-connections-of-the-appliance)
 
 **The appliance is slower than the timeouts around it, and requests sent soon
-after a slow publish were reset.** At the median times of Table 12 a target
+after a slow publish were reset.** At the median times of Table 13 a target
 create takes 10.5 s and a LUN attach 14.3 s, so a ControllerPublishVolume takes
-about 25 s; with the longest create, attach and read of Table 12 it takes about
+about 25 s; with the longest create, attach and read of Table 13 it takes about
 32 s. The attacher and the provisioner give each call 15 s unless `--timeout`
 says otherwise ([external-attacher](https://github.com/kubernetes-csi/external-attacher),
 [external-provisioner](https://github.com/kubernetes-csi/external-provisioner)),
@@ -580,7 +580,7 @@ before the rest; the options below assume it, so what they delay is the other
 findings.
 
 **Scope.** Table 6 gives each option's cost by part: the controller with the iSCSI driver, 25 findings; the node, 17; the REST module, 2; and the
-deployment, 1. Which finding is in which part is in Table 9. Eight findings break no rule of CSI v1.9.0 and stop no step of the operational stage, so they could move to the next record,
+deployment, 1. Which finding is in which part is in Table 8. Eight findings break no rule of CSI v1.9.0 and stop no step of the operational stage, so they could move to the next record,
 though [question 2](#2-td_plugin_scope_every_finding_but_later_work) keeps seven of them in, the open target going to a
 later record ([question 7](#7-td_plugin_target_access_per_node_later_record)):
 [bug_plugin_driver_iscsi_publish_cleanup_deletes_target_by_hash_not_iqn](#bug_plugin_driver_iscsi_publish_cleanup_deletes_target_by_hash_not_iqn),
@@ -596,7 +596,7 @@ record is not weighed: the operational stage needs a volume mounted in a pod.
 The Decision sets the scope ([question 2](#2-td_plugin_scope_every_finding_but_later_work)).
 
 The costs are rough estimates from the size of the findings and of the code
-(Table 11): commits, lines written or changed outside the tests, lab cycles,
+(Table 12): commits, lines written or changed outside the tests, lab cycles,
 and working days of one implementer, not counting review, the user's time at
 the lab, or the special runs of [Testing](#testing) that every option needs.
 [Question 18](#18-td_plugin_ctrl_rest_failure_without_spec_code_answers_internal) decides what each REST code answers, whichever
@@ -874,7 +874,9 @@ What follows from the option alone; the rest is written with
 - **A sidecar would still not tell a fault a retry cures from one that needs
   an operator,** until the mapping of REST codes is done ([question 18](#18-td_plugin_ctrl_rest_failure_without_spec_code_answers_internal),
   kub-testing T18).
-- **The dead code would be gone or in use** ([Dead code](#dead-code)).
+- **The code nothing reaches today would be in use where the repair needs
+  it** ([Dead code](#dead-code)). Whether the leftovers go is open
+  ([question 29](#open-questions)).
 
 Confidence: high for the controller, whose faults csi-sanity shows and would
 show fixed; low for the node until a real volume has been staged on the lab
@@ -1174,7 +1176,24 @@ them.
 ### Open questions
 [Open_questions](#open-questions)
 
-No question is open.
+- **29. Should the repair remove the leftovers that nothing uses?** They
+  are the items of [Dead code](#dead-code) marked *a leftover*: four
+  functions, five fields, a constant, a field of the snapshot descriptor and
+  one check. Live code does the job of each. Removing them is about 90 lines
+  deleted in four files, and changes no answer of any call; each leftover in
+  [Dead code](#dead-code) shows the diff that removes it. The question is
+  open for two reasons:
+  - The goals of the Problem statement do not need it. No call answers
+    differently with or without the leftovers.
+  - Leaving them keeps code that looks live and is not. A reader has to
+    check each one before trusting it, and may take it for the code that
+    does the job.
+
+  The choices:
+  - remove them in one commit of the repair: about 90 lines in four files,
+    one more commit in Table 6. With a configuration the plugin cannot use,
+    the log then shows one REST setup error, not two;
+  - leave them to later work: the list stays as information.
 
 ### Tactical decisions
 [Tactical_decisions](#tactical-decisions)
@@ -1419,7 +1438,7 @@ How long may one REST request, and one CSI call, take? The choices, not exclusiv
 - a `--timeout` for the attacher and the provisioner.
 
 **Decision**
-`idletimeout`, the key that already sets the time of a whole REST request (`pkg/rest/rproxy.go:223`), gets a default of 120 s, longer than the slowest volume delete recorded, 112 s; no new key is added. The manifests set the `--timeout` of the attacher to 60 s and of the provisioner to 150 s, so that a request fails in the plugin before the provisioner gives up. A publish's requests take about 10 s and 14 s at the median (Table 12), so 60 s covers a normal publish; a request that hangs outlives the attacher's call, and the attacher's retry meets the lock of [question 9](#9-td_plugin_lock_per_volume_taken) until it ends. The deadline of the CSI call is not taken: ADR 0002 leaves it to a later REST client design.
+`idletimeout`, the key that already sets the time of a whole REST request (`pkg/rest/rproxy.go:223`), gets a default of 120 s, longer than the slowest volume delete recorded, 112 s; no new key is added. The manifests set the `--timeout` of the attacher to 60 s and of the provisioner to 150 s, so that a request fails in the plugin before the provisioner gives up. A publish's requests take about 10 s and 14 s at the median (Table 13), so 60 s covers a normal publish; a request that hangs outlives the attacher's call, and the attacher's retry meets the lock of [question 9](#9-td_plugin_lock_per_volume_taken) until it ends. The deadline of the CSI call is not taken: ADR 0002 leaves it to a later REST client design.
 
 **Original decision**
 > 11  there should be dedicated property in config, that will be regulating this issue  
@@ -1944,6 +1963,11 @@ one session, which is where multipath would begin.
   `GET pools/<pool>/volumes/snapshots` in `empirical/jdss1/v4/typespec/`
   (read 2026-11-27, read only): `search`, `per_page=0`, the parent type
   of each entry, and the time of one request for the whole list.
+- A check of Dead code against every Go file of the repository at
+  `03fc012`, the CLI and the tests included (2026-11-28), on the user's
+  question why the code is dead: each item marked by what becomes of it;
+  `GetVolumeCapability` taken off the list, since the CLI calls it; and
+  [question 29](#open-questions), whether the repair removes the leftovers.
 - A check of this document against the current code, the logs of cycle
   `20261123-231354` and the documents it cites (2026-11-25): the line
   references corrected; the findings on snapshot IDs and names, ListVolumes,
@@ -1999,21 +2023,947 @@ one session, which is where multipath would begin.
   it is idempotent in Go's sense, a GET, HEAD, OPTIONS or TRACE or one with an
   idempotency key; a DELETE and a POST are not.
 - The request times of the appliance, from the hurl recordings of JovianDSS 1
-  on API v4 in `jdss-rest-api-spec` (read 2026-11-24): Table 12.
+  on API v4 in `jdss-rest-api-spec` (read 2026-11-24): Table 13.
 
 ## Appendix
 [Appendix](#appendix)
 
+### Compliance matrix
+[Compliance_matrix](#compliance-matrix)
+
+Table 8 places every finding once, under the part and the call where it is
+fixed: the parts of [Options considered](#options-considered). Table 9 gives,
+for each rule, the findings that break it; a finding of operation breaks no
+rule.
+
+**Table 8 — Findings by part and call** · `tbl_compliance_by_call`
+
+| Part | Call | Findings |
+|---|---|---|
+| controller and driver, 25 | CreateVolume | [bug_plugin_ctrl_create_volume_response_has_no_content_source](#bug_plugin_ctrl_create_volume_response_has_no_content_source), [bug_plugin_ctrl_create_volume_access_mode_not_checked](#bug_plugin_ctrl_create_volume_access_mode_not_checked), [bug_plugin_ctrl_create_volume_capacity_range_not_honoured](#bug_plugin_ctrl_create_volume_capacity_range_not_honoured), [bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size](#bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size), [bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists](#bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists) |
+| | DeleteVolume | [bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser](#bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser) |
+| | ListVolumes | [crash_plugin_ctrl_list_volumes_reads_nil_snapshot_of_clone_source](#crash_plugin_ctrl_list_volumes_reads_nil_snapshot_of_clone_source) |
+| | ControllerPublishVolume | [bug_plugin_ctrl_publish_volume_node_id_never_checked](#bug_plugin_ctrl_publish_volume_node_id_never_checked), [bug_plugin_driver_iscsi_publish_target_wait_does_not_wait](#bug_plugin_driver_iscsi_publish_target_wait_does_not_wait), [bug_plugin_driver_iscsi_publish_cleanup_deletes_target_by_hash_not_iqn](#bug_plugin_driver_iscsi_publish_cleanup_deletes_target_by_hash_not_iqn), [security_plugin_ctrl_iscsi_target_admits_any_initiator](#security_plugin_ctrl_iscsi_target_admits_any_initiator) |
+| | ValidateVolumeCapabilities | [bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability](#bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability) |
+| | CreateSnapshot | [crash_plugin_driver_snapshot_name_empty](#crash_plugin_driver_snapshot_name_empty), [bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes](#bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes), [bug_plugin_driver_snapshot_name_length_unchecked_against_appliance_limit](#bug_plugin_driver_snapshot_name_length_unchecked_against_appliance_limit), [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok) |
+| | DeleteSnapshot | [crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error](#crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error), [dataloss_plugin_driver_iscsi_delete_snapshot_deletes_clones_named_like_snapshots](#dataloss_plugin_driver_iscsi_delete_snapshot_deletes_clones_named_like_snapshots) |
+| | ListSnapshots | [crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot](#crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot) |
+| | every call that takes an ID | [bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument](#bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument), [bug_plugin_driver_plain_name_read_back_drops_underscores](#bug_plugin_driver_plain_name_read_back_drops_underscores) |
+| | every controller call | [bug_plugin_ctrl_rest_error_codes_without_csi_answer](#bug_plugin_ctrl_rest_error_codes_without_csi_answer), [bug_plugin_ctrl_volume_lock_never_taken](#bug_plugin_ctrl_volume_lock_never_taken), [crash_plugin_grpc_server_has_no_panic_recovery](#crash_plugin_grpc_server_has_no_panic_recovery), [crash_plugin_ctrl_main_ignores_setup_error](#crash_plugin_ctrl_main_ignores_setup_error) |
+| node, 17 | NodeStageVolume | [bug_plugin_node_iscsi_login_failure_ignored](#bug_plugin_node_iscsi_login_failure_ignored), [bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted](#bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted), [crash_plugin_node_stage_reads_nil_volume_capability](#crash_plugin_node_stage_reads_nil_volume_capability), [dataloss_plugin_node_stage_formats_block_volume](#dataloss_plugin_node_stage_formats_block_volume), [bug_plugin_node_reader_only_volume_staged_read_write](#bug_plugin_node_reader_only_volume_staged_read_write), [bug_plugin_node_device_not_waited_for_after_login](#bug_plugin_node_device_not_waited_for_after_login), [security_plugin_node_debug_log_prints_volume_capability](#security_plugin_node_debug_log_prints_volume_capability) |
+| | NodeUnstageVolume | [bug_plugin_node_unstage_no_logout](#bug_plugin_node_unstage_no_logout) |
+| | NodePublishVolume | [bug_plugin_node_publish_failure_leaves_target_path](#bug_plugin_node_publish_failure_leaves_target_path), [bug_plugin_node_mount_check_errors_ignored](#bug_plugin_node_mount_check_errors_ignored) |
+| | NodeUnpublishVolume | [bug_plugin_node_unpublish_leaves_target_path](#bug_plugin_node_unpublish_leaves_target_path), [bug_plugin_node_errors_not_grpc_status](#bug_plugin_node_errors_not_grpc_status) |
+| | NodeExpandVolume | [bug_plugin_node_expand_volume_answers_success_without_expanding](#bug_plugin_node_expand_volume_answers_success_without_expanding) |
+| | NodeGetCapabilities | [bug_plugin_node_capabilities_list_unknown](#bug_plugin_node_capabilities_list_unknown) |
+| | every node call | [bug_plugin_node_requests_not_validated](#bug_plugin_node_requests_not_validated), [bug_plugin_node_commands_ignore_call_deadline](#bug_plugin_node_commands_ignore_call_deadline), [bug_plugin_node_no_per_volume_lock](#bug_plugin_node_no_per_volume_lock) |
+| REST module, 2 | every request | [bug_plugin_rest_reused_connection_reset_after_slow_request](#bug_plugin_rest_reused_connection_reset_after_slow_request), [bug_plugin_rest_request_timeout_shorter_than_appliance_delete](#bug_plugin_rest_request_timeout_shorter_than_appliance_delete) |
+| deployment, 1 | ControllerPublishVolume, DeleteVolume | [bug_plugin_sidecar_timeout_shorter_than_publish_and_delete](#bug_plugin_sidecar_timeout_shorter_than_publish_and_delete) |
+
+The calls without a row, the identity calls, ControllerUnpublishVolume,
+GetCapacity, ControllerGetCapabilities, NodeGetInfo and the calls that answer
+Unimplemented, have no finding of their own;
+[question 23](#23-td_plugin_ctrl_unpublish_of_missing_volume_answers_ok) still changes what ControllerUnpublishVolume answers.
+
+**Table 9 — Findings by rule** · `tbl_compliance_by_rule`
+
+| Rule | Findings that break it |
+|---|---|
+| [rule_csi_every_call_answers_with_a_status](#rule_csi_every_call_answers_with_a_status) | the six panics of [Crashes](#crashes); the seventh finding there, [crash_plugin_grpc_server_has_no_panic_recovery](#crash_plugin_grpc_server_has_no_panic_recovery), breaks the rule only through a panic, so once the six are fixed it is a fault of operation, which [question 8](#8-td_plugin_panic_recovery_later_record) leaves to a later record |
+| [rule_csi_missing_or_unsupported_field_answers_invalid_argument](#rule_csi_missing_or_unsupported_field_answers_invalid_argument) | [crash_plugin_driver_snapshot_name_empty](#crash_plugin_driver_snapshot_name_empty), [bug_plugin_ctrl_create_volume_access_mode_not_checked](#bug_plugin_ctrl_create_volume_access_mode_not_checked), [bug_plugin_node_requests_not_validated](#bug_plugin_node_requests_not_validated) |
+| [rule_csi_error_status_message_describes_the_failure](#rule_csi_error_status_message_describes_the_failure) | [bug_plugin_ctrl_rest_error_codes_without_csi_answer](#bug_plugin_ctrl_rest_error_codes_without_csi_answer), [bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size](#bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size) |
+| [rule_csi_call_not_completed_answers_an_error](#rule_csi_call_not_completed_answers_an_error) | [bug_plugin_node_iscsi_login_failure_ignored](#bug_plugin_node_iscsi_login_failure_ignored), [bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted](#bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted), [bug_plugin_node_expand_volume_answers_success_without_expanding](#bug_plugin_node_expand_volume_answers_success_without_expanding) |
+| [rule_csi_repeated_call_answers_as_the_first](#rule_csi_repeated_call_answers_as_the_first) | [bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists](#bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists) |
+| [rule_csi_create_snapshot_name_taken_on_other_volume_answers_already_exists](#rule_csi_create_snapshot_name_taken_on_other_volume_answers_already_exists) | [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok) |
+| [rule_csi_delete_of_missing_object_answers_ok](#rule_csi_delete_of_missing_object_answers_ok) | [bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument](#bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument), [bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser](#bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser) |
+| [rule_csi_call_on_missing_object_answers_not_found](#rule_csi_call_on_missing_object_answers_not_found) | [bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument](#bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument), [bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser](#bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser) |
+| [rule_csi_publish_to_missing_node_answers_not_found](#rule_csi_publish_to_missing_node_answers_not_found) | [bug_plugin_ctrl_publish_volume_node_id_never_checked](#bug_plugin_ctrl_publish_volume_node_id_never_checked) |
+| [rule_csi_volume_from_source_reports_its_source](#rule_csi_volume_from_source_reports_its_source) | [bug_plugin_ctrl_create_volume_response_has_no_content_source](#bug_plugin_ctrl_create_volume_response_has_no_content_source) |
+| [rule_csi_validate_confirms_only_supported_capabilities](#rule_csi_validate_confirms_only_supported_capabilities) | [bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability](#bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability) |
+| [rule_csi_create_volume_capacity_range_honoured](#rule_csi_create_volume_capacity_range_honoured) | [bug_plugin_ctrl_create_volume_capacity_range_not_honoured](#bug_plugin_ctrl_create_volume_capacity_range_not_honoured) |
+| [rule_csi_ids_within_size_limit](#rule_csi_ids_within_size_limit) | [bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes](#bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes) |
+| [rule_csi_stage_honours_the_volume_capability](#rule_csi_stage_honours_the_volume_capability) | [dataloss_plugin_node_stage_formats_block_volume](#dataloss_plugin_node_stage_formats_block_volume), [bug_plugin_node_reader_only_volume_staged_read_write](#bug_plugin_node_reader_only_volume_staged_read_write) |
+| [rule_csi_unstage_undoes_stage](#rule_csi_unstage_undoes_stage) | [bug_plugin_node_unstage_no_logout](#bug_plugin_node_unstage_no_logout) |
+| [rule_csi_unpublish_removes_what_publish_created](#rule_csi_unpublish_removes_what_publish_created) | [bug_plugin_node_publish_failure_leaves_target_path](#bug_plugin_node_publish_failure_leaves_target_path), [bug_plugin_node_unpublish_leaves_target_path](#bug_plugin_node_unpublish_leaves_target_path) |
+| [rule_csi_concurrent_calls_on_a_volume_handled](#rule_csi_concurrent_calls_on_a_volume_handled) | [bug_plugin_ctrl_volume_lock_never_taken](#bug_plugin_ctrl_volume_lock_never_taken), [bug_plugin_node_no_per_volume_lock](#bug_plugin_node_no_per_volume_lock) |
+| [rule_csi_list_snapshots_by_missing_id_answers_empty](#rule_csi_list_snapshots_by_missing_id_answers_empty) | [crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot](#crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot), [bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument](#bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument) |
+
+### Connections and time
+[Connections_and_time](#connections-and-time)
+
+Faults of the REST module, the driver and the deployment against the
+appliance's own times.
+
+#### bug_plugin_driver_iscsi_publish_target_wait_does_not_wait
+
+| | |
+|---|---|
+| Where | `pkg/driver/iscsi_driver.go:664-680`, `PublishVolume` |
+| What happens | the wait for the new target sleeps only on ResourceDNE, and a missing target is ResourceDNETarget in the REST module's catalogue; a target that is not yet active is read again at once |
+| Effect | the three reads follow each other at once, and a target that becomes readable a moment later fails the publish with a timeout |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_rest_reused_connection_reset_after_slow_request
+
+| | |
+|---|---|
+| Where | `pkg/rest/rproxy.go:222`, the transport; `:94-104`, `Send` |
+| What happens | the REST module keeps connections alive; three requests soon after a slow publish were reset, two DELETEs of a target and one POST of a LUN, a reused connection being the likely cause, not shown ([gap_jdss_rest_connection_reset_cause](#gap_jdss_rest_connection_reset_cause)); Go's client does not send a DELETE or a POST again on a new connection |
+| Effect | the request fails with `connection reset by peer`, and csi-sanity's lifecycle tests fail on it |
+| Evidence | three resets in cycle `20261123-231354`; Go's `net/http` documentation |
+| Assigned to | not this document: later work, kub-testing T19; here connections stay kept alive, and a cycle at Debug records the cause (questions [10](#10-td_plugin_rest_connections_kept_alive_reset_fix_later) and [17](#17-td_lab_debug_cycle_allowed)) |
+
+#### bug_plugin_rest_request_timeout_shorter_than_appliance_delete
+
+| | |
+|---|---|
+| Where | `pkg/rest/rproxy.go:223`, the timeout from `idletimeout` |
+| What happens | one timeout serves every request, 30 s in the configuration example, and a volume delete in a pool of a hundred volumes or more can take longer |
+| Effect | DeleteVolume ends in a timeout while the appliance goes on deleting |
+| Evidence | the hurl recordings ([Measurements](#measurements)) |
+| Assigned to | not assigned: What changes is not written yet; a default of 120 s for `idletimeout` ([question 11](#11-td_plugin_timeouts_config_key_and_sidecar_flags)) |
+
+#### bug_plugin_sidecar_timeout_shorter_than_publish_and_delete
+
+| | |
+|---|---|
+| Where | `deploy/joviandss/iscsi/joviandss-csi-controller.yaml:146-175`, the provisioner and attacher containers |
+| What happens | the manifests set no `--timeout`, so each call gets the sidecars' default of 15 s; a publish takes about 25 s at the median times, and a volume delete over 15 s is common in a large pool |
+| Effect | the first ControllerPublishVolume of a volume times out at the attacher, which sends it again after a backoff; the second runs beside the first, which goes on, since the plugin takes no lock and its requests carry no deadline |
+| Evidence | the sidecars' READMEs; Table 13; not seen live |
+| Assigned to | not assigned: What changes is not written yet; the manifests set `--timeout` to 60 s for the attacher and 150 s for the provisioner ([question 11](#11-td_plugin_timeouts_config_key_and_sidecar_flags)), as `docs/configuration.md` describes |
+
+### Crashes
+[Crashes](#crashes)
+
+Panics the code can reach, and the missing recovery that lets each one end the
+process. The gRPC server recovers none
+([crash_plugin_grpc_server_has_no_panic_recovery](#crash_plugin_grpc_server_has_no_panic_recovery)),
+so each crashes the controller or the node, and every call after it fails until
+the process has restarted.
+
+#### crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error
+
+| | |
+|---|---|
+| Where | `pkg/driver/iscsi_driver.go:524`, `DeleteSnapshot` |
+| What happens | the error of the snapshot delete is read with `err.GetCode()` before it is checked, and a successful delete returns no error |
+| Effect | every successful DeleteSnapshot of a zvol snapshot crashes the controller: the snapshot is gone, and the CO gets no reply |
+| Evidence | every live cycle on the current code, in controller B; code reading |
+| Assigned to | this document's stage 1 ([question 16](#16-td_plugin_delete_snapshot_crash_fix_in_first_stage)); What changes, which names its item, is not written yet |
+
+#### crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:833-870`, `ListSnapshots` with `snapshot_id` |
+| What happens | the condition is inverted: the entry is built when the read failed, from a nil snapshot, and a successful read falls through to `return nil, nil`; a snapshot that does not exist is answered InvalidArgument (`:834-835`) |
+| Effect | a snapshot that exists is answered with an empty list; a missing one with InvalidArgument; a failed read of another kind crashes the controller |
+| Evidence | the empty list in cycle `20261123-110200`; the rest by code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### crash_plugin_ctrl_list_volumes_reads_nil_snapshot_of_clone_source
+
+| | |
+|---|---|
+| Where | `pkg/controller/listers.go:193-216`, `:239-262`, `completeListResponseFromVolume`; the inverted check at `:196`, `:242` |
+| What happens | the content source of a clone is built when `NewSnapshotDescFromSDS` failed, from a nil descriptor, and not when it succeeded. In both cases the descriptor is built on the listed volume itself, where the snapshot belongs to the volume of the origin, `v.OriginVolume()`. The branch beside it (`:205-213`, `:251-259`) reads the name of the origin's snapshot as the ID of the source volume, and the intermediate snapshot of a clone carries the clone's own name (`pkg/driver/iscsi_driver.go:160-173`). `VolumeComply` reads both parts of the origin as they are (`pkg/controller/controllerplugin.go:465`, `:474-477`) |
+| Effect | ListVolumes crashes the controller on a clone of a snapshot whose name starts with `s` and is in none of the plugin's forms, such as one made by hand, never reports a snapshot as a volume's source, and reports a clone of a volume as cloned from itself. With the check alone turned round, a volume restored from a snapshot would be listed with a snapshot ID that names the restored volume, not the volume the snapshot was taken of |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### crash_plugin_grpc_server_has_no_panic_recovery
+
+| | |
+|---|---|
+| Where | `pkg/pluginserver/pluginserver.go:70`, `:121-134`, `grpcErrorHandler` |
+| What happens | the one interceptor of the server logs an error and recovers no panic |
+| Effect | any panic in a handler ends the process |
+| Evidence | code reading; every crash of the live cycles |
+| Assigned to | not this document: a later record on panic recovery, kub-testing T15 ([question 8](#8-td_plugin_panic_recovery_later_record)) |
+
+#### crash_plugin_node_stage_reads_nil_volume_capability
+
+| | |
+|---|---|
+| Where | `pkg/node/iscsi_stage.go:112`, `ISCSiStageVolume` |
+| What happens | the capability of the request is read without a check that it is set, after the login |
+| Effect | a NodeStageVolume without a capability crashes the node plugin and leaves the session logged in |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### crash_plugin_driver_snapshot_name_empty
+
+| | |
+|---|---|
+| Where | `pkg/driver/snapid.go:153-172`, `Name`, `SDS` and `CSIID`; `:145`, `NewSnapshotDescFromCSIID`; the lines that read a snapshot's name: `pkg/controller/controllerplugin.go:363` (CreateVolume from a snapshot), `:692`, `:696`, `:709` (CreateSnapshot, which takes the name unchecked at `:680`), `:762`, `:764` (DeleteSnapshot), `:831` (ListSnapshots), and `pkg/driver/iscsi_driver.go:556`, `:566` (DeleteSnapshot) |
+| What happens | the accessors panic when their field is empty, and a descriptor read back from a snapshot ID has no name in three cases: in the hash form, which the plugin gives only to a name longer than the 128 bytes CSI allows; in the legacy form `s_` (`snapid.go:86-88`, [question 27](#27-td_plugin_driver_legacy_prefixes_read_as_own)); and when the snapshot part is in none of the plugin's forms, which `NewSnapshotDescFromCSIID` lets through by dropping the error of `parseSDS`. The lines that name the snapshot in a log line or a message then read the empty name, as an argument Go evaluates at any log level. CreateSnapshot does not check the name of its request: an empty name takes the base32 form, the snapshot `sb_` is made, and the Debug line after the create reads its empty name |
+| Effect | a message or a reply that names a snapshot without a name crashes the controller. DeleteSnapshot of an ID such as `ss_…`, `s_…` or `zz_x_dnBfYQ==` crashes it once the appliance has answered, whether the snapshot exists or not, and goes on doing so after [crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error](#crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error) is fixed; CreateSnapshot with an empty name leaves `sb_` on the appliance and crashes it |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### crash_plugin_ctrl_main_ignores_setup_error
+
+| | |
+|---|---|
+| Where | `app/joviandssplugin/main.go:124-126`; `pkg/controller/controllerplugin.go:182-200`, `:221`, `SetupControllerPlugin`; `pkg/driver/iscsi_driver.go:430`, `NewJovianDSSCSIISCSiDriver` |
+| What happens | the error of `GetPluginServer` is dropped, and `Run` is called on what it returned; the error of `Run` is dropped too, and `main` then exits with status 0 (`main.go:59`). When the configuration of the iSCSI build has no `iscsi` section, setup makes no driver and returns success where it fails. The error of the REST client's setup is dropped as well, by the driver and by the controller: the REST module keeps it and returns it from every request (`pkg/rest/rest.go:49-66`), and ADR 0002 leaves making the start fail on it to this document |
+| Effect | a setup that fails starts no server: `GetPluginServer` logs the cause at Warn (`pkg/pluginserver/pluginserver.go:58`, `:66`, `:90`, `:98`), and the plugin then ends on a nil pointer, its last words the trace of the panic. A setup without the `iscsi` section crashes the controller on its first call. A REST client that cannot be set up, for an `idletimeout` that is missing or no duration, for no address or for a `cafile` that cannot be read among other faults, starts the plugin, and every call that needs the appliance fails with the setup error |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet; the process ends with the error ([question 12](#12-td_plugin_failed_setup_ends_process)) |
+
+### CSI answers
+[CSI_answers](#csi-answers)
+
+Calls that answer with a code or a content the specification does not give,
+or answer one case otherwise than the other calls do.
+
+#### bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument
+
+| | |
+|---|---|
+| Where | `pkg/driver/lunid.go:158-163`, `NewVolumeDescFromCSIID`, and the calls that parse an ID through it; DeleteVolume answers the same code from its own path (`pkg/controller/controllerplugin.go:603`, [bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser](#bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser)); for a snapshot ID, `pkg/driver/snapid.go:124-125`, `NewSnapshotDescFromCSIID`, in DeleteSnapshot and ListSnapshots, and `pkg/controller/controllerplugin.go:366`, CreateVolume from a snapshot |
+| What happens | a volume ID that breaks the appliance's name rules, or is in none of the plugin's forms, is answered InvalidArgument (ADR 0002). One with the prefix `vb_` whose base32 does not decode comes back as the decoder's own error (`lunid.go:131-132`), which the calls that return the parser's error pass on, so the CO gets Unknown. A snapshot ID of fewer than three parts, as each one csi-sanity makes up is, is answered InvalidArgument by its parser, and CreateVolume answers InvalidArgument to any snapshot source its parser refuses |
+| Effect | csi-sanity's made-up IDs get InvalidArgument where it expects NotFound, an empty list or, from a delete, success. Four tests of controller A fail on it. Four tests of controller B meet it as well, which the crash has kept from every cycle: CreateVolume from the snapshot `non-existing-snapshot-id`, ListSnapshots by the snapshot `none-exist-id` and by a made-up source volume, and DeleteSnapshot of `reallyfakesnapshotid` |
+| Evidence | both live cycles on the current code, for controller A; for controller B, code reading and csi-test v5.6.0, `pkg/sanity/controller.go:518`, `:1018`, `:1070`, `:1308`, whose tests ran after the crash in cycle `20261123-231354` and were answered Unavailable |
+| Assigned to | not assigned: What changes is not written yet; the calls questions [5](#5-td_plugin_ctrl_delete_volume_unknown_id_answers_ok) and [21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects) list answer an ID the plugin cannot have made as an object that does not exist, after the check of the missing fields; ControllerUnpublishVolume answers OK and CreateSnapshot InvalidArgument ([question 23](#23-td_plugin_ctrl_unpublish_of_missing_volume_answers_ok)) |
+
+#### bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:373`, `:584` |
+| What happens | the source volume of CreateVolume and the volume of DeleteVolume go to `NewVolumeDescFromVDS` directly, past the checks of `NewVolumeDescFromCSIID` |
+| Effect | the two calls answer an ID the plugin cannot have made otherwise than the other calls do, until questions [5](#5-td_plugin_ctrl_delete_volume_unknown_id_answers_ok) and [21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects) give every call one reading |
+| Evidence | code reading; both live cycles |
+| Assigned to | not assigned: What changes is not written yet; the calls questions [5](#5-td_plugin_ctrl_delete_volume_unknown_id_answers_ok) and [21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects) list answer an ID the plugin cannot have made as an object that does not exist, after the check of the missing fields; ControllerUnpublishVolume answers OK and CreateSnapshot InvalidArgument ([question 23](#23-td_plugin_ctrl_unpublish_of_missing_volume_answers_ok)) |
+
+#### bug_plugin_ctrl_create_volume_response_has_no_content_source
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:547-549`, `:559-561`, `CreateVolume` |
+| What happens | both return paths set the volume's ID and its capacity only |
+| Effect | a volume made from a snapshot or from a volume is answered without its content source |
+| Evidence | cycle `20261123-231354`; code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:984-1035`, `ValidateVolumeCapabilities` |
+| What happens | `confirmed` holds `cp.vCap`, which nothing sets; the loop that finds an unsupported access mode sets a variable that only an empty `if` reads; the check of the volume context tests the capabilities again |
+| Effect | every call is answered as confirmed with an empty list, for supported and unsupported capabilities alike |
+| Evidence | both live cycles; code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_ctrl_publish_volume_node_id_never_checked
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:884`, `:910`; `pkg/driver/iscsi_driver.go:594`, `PublishVolume`, which takes no node ID |
+| What happens | the node ID of the request is logged and used nowhere: an empty one is not refused either, and the capability is checked only after the volume ID is read (`:888-901`) |
+| Effect | a publish to a node that does not exist succeeds and makes a target. csi-sanity's tests of a publish without a node ID and without a capability pass only because the made-up volume ID they send is refused first |
+| Evidence | both live cycles; code reading; in the controller's log of cycle `20261123-231354` the volume ID's parser refuses a `fake-vol-id-…` four times, two more than the tests of a volume that does not exist account for, which fits the tests of a publish without a node ID and without a capability |
+| Assigned to | the check that the node exists: not this document, later work, kub-testing T17 ([question 20](#20-td_plugin_ctrl_publish_node_not_checked)). The refusal of a request without a node ID or a capability, before the volume ID is read: not assigned, What changes is not written yet ([question 21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects)) |
+
+#### bug_plugin_ctrl_rest_error_codes_without_csi_answer
+
+| | |
+|---|---|
+| Where | the switches of `pkg/controller/controllerplugin.go` (Table 3) |
+| What happens | the eleven codes no call reads reach a call's default: Internal; CreateVolume turns any status of its check but OK, NotFound and AlreadyExists into Unknown (`:553`); ControllerPublishVolume answers "Unknown internal error" without the text of the REST error (`:948`) |
+| Effect | a refused connection, a timeout, a failed login and a missing pool all reach the sidecars alike, so they cannot tell a fault that a retry cures from one that needs an operator; a failed publish says nothing of why |
+| Evidence | code reading; of the three connection resets of cycle `20261123-231354`, the one in a publish reached csi-sanity as "Unknown internal error", and the two in an unpublish as Internal with the text of the REST error; ADR 0002 question 70; kub-testing F32 |
+| Assigned to | not assigned: What changes is not written yet; each switch of the controller holds its answers ([Decision](#decision)), and a failure the specification names no code for is answered Internal with its cause ([question 18](#18-td_plugin_ctrl_rest_failure_without_spec_code_answers_internal)); the mapping by kind of failure is later work, kub-testing T18, and until it is done a sidecar still cannot tell a fault a retry cures from one that needs an operator |
+
+#### bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:454`, `:458`, `VolumeComply` |
+| What happens | the message gives the requested size where the size of the existing volume belongs |
+| Effect | below the minimum, the message compares the requested size with itself (`:454`); above the limit, it gives the requested size as the existing volume's (`:458`) |
+| Evidence | cycle `20261123-110200` |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_ctrl_create_volume_capacity_range_not_honoured
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:384-396`, `createNewVolume`; `pkg/driver/iscsi_driver.go:72-85`, `CreateVolume` |
+| What happens | both functions check for equal sizes before they apply the minimum. With no capacity range both sizes are 0, so the driver asks the appliance for 0 bytes. A required size above the limit is not refused. A volume made from a source keeps the size 0 it was given |
+| Effect | a request without a range asks for 0 bytes; an impossible range is accepted; a clone or a restore is answered with a capacity of 0 |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists
+
+| | |
+|---|---|
+| Where | `pkg/driver/iscsi_driver.go:160-170`, `CreateVolumeFromVolume` |
+| What happens | when the intermediate snapshot of a clone exists already, the function deletes it and returns the "exists" error |
+| Effect | a retried clone is answered AlreadyExists, the code the specification gives for a volume that exists with other properties |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:675-712`, `CreateSnapshot`; `pkg/driver/iscsi_driver.go:485-498`, `CreateSnapshot` |
+| What happens | the snapshot's name on JovianDSS comes from the CSI name alone (`controllerplugin.go:680`), and the snapshot is made under the source volume of the request; no snapshot of that name under another volume is looked for. A snapshot of that name under the same volume is read back and answered as the one asked for (`:689-690`, `:701-712`) |
+| Effect | a CreateSnapshot with the name of another volume's snapshot makes a second snapshot and answers OK, where the specification gives AlreadyExists; csi-sanity's "should fail when requesting to create a snapshot with already existing name and different source volume ID" fails on it. Kubernetes gives each snapshot a name of its own, `snapshot-<UUID>` ([question 24](#24-td_plugin_driver_snapshot_id_within_128_bytes)), so the request comes from csi-sanity or another CO |
+| Evidence | code reading; csi-test v5.6.0, `pkg/sanity/controller.go:1388`, whose test ran after the crash in cycle `20261123-231354` and was answered Unavailable |
+| Assigned to | not assigned: What changes is not written yet; CreateSnapshot checks the exact name against the pool's snapshots before it makes one ([question 28](#28-td_plugin_ctrl_create_snapshot_name_checked_on_pool)) |
+
+### Data loss and corruption
+[Data_loss_and_corruption](#data-loss-and-corruption)
+
+Faults that destroy data, or let it be changed where it should not be.
+
+#### dataloss_plugin_driver_iscsi_delete_snapshot_deletes_clones_named_like_snapshots
+
+| | |
+|---|---|
+| Where | `pkg/driver/iscsi_driver.go:529`, `DeleteSnapshot` |
+| What happens | when the delete of a snapshot is refused for its clones, every clone whose name starts with `s` is deleted: `IsSDS` reads the first letter only |
+| Effect | a volume cloned by hand from the snapshot under such a name, `staging-db` for instance, is deleted |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### dataloss_plugin_node_stage_formats_block_volume
+
+| | |
+|---|---|
+| Where | `pkg/node/host.go:90-125`, `FormatMountVolume`; `pkg/node/iscsi_stage.go:112` |
+| What happens | NodeStageVolume formats and mounts whatever capability it gets; a block capability is refused at node publish only (`pkg/node/publish.go:48-50`) |
+| Effect | staging a volume asked for as a block device puts a file system on it when the device carries none, and what was written to it as a raw device is lost |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_reader_only_volume_staged_read_write
+
+| | |
+|---|---|
+| Where | `pkg/node/host.go:90-125`, `FormatMountVolume` |
+| What happens | the staging mount takes no read-only option for a SINGLE_NODE_READER_ONLY volume |
+| Effect | a read-only volume is staged read-write, and may be formatted or repaired at stage |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_ctrl_create_volume_access_mode_not_checked
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:523-527`, `CreateVolume` |
+| What happens | CreateVolume checks only that capabilities are present, not their access mode or their type; the list of the modes the controller supports is one for both builds (`:80-88`) |
+| Effect | a multi-node writer volume is made, and nothing stops two nodes from attaching its LUN read-write; the example claims ask for ReadWriteMany (`deploy/example/nginx-pvc.yaml:7`) |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet; each build gets a list of its own, and the NFS build's holds the multi-node modes ([question 26](#26-td_plugin_ctrl_nfs_build_accepts_multi_node_access_modes)) |
+
+### Dead code
+[Dead_code](#dead-code)
+
+Code that nothing reaches in the current code. Each item has no reference in
+any Go file of the repository, tests and the CLI included, outside its own
+definition and commented-out lines. That shows only that nothing uses it
+today, not that nothing will. So each item carries what becomes of it:
+
+- *used by the repair*: a finding needs it;
+- *for later work*: a later record may need it;
+- *a leftover*: live code does its job; whether the repair removes it is
+  [question 29](#open-questions).
+
+Each item shows its code at `03fc012`: an item that stays as it is, a
+leftover as the diff that removes it and nothing else. Each diff is made
+against `03fc012`, with one line of context, and applies alone or with the
+others in any order; together they take out every leftover and the two
+imports only leftovers use, `crypto/sha256` of the controller and `strconv`
+of `lunid.go`. The diffs are not compiled yet.
+
+**Files**
+
+- `pkg/node/targetapi.go` and `pkg/node/target.go`, 590 lines: the type
+  `Target` and its eleven functions, which nothing outside the two files
+  uses. Their CHAP setup is commented out. *For later work*: the record on
+  target access, with CHAP per node
+  ([question 7](#7-td_plugin_target_access_per_node_later_record)). Abridged to the type and the signatures:
+
+  ```go
+  // Target stores info about iscsi target
+  type Target struct {
+  	l          *logrus.Entry
+  	STPath     string // Where target is staged
+  	TPath      string // Where target should be mounted
+  	DPath      string // Device representation in system
+  	Portal     string // ip of JovianDSS
+  	PortalPort string // port of JovianDSS
+  	Iqn        string // prefix part of iqn
+  	Lun        string // expected to be 0
+  	Tname      string // target name = volumeID
+  	// CoUser     string // Chap outgoing password
+  	// CoPass     string // Chap outgoing Password
+  	TProtocol string // tcp, others are not supported
+
+  	FsType     string   // Type of file system
+  	MountFlags []string // mount tool arguments
+  }
+
+  // pkg/node/targetapi.go
+  func GetTarget(l *log.Entry, tp string) (t *Target, err error)
+  func GetTargetFromReq(ctx context.Context, r interface{}) (t *Target, err error)
+  func GetTargetFromPath(l *log.Entry, path string) (t *Target, err error)
+  func (t *Target) SerializeTarget() error
+  func (t *Target) DeSerializeTarget(stp string) error
+  func (t *Target) DeleteSerialization() (err error)
+  // func (t *Target) SetChapCred() error
+  // func (t *Target) ClearChapCred() error
+  func (t *Target) FormatMountVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) error
+  func (t *Target) UnMountVolume(ctx context.Context) error
+  func GetStageStatus(stp string) bool
+  func (t *Target) StageVolume(ctx context.Context) error
+  func (t *Target) UnStageVolume(ctx context.Context) error
+  ```
+
+  The two files also hold three things live code reads, which have to move
+  before the files go: the constant `deviceIPPath`, read at
+  `pkg/node/iscsi_stage.go:111`, and the types `statFunc` and `globFunc`,
+  read at `pkg/node/host.go:58`:
+
+  ```go
+  // pkg/node/targetapi.go:42-44
+  const (
+  	deviceIPPath = "/host/dev/disk/by-path/ip"
+  )
+
+  // pkg/node/targetapi.go:565-566
+  type statFunc func(string) (os.FileInfo, error)
+  type globFunc func(string) ([]string, error)
+  ```
+
+**Functions**
+
+- `lockVolume` and `unlockVolume`
+  (`pkg/controller/controllerplugin.go:228-260`). *Used by the repair*:
+  [bug_plugin_ctrl_volume_lock_never_taken](#bug_plugin_ctrl_volume_lock_never_taken). The map they write,
+  `volumesInProcess`, is never made, so the first `lockVolume` would panic
+  (`:236`).
+
+  ```go
+  func (cp *ControllerPlugin) lockVolume(vID string) error {
+  	var err error
+  	err = nil
+  	msg := fmt.Sprintf("Volume %s is busy", vID)
+  	errFail := status.Error(codes.Aborted, msg)
+
+  	cp.volumesAccess.Lock()
+  	if cp.volumesInProcess[vID] == false {
+  		cp.volumesInProcess[vID] = true
+  	} else {
+  		err = errFail
+  	}
+  	cp.volumesAccess.Unlock()
+
+  	return err
+  }
+
+  func (cp *ControllerPlugin) unlockVolume(vID string) error {
+  	var err error
+  	err = nil
+  	msg := fmt.Sprintf("Volume %s is not locked", vID)
+  	errFail := status.Error(codes.FailedPrecondition, msg)
+
+  	cp.volumesAccess.Lock()
+  	if cp.volumesInProcess[vID] == true {
+  		delete(cp.volumesInProcess, vID)
+  	} else {
+  		err = errFail
+  	}
+  	cp.volumesAccess.Unlock()
+
+  	return err
+  }
+  ```
+
+- `ISCSiUnStageVolume` (`pkg/node/iscsi_stage.go:126-194`), whose one call
+  is commented out (`pkg/node/stage.go:64`); `UnStageVolume`
+  (`pkg/node/stage.go:50-66`), which holds that call and is called by
+  nothing; `UMountDevice` (`pkg/node/host.go:163-185`), which only
+  `ISCSiUnStageVolume` calls. *Used by the repair*:
+  [bug_plugin_node_unstage_no_logout](#bug_plugin_node_unstage_no_logout). Abridged where
+  `ISCSiUnStageVolume` reads the publish context as `ISCSiStageVolume` does:
+
+  ```go
+  // pkg/node/iscsi_stage.go:126-142
+  func (np *NodePlugin) ISCSiUnStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) error {
+  	var msg string
+
+  	l := jcom.LFC(ctx)
+
+  	l = l.WithFields(log.Fields{
+  		"func":    "ISCSIUnStageVolume",
+  		"section": "node",
+  	})
+  	umounter := np.mounter.(mount.MounterForceUnmounter)
+  	if mp, _ := np.mounter.IsMountPoint(req.GetStagingTargetPath()); mp == true {
+  		if err := umounter.UnmountWithForce(req.GetStagingTargetPath(), time.Minute); err != nil {
+  			msg = fmt.Sprintf("Failure in umounting %s unmounting %s", req.GetStagingTargetPath(), err.Error())
+  			l.Warn(msg)
+  			return status.Error(codes.Internal, msg)
+  		}
+  	}
+  	// … :143-177, the addresses, the port, the IQN and the LUN read from
+  	// the publish context, as in ISCSiStageVolume …
+
+  	for _, addr := range addrs {
+  		fullPortal := addr + ":" + port
+
+  		devicePath := strings.Join([]string{deviceIPPath, fullPortal, "iscsi", iqn, "lun", lun}, "-")
+
+  		if exists, _ := mount.PathExists(devicePath); exists {
+
+  			UMountDevice(ctx, umounter, devicePath)
+  			exec.Command("iscsiadm", "-m", "node", "-p", fullPortal, "-T", iqn, "--logout").Run()
+  			exec.Command("iscsiadm", "-m", "node", "-p", fullPortal, "-T", iqn, "-o", "delete").Run()
+  			return nil
+  		}
+  	}
+
+  	return nil
+  }
+
+  // pkg/node/stage.go:50-66
+  func (np *NodePlugin) UnStageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) error {
+  	l := jcom.LFC(ctx)
+
+  	l = l.WithFields(log.Fields{
+  		"func":    "UnStageVolume",
+  		"section": "node",
+  	})
+  	// pubContext := req.GetPublishContext()
+
+  	// protocol := pubContext["protocol_type"]
+
+  	// if len(protocol) > 0 && protocol == "NFS" {
+  	// 	return np.NFSUnStageVolume(ctx, req)
+  	// } else {
+  	// 	return np.ISCSiUnStageVolume(ctx, req)
+  	// }
+  	return nil
+
+  // pkg/node/host.go:163-185
+  func UMountDevice(ctx context.Context, umounter mount.MounterForceUnmounter, device string) error {
+  	l := jcom.LFC(ctx)
+
+  	l = l.WithFields(log.Fields{
+  		"func":    "UnMountVolume",
+  		"section": "node",
+  	})
+
+  	m := mount.SafeFormatAndMount{
+  		Interface: mount.New(""),
+  		Exec:      kexec.New(),
+  	}
+
+  	if mounts, err := m.GetMountRefs(device); err != nil {
+  		return err
+  	} else {
+  		for _, mpoint := range mounts {
+  			umounter.UnmountWithForce(mpoint, time.Minute)
+  		}
+  	}
+  	umounter.UnmountWithForce(device, time.Minute)
+  	return nil
+  }
+  ```
+
+- `waitForPathToExist` with `waitForPathToExistInternal`
+  (`pkg/node/host.go:54-87`), which only `targetapi.go:519` calls. *Used by
+  the repair*:
+  [bug_plugin_node_device_not_waited_for_after_login](#bug_plugin_node_device_not_waited_for_after_login).
+
+  ```go
+  func waitForPathToExist(devicePath *string, maxRetries int, deviceTransport string) bool {
+  	return waitForPathToExistInternal(devicePath, maxRetries, deviceTransport, os.Stat, filepath.Glob)
+  }
+
+  func waitForPathToExistInternal(devicePath *string, maxRetries int, deviceTransport string, osStat statFunc, filepathGlob globFunc) bool {
+  	if devicePath == nil {
+  		return false
+  	}
+
+  	for i := 0; i < maxRetries; i++ {
+  		var err error
+  		if deviceTransport == "tcp" {
+  			_, err = osStat(*devicePath)
+  		} else {
+  			fpath, _ := filepathGlob(*devicePath)
+  			if fpath == nil {
+  				err = os.ErrNotExist
+  			} else {
+  				*devicePath = fpath[0]
+  			}
+  		}
+  		if err == nil {
+  			return true
+  		}
+  		if !os.IsNotExist(err) {
+  			return false
+  		}
+  		if i == maxRetries-1 {
+  			break
+  		}
+  		time.Sleep(time.Second)
+  	}
+  	return false
+  }
+  ```
+
+- `getRandomName` (`pkg/controller/controllerplugin.go:275`) and
+  `getRandomPassword` (`:290`), which make CHAP user names and passwords.
+  *For later work*: CHAP per node
+  ([question 7](#7-td_plugin_target_access_per_node_later_record)).
+
+  ```go
+  func (cp *ControllerPlugin) getRandomName(l int) (s string) {
+  	var v int64
+  	out := make([]byte, l)
+  	const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ01234567"
+
+  	for i := 0; i < l; i++ {
+  		err := binary.Read(rand.Reader, binary.BigEndian, &v)
+  		if err != nil {
+  			cp.l.Fatal(err)
+  		}
+  		out[i] = chars[v&31]
+  	}
+  	return string(out[:])
+  }
+
+  func (cp *ControllerPlugin) getRandomPassword(l int) (s string) {
+  	var v int64
+  	out := make([]byte, l)
+  	const chars = "abcdefghijklmnopqrstuvwxyz" +
+  		"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@"
+
+  	for i := 0; i < l; i++ {
+  		err := binary.Read(rand.Reader, binary.BigEndian, &v)
+  		if err != nil {
+  			cp.l.Fatal(err)
+  		}
+  		out[i] = chars[v&63]
+  	}
+  	return string(out[:])
+  }
+  ```
+
+- `getStandardID` (`:262`): *a leftover*; the driver makes the same hash for
+  a target name (`pkg/driver/iscsi_driver.go:607`). Its diff takes the import
+  `crypto/sha256`, which nothing else of the file uses:
+
+  ```diff
+  --- a/pkg/controller/controllerplugin.go
+  +++ b/pkg/controller/controllerplugin.go
+  @@ -21,3 +21,2 @@ import (
+   	"crypto/rand"
+  -	"crypto/sha256"
+   	"encoding/binary"
+  @@ -261,15 +260,2 @@ func (cp *ControllerPlugin) unlockVolume(vID string) error {
+   
+  -func (cp *ControllerPlugin) getStandardID(name string) string {
+  -	l := cp.l.WithFields(log.Fields{
+  -		"func": "getStandardID",
+  -	})
+  -
+  -	// Get universal volume ID
+  -	preID := []byte(name)
+  -	rawID := sha256.Sum256(preID)
+  -	id := strings.ToLower(fmt.Sprintf("%X", rawID))
+  -	l.Tracef("For %s id is %s", name, id)
+  -	return id
+  -}
+  -
+   func (cp *ControllerPlugin) getRandomName(l int) (s string) {
+  ```
+
+- `parseOrigin` with its type `origin` (`:115-140`): *a leftover*; the REST
+  module reads an origin (`pkg/rest/types_methods.go:205`).
+
+  ```diff
+  --- a/pkg/controller/controllerplugin.go
+  +++ b/pkg/controller/controllerplugin.go
+  @@ -114,29 +114,2 @@ type ControllerPlugin struct {
+   
+  -type origin struct {
+  -	Pool     string
+  -	Volume   string
+  -	Snapshot string
+  -}
+  -
+  -func parseOrigin(or string) (*origin, error) {
+  -	var out origin
+  -	poolAndName := strings.Split(or, "/")
+  -
+  -	if len(poolAndName) != 2 {
+  -		msg := fmt.Sprintf("Incorrecct origin %s", or)
+  -		return nil, status.Error(codes.Internal, msg)
+  -	}
+  -
+  -	out.Pool = poolAndName[0]
+  -	nameAndSnap := strings.Split(poolAndName[1], "@")
+  -	if len(poolAndName) != 2 {
+  -		msg := fmt.Sprintf("Incorrecct origin %s", or)
+  -		return nil, status.Error(codes.Internal, msg)
+  -	}
+  -
+  -	out.Volume = nameAndSnap[0]
+  -	out.Snapshot = nameAndSnap[1]
+  -	return &out, nil
+  -}
+  -
+   // The rule for the name of an iSCSI target: lower case only, which the
+  ```
+
+- `cloneLUN` (`pkg/driver/iscsi_driver.go:39-70`): *a leftover*;
+  `CreateVolumeFromSnapshot` and `CreateVolumeFromVolume` clone (`:90`,
+  `:152`).
+
+  ```diff
+  --- a/pkg/driver/iscsi_driver.go
+  +++ b/pkg/driver/iscsi_driver.go
+  @@ -38,35 +38,2 @@ type CSIISCSiDriver struct {
+   
+  -func (d *CSIISCSiDriver) cloneLUN(ctx context.Context, pool string, source LunDesc, clone LunDesc, snap *SnapshotDesc) jrest.RestError {
+  -	l := jcom.LFC(ctx)
+  -	l = l.WithFields(logrus.Fields{
+  -		"proto":   "iSCSI",
+  -		"func":    "cloneLUN",
+  -		"section": "driver",
+  -	})
+  -
+  -	l.Debugf("Start cloning")
+  -
+  -	var sds string
+  -	if snap == nil {
+  -		snapdata := jrest.CreateSnapshotDescriptor{SnapshotName: clone.VDS()}
+  -
+  -		if err := d.re.CreateSnapshot(ctx, pool, source.VDS(), &snapdata); err != nil {
+  -			code := err.GetCode()
+  -			if code != jrest.RestErrorResourceExists {
+  -				return err
+  -			}
+  -			// TODO: check if specific snapshot have clones, if it does and name of clone
+  -			//	is the same as name of the clone, then return error
+  -			//	if there are no clones snapshot have to be deleteted and recreated
+  -		}
+  -		sds = clone.VDS()
+  -	} else {
+  -		sds = snap.sds
+  -	}
+  -
+  -	clonedata := jrest.CloneVolumeDescriptor{Name: clone.VDS(), Snapshot: sds}
+  -	err := d.re.CreateClone(ctx, pool, source.VDS(), clonedata)
+  -	return err
+  -}
+  -
+   func (d *CSIISCSiDriver) CreateVolume(ctx context.Context, pool string, nvd *VolumeDesc, requiredBytes int64, limitBytes int64) jrest.RestError {
+  ```
+
+- `nameToID` (`pkg/driver/lunid.go:38-48`): *a leftover*; no code makes an
+  ID this way. Its diff takes the import `strconv`, which nothing else of the
+  file uses:
+
+  ```diff
+  --- a/pkg/driver/lunid.go
+  +++ b/pkg/driver/lunid.go
+  @@ -6,3 +6,2 @@ import (
+   	"regexp"
+  -	"strconv"
+   	"strings"
+  @@ -37,14 +36,2 @@ var allowedSymbolsRegexp = regexp.MustCompile(allowedSymbolsPattern)
+   
+  -func nameToID(name string) string {
+  -
+  -	// Replace each non-allowed symbol with its hexadecimal representation
+  -	transformedString := allowedSymbolsRegexp.ReplaceAllStringFunc(name, func(s string) string {
+  -		// Convert the non-allowed symbol to its hexadecimal representation
+  -		runeValue := []rune(s)[0]
+  -		hexRepresentation := strconv.FormatInt(int64(runeValue), 16)
+  -		return "_" + hexRepresentation
+  -	})
+  -	return transformedString
+  -}
+  -
+   type VolumeDesc struct {
+  ```
+
+**Fields, variables and checks**
+
+- the field `vCap` (`pkg/controller/controllerplugin.go:112`), read at
+  `:1031` and never set, and the variable `supported` of
+  ValidateVolumeCapabilities (`:984`), read only by an empty `if` (`:1021`).
+  *Used by the repair*:
+  [bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability](#bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability).
+
+  ```go
+  // :112
+  	vCap         []*csi.VolumeCapability
+
+  // :984
+  	supported := true
+
+  // :1007-1022
+  	for _, c := range vcap {
+  		m := c.GetAccessMode()
+  		pass := false
+  		for _, mode := range supportedVolumeCapabilities {
+  			if mode == m.Mode {
+  				pass = true
+  			}
+  		}
+  		if pass == false {
+  			supported = false
+  			break
+  		}
+  	}
+
+  	if supported != true {
+  	}
+
+  // :1029-1034
+  	resp := &csi.ValidateVolumeCapabilitiesResponse{
+  		Confirmed: &csi.ValidateVolumeCapabilitiesResponse_Confirmed{
+  			VolumeCapabilities: cp.vCap,
+  			VolumeContext:      vCtx,
+  		},
+  	}
+  ```
+
+- the field `volumesInProcess` (`:97`), which only the lock reads, and which
+  nothing makes. *Used by the repair*, with the lock.
+
+  ```go
+  // :96-97
+  	volumesAccess    sync.Mutex
+  	volumesInProcess map[string]bool
+  ```
+
+- the fields `re`, set up at `:221` and never read, `capabilities`,
+  `snapReg`, `nfsd` and `iscsid` of `ControllerPlugin` (`:95-111`): *a
+  leftover*; the driver keeps the REST endpoint it uses
+  (`pkg/driver/iscsi_driver.go:430`). With a configuration the plugin
+  cannot use, the log shows one REST setup error less without `re`.
+
+  ```diff
+  --- a/pkg/controller/controllerplugin.go
+  +++ b/pkg/controller/controllerplugin.go
+  @@ -94,3 +94,2 @@ type ControllerPlugin struct {
+   	iqnPrefix        string
+  -	snapReg          string
+   	volumesAccess    sync.Mutex
+  @@ -101,6 +100,2 @@ type ControllerPlugin struct {
+   
+  -	nfsd   jdrvr.CSIDriver
+  -	iscsid jdrvr.CSIDriver
+  -
+  -	re               jrest.RestEndpoint
+   	iscsiEndpointCfg jcom.ISCSIEndpointCfg
+  @@ -110,4 +105,3 @@ type ControllerPlugin struct {
+   	// iscsiEndpoint    []*rest.StorageInterface
+  -	capabilities []*csi.ControllerServiceCapability
+  -	vCap         []*csi.VolumeCapability
+  +	vCap []*csi.VolumeCapability
+   }
+  @@ -220,4 +214,2 @@ func SetupControllerPlugin(cp *ControllerPlugin, cfg *jcom.JovianDSSCfg) (err er
+   
+  -	jrest.SetupEndpoint(&cp.re, &cfg.RestEndpointCfg, cp.le)
+  -
+   	cp.pool = cfg.Pool
+  ```
+
+- the field `isIntermidiateSnapshot` (`pkg/driver/snapid.go:23`): *a
+  leftover*; `isIntermediate` tells an intermediate snapshot by its name
+  (`pkg/driver/restwrappers.go:40`).
+
+  ```diff
+  --- a/pkg/driver/snapid.go
+  +++ b/pkg/driver/snapid.go
+  @@ -21,4 +21,3 @@ type SnapshotDesc struct {
+   	// This id get formed by combining vds and sds encoded in base64 and separated by underscore
+  -	csiID                  string // this id provided to kubernetes
+  -	isIntermidiateSnapshot bool   // flag that indicate that this snapshot is intermediate snapshot to another volume
+  +	csiID string // this id provided to kubernetes
+   }
+  ```
+
+- the constant `MaxVolumeNameLength` (`pkg/driver/lunid.go:32`): *a
+  leftover*; `maxApplianceName` holds the limit (`:169`).
+
+  ```diff
+  --- a/pkg/driver/lunid.go
+  +++ b/pkg/driver/lunid.go
+  @@ -31,4 +31,2 @@ type LunDesc interface {
+   
+  -const MaxVolumeNameLength int = 248
+  -
+   const allowedSymbolsPattern = `^[-\w]+$`
+  ```
+
+- the check of a target name longer than 255 characters
+  (`pkg/driver/iscsi_driver.go:610-612`), which a name of 64 hex digits
+  never meets: *a leftover*.
+
+  ```diff
+  --- a/pkg/driver/iscsi_driver.go
+  +++ b/pkg/driver/iscsi_driver.go
+  @@ -609,6 +609,2 @@ func (d *CSIISCSiDriver) PublishVolume(ctx context.Context, pool string, ld LunD
+   
+  -	if len(tname) > 255 {
+  -		return nil, jrest.GetError(jrest.RestErrorArgumentIncorrect, fmt.Sprintf("Resulting target name is too long %s", tname))
+  -	}
+  -
+   	var ctDesc jrest.CreateTargetDescriptor
+  ```
+
+**Keys**
+
+- `namelen` and `passlen` of the `iscsi` section
+  (`pkg/common/common.go:83-84`), which nothing reads: the lengths of the
+  CHAP names and passwords. *For later work*, with `getRandomName` and
+  `getRandomPassword`. The file is read with `yaml.Unmarshal`
+  (`pkg/common/common.go:150`), which ignores keys the code does not know,
+  so removing them would break no configuration.
+
+  ```go
+  // pkg/common/common.go:81-84
+  // ISCSIEndpointCfg is the iscsi section of the configuration.
+  type ISCSIEndpointCfg struct {
+  	Vnamelen int `json:"namelen,omitempty" yaml:"namelen"`
+  	Vpasslen int `json:"passlen,omitempty" yaml:"passlen"`
+  ```
+
+Not in the list: `GetVolumeCapability`
+(`pkg/controller/controllerplugin.go:1095-1107`). The CLI calls it, and
+`make container` ships the CLI:
+
+```go
+// cmd/controller/createVolume.go:76
+	req.VolumeCapabilities = controller.GetVolumeCapability(supportedVolumeCapabilities)
+```
+
 ### Evidence
 [Evidence](#evidence)
 
-**Table 8 — Evidence sources** · `tbl_evidence_sources`
+**Table 10 — Evidence sources** · `tbl_evidence_sources`
 
 | Source | What it is | Use |
 |---|---|---|
-| The current code, `03fc012` | the plugin's `master` | every line reference; Table 11 |
+| The current code, `03fc012` | the plugin's `master` | every line reference; Table 12 |
 | Live csi-sanity cycles `20261123-110200` and `20261123-231354` | csi-sanity v5.6.0 against the lab appliance, the iSCSI build, the controller's log at Info | Table 2; what the controller and the node answer |
-| The hurl recordings of JovianDSS 1 on API v4, `jdss-rest-api-spec/empirical/hurl/out/` (read only) | the appliance's replies and their times | Table 12; the target a publish makes; the `search` of the pool's snapshot list ([question 28](#28-td_plugin_ctrl_create_snapshot_name_checked_on_pool)) |
+| The hurl recordings of JovianDSS 1 on API v4, `jdss-rest-api-spec/empirical/hurl/out/` (read only) | the appliance's replies and their times | Table 13; the target a publish makes; the `search` of the pool's snapshot list ([question 28](#28-td_plugin_ctrl_create_snapshot_name_checked_on_pool)) |
 | The CSI specification, `spec.md` of v1.9.0 and v1.14.0, and its release notes | the protocol | What "compliant" means; Table 4 |
 | The Kubernetes CSI documentation, the sidecars' READMEs and the README of csi-driver-host-path | the sidecars, their versions and timeouts, the end-to-end tests, the example driver | Table 5; the timeouts of the attacher and the provisioner; [question 15](#15-td_lab_compatibility_shown_by_sanity_e2e_and_operation) and [the rewrite option](#aopt_plugin_rewrite_controller_node_and_driver) |
 | The csi-lib-iscsi and csi-driver-iscsi repositories | a library for the node's iSCSI steps | [question 14](#14-td_plugin_node_iscsi_code_kept) |
@@ -2106,6 +3056,359 @@ runs. The stage and the discovery close with a PVC in a pod ([Testing](#testing)
 the reset with a cycle at Debug (step 13, [question 17](#17-td_lab_debug_cycle_allowed)); the sidecars with a real PVC on the shipped ones (step 18); the allow list with a
 login from another node (step 17); the time zone with one snapshot read both ways (step 3); the length of a snapshot name with one long name (step 20); and the
 end-to-end storage tests with a run of the suite (step 21).
+
+### False success
+[False_success](#false-success)
+
+Calls that answer success for a state that does not exist.
+
+#### bug_plugin_node_iscsi_login_failure_ignored
+
+| | |
+|---|---|
+| Where | `pkg/node/iscsi_stage.go:81-122`, `ISCSiStageVolume` |
+| What happens | every failure of discovery, node record or login moves on to the next address, and the function returns success when none is left |
+| Effect | NodeStageVolume answers success with nothing mounted at the staging path, and the pod's writes land on the node's disk |
+| Evidence | code reading; never run on a real volume ([gap_lab_iscsi_node_stage_with_a_real_volume](#gap_lab_iscsi_node_stage_with_a_real_volume)) |
+| Assigned to | this document's stage 1 ([Decision](#decision)); What changes, which names its item, is not written yet |
+
+#### bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted
+
+| | |
+|---|---|
+| Where | `pkg/node/iscsi_stage.go:101-106`, `:122` |
+| What happens | a login refused because a session exists deletes the node record and moves on, and the function returns success |
+| Effect | a repeated NodeStageVolume answers success without a look at the staging path: with nothing mounted when an earlier call left a session and no mount, as the crash of [crash_plugin_node_stage_reads_nil_volume_capability](#crash_plugin_node_stage_reads_nil_volume_capability) does, or is still staging; after a stage that succeeded, its mount is still in place |
+| Evidence | code reading; the refused login was seen on the node code before the merge (kub-testing F6) |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_expand_volume_answers_success_without_expanding
+
+| | |
+|---|---|
+| Where | `pkg/node/nodeplugin.go:69-74` |
+| What happens | NodeExpandVolume answers success and does nothing; the node does not advertise expansion |
+| Effect | a CO that calls it is told the file system grew |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+### ID sources
+[ID_sources](#id-sources)
+
+**Table 11 — Where the names and IDs come from** · `tbl_id_sources`
+
+| Names and IDs | Meaning | Source |
+|---|---|---|
+| `crash_`, `bug_`, `dataloss_`, `security_`, `gap_` and `rule_` names | the findings, gaps and rules of this document, each mapped to the older IDs of the reviews and the tracker, and the names of other records' findings that it cites: ADR 0002's, and the NFS build's in Future work | the registry of names, `kub-testing/issues/` |
+| `aopt_` names | the options of this document | this document |
+| `td_` names | the tactical decisions of this document, numbered as the questions were | this document; the registry of names does not hold them |
+| the presets identity, controller A, controller B, controller capacity and node | csi-sanity runs of kub-testing | `kub-testing/tests/csi-sanity/` |
+| T8, T10, T14 to T19, F6, F32, TOOL10 | rows of the kub-testing tracker | `kub-testing/ISSUES.md` |
+| D9 | a finding of the code review of 2026-10-02 | `review/2026-10-02-code-review.md` |
+| items 58 to 74 | items of the plugin's backlog | `review/backlog.md` |
+| D1 to D7 | the items of the earlier document that this one reworks | `docs/design/0003-controller-crash-fixes-design.md` |
+| question 70 of ADR 0002 | a decided question of that record | ADR 0002, its Decisions table |
+
+### Leftovers and concurrent calls
+[Leftovers_and_concurrent_calls](#leftovers-and-concurrent-calls)
+
+Objects a call leaves behind on the appliance or on the node, and calls on one
+volume that run at once.
+
+#### bug_plugin_driver_iscsi_publish_cleanup_deletes_target_by_hash_not_iqn
+
+| | |
+|---|---|
+| Where | `pkg/driver/iscsi_driver.go:648-649`, `PublishVolume` |
+| What happens | when the attach fails because the volume does not exist, the cleanup deletes the target by its bare hash, while it was made under the full IQN |
+| Effect | the empty target stays on the appliance |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_unstage_no_logout
+
+| | |
+|---|---|
+| Where | `pkg/node/nodeplugin.go:156`; `pkg/node/stage.go:50-66`; `pkg/node/iscsi_stage.go:126-194` |
+| What happens | NodeUnstageVolume only unmounts; the function that would log out is called by nothing, and cannot be called from there as it is: it takes a stage request and reads the target from the publish context, which an unstage request does not carry (`iscsi_stage.go:126`, `:143-177`) |
+| Effect | one session and one device are left per volume unstaged, and after the target is deleted the session tries to recover for ever |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_publish_failure_leaves_target_path
+
+| | |
+|---|---|
+| Where | `pkg/node/nodeplugin.go:194-205`, `NodePublishVolume` |
+| What happens | the target path is created before the request is checked and before the bind mount; a failure after that leaves the path |
+| Effect | a NodePublishVolume without a capability leaves `…/mount/target` in csi-sanity's directory, which csi-sanity then cannot remove or create again: 22 tests of the node preset fail on it |
+| Evidence | cycle `20261123-231354`, the node preset's log |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_unpublish_leaves_target_path
+
+| | |
+|---|---|
+| Where | `pkg/node/publish.go:60-75`, `UnpublishVolume` |
+| What happens | NodeUnpublishVolume unmounts the target path and leaves it |
+| Effect | the path that NodePublishVolume created stays on the node |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_ctrl_volume_lock_never_taken
+
+| | |
+|---|---|
+| Where | `pkg/controller/controllerplugin.go:228-260`, `lockVolume` and `unlockVolume` |
+| What happens | the lock per volume is defined and never taken; the map it keeps the volumes in (`:97`) is never made, so the first `lockVolume` would panic on a write to a nil map (`:236`) |
+| Effect | two calls on one volume run at once |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet; the lock is taken ([question 9](#9-td_plugin_lock_per_volume_taken)) |
+
+#### bug_plugin_node_no_per_volume_lock
+
+| | |
+|---|---|
+| Where | `pkg/node/nodeplugin.go:99-232`, the node calls |
+| What happens | the node takes no lock per volume |
+| Effect | a retried stage runs beside the first; with [bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted](#bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted) it answers success with nothing mounted |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+### Measurements
+[Measurements](#measurements)
+
+**Lines of Go outside the tests, per package, on `03fc012`:**
+
+**Table 12 — Size of the packages** · `tbl_package_sizes`
+
+| Package | Lines | Files | Of which |
+|---|---|---|---|
+| `pkg/controller` | 1,412 | 2 | |
+| `pkg/node` | 1,622 | 9 | the NFS stage and publish, 205; the two unused files of [Dead code](#dead-code), 590 |
+| `pkg/driver` | 2,586 | 12 | the NFS driver, 782 |
+| `pkg/pluginserver` | 134 | 1 | |
+| `pkg/rest` | 3,837 | 20 | |
+
+**Request times of the successful requests of JovianDSS 1 `1.0up33.65410` on
+API v4, over all hurl runs in `jdss-rest-api-spec/empirical/hurl/out/` (the
+repository at `434c9cd`):**
+
+**Table 13 — Request times of the appliance** · `tbl_appliance_request_times`
+
+| Request | Median | 90th percentile | Longest | Count |
+|---|---|---|---|---|
+| `POST pools/<p>/san/iscsi/targets` | 10.5 s | 11.7 s | 12.1 s | 323 |
+| `POST .../targets/<t>/luns` | 14.3 s | 16.0 s | 18.2 s | 182 |
+| `GET .../targets/<t>` | 0.5 s | 0.9 s | 1.2 s | 263 |
+| `DELETE .../targets/<t>/luns/<v>` | 4.8 s | 5.3 s | 5.7 s | 131 |
+| `DELETE .../targets/<t>` | 4.8 s | 5.3 s | 5.8 s | 318 |
+| `DELETE pools/<p>/volumes/<v>` | 6.1 s | 52.9 s | 111.9 s | 1722 |
+
+Of the 1722 volume deletes, 346 took longer than 30 s, all in pools that held
+100 to 500 volumes. A new connection had its TLS handshake done after about
+2 ms at the median, over 12,509 connections.
+
+### Names and IDs
+[Names_and_IDs](#names-and-ids)
+
+Faults in how the plugin builds a name or an ID and reads it back.
+
+#### bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes
+
+| | |
+|---|---|
+| Where | `pkg/driver/snapid.go:30-61`, `NewSnapshotDescFromName` |
+| What happens | the snapshot ID is the snapshot's name, `_`, and the base64 of its volume's name; a snapshot's name on JovianDSS has up to 243 characters and a volume's up to 128, so the ID reaches 416 characters, and 384 from names within the 128 bytes CSI allows a CO to send |
+| Effect | a snapshot of a long name, or of a volume with a long name, is answered with an ID longer than the 128 bytes CSI allows; the names Kubernetes generates give 113, a `snapshot-<UUID>` snapshot of a `pvc-ns-<UUID>` volume, from the prefixes the manifests set (`deploy/joviandss/iscsi/joviandss-csi-controller.yaml:150`) and the snapshotter's default |
+| Evidence | code reading; ADR 0002 lowered the thresholds of a volume's name to 125 and left the snapshot's |
+| Assigned to | not assigned: What changes is not written yet; a snapshot ID never longer than 128 bytes ([question 24](#24-td_plugin_driver_snapshot_id_within_128_bytes)) |
+
+#### bug_plugin_driver_snapshot_name_length_unchecked_against_appliance_limit
+
+| | |
+|---|---|
+| Where | `pkg/driver/snapid.go:37-55`, `NewSnapshotDescFromName`; `pkg/driver/lunid.go:177-187`, `checkApplianceName` |
+| What happens | a snapshot takes the plain form up to 239 characters and the base32 form up to 240, so its name on JovianDSS reaches 242 or 243, and 211 from a name within the 128 bytes CSI allows, while the plugin holds a volume name to 131, one less than the 132 JovianDSS takes |
+| Effect | a CreateSnapshot of a long name may be refused by JovianDSS, where the hash form would fit |
+| Evidence | code reading; the limit of a snapshot name is not recorded ([gap_jdss_rest_snapshot_name_length_limit](#gap_jdss_rest_snapshot_name_length_limit)) |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_driver_plain_name_read_back_drops_underscores
+
+| | |
+|---|---|
+| Where | `pkg/driver/lunid.go:117`, `:126-128`, `NewVolumeDescFromVDS`; `pkg/driver/snapid.go:65`, `:75-77`, `parseSDS` |
+| What happens | a plain name is split at every `_`, and the parts after the prefix are joined with nothing between them, for a volume's `vp_` and a snapshot's `sp_` alike |
+| Effect | `vp_my_volume` is read back with the name `myvolume`, and `sp_my_snap` with `mysnap`; the names are used in messages only (`pkg/driver/iscsi_driver.go:292`, `pkg/driver/nfs_driver.go:364`), and every request to JovianDSS keeps the full name |
+| Evidence | code reading; review D9 (`review/2026-10-02-code-review.md`) |
+| Assigned to | not assigned: What changes is not written yet |
+
+### Node
+[Node](#node)
+
+The faults of the node path that the other catalogues do not hold.
+
+#### bug_plugin_node_requests_not_validated
+
+| | |
+|---|---|
+| Where | `pkg/node/nodeplugin.go:99-232` |
+| What happens | no node call checks its volume ID, its paths or its capability before it acts |
+| Effect | a request without its volume ID or its path is answered Internal from `mkdir`, or success from an unmount |
+| Evidence | the node preset of both live cycles; code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_capabilities_list_unknown
+
+| | |
+|---|---|
+| Where | `pkg/node/nodeplugin.go:37` |
+| What happens | the node advertises the capability UNKNOWN, the empty value of the type, beside STAGE_UNSTAGE_VOLUME |
+| Effect | the CO reads a capability that means nothing |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_device_not_waited_for_after_login
+
+| | |
+|---|---|
+| Where | `pkg/node/iscsi_stage.go:111-112` |
+| What happens | the device path is formatted and mounted right after the login, without a wait for it to appear |
+| Effect | a stage fails now and then, when the device appears late |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_mount_check_errors_ignored
+
+| | |
+|---|---|
+| Where | `pkg/node/host.go:217`; `pkg/node/publish.go:52` |
+| What happens | the error of `IsMountPoint` is ignored, so a mount that cannot be read counts as no mount |
+| Effect | a stale mount is left in place by an unpublish, or bound over by a node publish |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_errors_not_grpc_status
+
+| | |
+|---|---|
+| Where | `pkg/node/host.go:220` |
+| What happens | an unmount failure is returned as a plain error |
+| Effect | the CO gets Unknown |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+#### bug_plugin_node_commands_ignore_call_deadline
+
+| | |
+|---|---|
+| Where | `pkg/node/iscsi_stage.go:85-114` |
+| What happens | `iscsiadm` and the format run without the call's context and without a timeout |
+| Effect | a command that hangs outlives its call and runs beside the CO's retry |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+### Security findings
+[Security_findings](#security-findings)
+
+What the iSCSI build exposes.
+
+#### security_plugin_ctrl_iscsi_target_admits_any_initiator
+
+| | |
+|---|---|
+| Where | `pkg/driver/iscsi_driver.go:614-619`, `PublishVolume`, the target create |
+| What happens | the target is made with its name and `active` only; the recorded reply of a target made so has no CHAP user and empty allow and deny lists |
+| Effect | as far as the recordings show, any initiator that reaches the appliance may log in to a published volume ([gap_jdss_rest_target_empty_allow_list_meaning](#gap_jdss_rest_target_empty_allow_list_meaning)) |
+| Evidence | code reading; the recorded target replies |
+| Assigned to | not this document: a later record on target access, CHAP per node and one target per node, kub-testing T14 ([question 7](#7-td_plugin_target_access_per_node_later_record)) |
+
+#### security_plugin_node_debug_log_prints_volume_capability
+
+| | |
+|---|---|
+| Where | `pkg/node/nodeplugin.go:113`; `deploy/joviandss/iscsi/joviandss-csi-node.yaml:102` |
+| What happens | the node logs the whole volume capability at Debug, with its mount flags, and the node's manifest in `deploy/` sets the log level to Debug, while the lab runs the controller at Info |
+| Effect | a mount flag that holds a secret reaches the node's log |
+| Evidence | code reading |
+| Assigned to | not assigned: What changes is not written yet |
+
+### Terms
+[Terms](#terms)
+
+**Table 14 — Terms** · `tbl_terms`
+
+| Term | Meaning |
+|---|---|
+| access mode | how a volume may be used: SINGLE_NODE_WRITER, which Kubernetes asks for as ReadWriteOnce; SINGLE_NODE_READER_ONLY; a multi-node writer, asked for as ReadWriteMany, which is not in the controller's list of supported modes today, and which the NFS build goes on accepting ([question 26](#26-td_plugin_ctrl_nfs_build_accepts_multi_node_access_modes)) |
+| allow list | the initiators a target admits; what an empty one admits is a gap ([gap_jdss_rest_target_empty_allow_list_meaning](#gap_jdss_rest_target_empty_allow_list_meaning)) |
+| alpha, GA | a feature of CSI that may still change, and one that is final |
+| build | the plugin's binary and image made for one protocol, iSCSI or NFS, chosen at compile time, with the manifests of that protocol |
+| CHAP | the iSCSI login with a user name and a secret |
+| CO | the container orchestrator, here Kubernetes and its sidecars, which call the plugin |
+| compatibility with CSI v1.9.0 | the second thing the Problem statement asks for: csi-sanity's presets passing, the end-to-end storage tests of Kubernetes passing, and a user's operation showing no issue; the rules of What "compliant" means are what they check of each call |
+| compliant | meeting the rules of What "compliant" means; compatibility with CSI v1.9.0 is what the tests show |
+| content source | the snapshot or volume a new volume is made from |
+| crash | a panic that ends the controller or the node process |
+| CRD | a CustomResourceDefinition, such as those of volume snapshots |
+| CSI | the Container Storage Interface: the specification of the calls between a CO and a storage plugin, at v1.9.0 here |
+| CSI ID | the ID the plugin answers for a volume or a snapshot, which the CO passes to every later call |
+| CSI name | the name the CO gives in CreateVolume or CreateSnapshot |
+| csi-sanity | the conformance test suite of Kubernetes CSI, csi-test v5.6.0 here |
+| cycle | one build, deploy and run of every preset on the lab, kept under its timestamp |
+| discovery | the `iscsiadm` step that asks an address for the targets it offers |
+| DNE | "does not exist", in the names of REST codes |
+| end-to-end storage tests of Kubernetes | the storage tests of Kubernetes' end-to-end suite, which test a CSI driver deployed in a cluster, through its sidecars ([functional testing](https://kubernetes-csi.github.io/docs/functional-testing.html)) |
+| external-attacher | the repository of Kubernetes' attacher sidecar, csi-attacher |
+| fault of operation | a finding that breaks no rule of the specification but the operation of the plugin: the open target, the timeouts, the objects left behind |
+| gRPC | the remote procedure call protocol CSI calls are made in; its status codes are the answers of a call |
+| hurl | the HTTP test tool whose runs recorded the appliance's replies |
+| ID the plugin cannot have made | an ID in none of the plugin's forms (Table 1), such as csi-sanity's made-up IDs; an ID that the appliance's name rules refuse is one of them ([question 21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects)), an ID in a legacy form is not ([question 27](#27-td_plugin_driver_legacy_prefixes_read_as_own)) || initiator | the iSCSI client of a node, known by its initiator name |
+| interceptor | code of the gRPC server that every call passes through |
+| intermediate snapshot | the snapshot of a source volume that the plugin makes to clone it, named like the new volume |
+| IQN | the iSCSI qualified name of a target or an initiator |
+| jdss-rest-api-spec | the sibling repository of the appliance's REST API, with the hurl recordings of what it serves; read only |
+| JovianDSS 1 | the first generation of the appliance's software, the one the plugin and the lab use |
+| kept alive | of a connection: left open after its request, for the next request to use |
+| kub-spec | a local clone of the CSI specification's repository at v1.14.0 |
+| kub-testing | the sibling repository of the lab's tests, tracker and registry of names |
+| lab | the Kubernetes cluster and the appliances that kub-testing runs the plugin on |
+| later record | an ADR of its own that takes a subject this document leaves: target access (kub-testing T14) and panic recovery (T15) |
+| later work | what this document leaves to kub-testing's tracker: the later records, the move to `csi-lib-iscsi` (T16), the check of the node in a publish (T17), the mapping of REST codes (T18) and the fix of the connection reset (T19) |
+| legacy form | a form of a name that the plugin reads and no code writes, `v_` for a volume and `s_` for a snapshot (Table 1, [question 27](#27-td_plugin_driver_legacy_prefixes_read_as_own)) |
+| LUN | the logical unit of a target, here the zvol |
+| multipath | several sessions of a node to one target, over different addresses, used as one device |
+| NAS volume, NAS snapshot | the file system and its snapshot behind an NFS volume |
+| node ID | the ID NodeGetInfo answers for a node, which ControllerPublishVolume gets back |
+| node record | the entry `iscsiadm` keeps on a node for a target and an address, which a login uses |
+| open target | a published iSCSI target that admits any initiator ([security_plugin_ctrl_iscsi_target_admits_any_initiator](#security_plugin_ctrl_iscsi_target_admits_any_initiator)) |
+| operational stage | the first thing the Problem statement asks for, as Options considered reads it: a PVC living its whole life in a real pod on the lab, with the shipped sidecars or the ones that replace them |
+| PersistentVolume | the Kubernetes object that stands for one volume, and that a PVC is bound to |
+| the plugin's form of an ID | an ID in one of the forms of Table 1, the legacy ones included |
+| preset | a set of csi-sanity tests that kub-testing runs together: controller A holds the tests of volumes and publish, controller B those of snapshots |
+| publish | ControllerPublishVolume, which makes the target and attaches the LUN; NodePublishVolume is called a node publish |
+| publish context | the map ControllerPublishVolume answers and NodeStageVolume gets: here the target's IQN, its addresses and the LUN |
+| PVC | a PersistentVolumeClaim, a pod's request for a volume |
+| RBAC | the Kubernetes rules of what a sidecar may read and change |
+| repair | the work this document decides: each call of the iSCSI build fixed where it fails, in its own handler, with the structure of the calls kept ([aopt_plugin_iscsi_repair_each_call_in_place](#aopt_plugin_iscsi_repair_each_call_in_place), [question 4](#4-td_plugin_option_repair_each_call_in_place)); it takes every finding of the Appendix but the four left to later work ([question 2](#2-td_plugin_scope_every_finding_but_later_work)) |
+| REST code | the code of a `RestError` that says what the failure means for the call (ADR 0002) |
+| REST module | `pkg/rest`, the plugin's client of the appliance's REST API (ADR 0002) |
+| session | an iSCSI login of a node to a target, through which the node sees the target's LUNs |
+| sidecar | a container that Kubernetes CSI ships beside a plugin to call it: provisioner, attacher, snapshotter, node driver registrar, livenessprobe, resizer |
+| SP | the storage plugin, in the specification's words: here the JovianDSS plugin |
+| stage | a group of commits of the work, in What changes, written stage 1 and so on, and not the operational stage; said of a node, the work of NodeStageVolume, which attaches and mounts a volume |
+| staging path | the node path where NodeStageVolume mounts a volume once per node |
+| static volume | a PersistentVolume made by hand, whose volume handle a person types |
+| status code | the code of a gRPC answer, written as Go's gRPC package names it, InvalidArgument; the specification writes INVALID_ARGUMENT |
+| target | the iSCSI target on the appliance, made per volume at publish |
+| target path | the path of one pod where NodePublishVolume bind mounts the staged volume |
+| test | one test of csi-sanity; the lifecycle tests are those that create, publish, unpublish and delete one volume |
+| VDS, SDS, descriptor | the volume's and the snapshot's name on the appliance, and the plugin's object that holds a name with its forms (`pkg/driver/lunid.go`, `snapid.go`) |
+| volume context | the map CreateVolume answers, passed to the later calls of the volume |
+| volume handle | the volume ID a PersistentVolume holds, which the CO passes to every call on the volume |
+| VolumeAttachment | the Kubernetes object that records a volume attached to a node; the attacher acts on it |
+| zvol | a ZFS volume on the appliance: the block device behind an iSCSI volume |
 
 ### What "compliant" means
 [What_compliant_means](#what-compliant-means)
@@ -2250,729 +3553,3 @@ csi-sanity tests, so compatibility waits on it ([Decision](#decision)).
 |---|---|
 | Requirement | ListSnapshots by the ID of a snapshot that does not exist answers an empty list |
 | Checked against | csi-sanity's "should return empty when the specified snapshot id does not exist"; [ListSnapshots](https://github.com/container-storage-interface/spec/blob/v1.9.0/spec.md#listsnapshots) says nothing of the case |
-
-### Compliance matrix
-[Compliance_matrix](#compliance-matrix)
-
-Table 9 places every finding once, under the part and the call where it is
-fixed: the parts of [Options considered](#options-considered). Table 10 gives,
-for each rule, the findings that break it; a finding of operation breaks no
-rule.
-
-**Table 9 — Findings by part and call** · `tbl_compliance_by_call`
-
-| Part | Call | Findings |
-|---|---|---|
-| controller and driver, 25 | CreateVolume | [bug_plugin_ctrl_create_volume_response_has_no_content_source](#bug_plugin_ctrl_create_volume_response_has_no_content_source), [bug_plugin_ctrl_create_volume_access_mode_not_checked](#bug_plugin_ctrl_create_volume_access_mode_not_checked), [bug_plugin_ctrl_create_volume_capacity_range_not_honoured](#bug_plugin_ctrl_create_volume_capacity_range_not_honoured), [bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size](#bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size), [bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists](#bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists) |
-| | DeleteVolume | [bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser](#bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser) |
-| | ListVolumes | [crash_plugin_ctrl_list_volumes_reads_nil_snapshot_of_clone_source](#crash_plugin_ctrl_list_volumes_reads_nil_snapshot_of_clone_source) |
-| | ControllerPublishVolume | [bug_plugin_ctrl_publish_volume_node_id_never_checked](#bug_plugin_ctrl_publish_volume_node_id_never_checked), [bug_plugin_driver_iscsi_publish_target_wait_does_not_wait](#bug_plugin_driver_iscsi_publish_target_wait_does_not_wait), [bug_plugin_driver_iscsi_publish_cleanup_deletes_target_by_hash_not_iqn](#bug_plugin_driver_iscsi_publish_cleanup_deletes_target_by_hash_not_iqn), [security_plugin_ctrl_iscsi_target_admits_any_initiator](#security_plugin_ctrl_iscsi_target_admits_any_initiator) |
-| | ValidateVolumeCapabilities | [bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability](#bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability) |
-| | CreateSnapshot | [crash_plugin_driver_snapshot_name_empty](#crash_plugin_driver_snapshot_name_empty), [bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes](#bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes), [bug_plugin_driver_snapshot_name_length_unchecked_against_appliance_limit](#bug_plugin_driver_snapshot_name_length_unchecked_against_appliance_limit), [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok) |
-| | DeleteSnapshot | [crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error](#crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error), [dataloss_plugin_driver_iscsi_delete_snapshot_deletes_clones_named_like_snapshots](#dataloss_plugin_driver_iscsi_delete_snapshot_deletes_clones_named_like_snapshots) |
-| | ListSnapshots | [crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot](#crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot) |
-| | every call that takes an ID | [bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument](#bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument), [bug_plugin_driver_plain_name_read_back_drops_underscores](#bug_plugin_driver_plain_name_read_back_drops_underscores) |
-| | every controller call | [bug_plugin_ctrl_rest_error_codes_without_csi_answer](#bug_plugin_ctrl_rest_error_codes_without_csi_answer), [bug_plugin_ctrl_volume_lock_never_taken](#bug_plugin_ctrl_volume_lock_never_taken), [crash_plugin_grpc_server_has_no_panic_recovery](#crash_plugin_grpc_server_has_no_panic_recovery), [crash_plugin_ctrl_main_ignores_setup_error](#crash_plugin_ctrl_main_ignores_setup_error) |
-| node, 17 | NodeStageVolume | [bug_plugin_node_iscsi_login_failure_ignored](#bug_plugin_node_iscsi_login_failure_ignored), [bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted](#bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted), [crash_plugin_node_stage_reads_nil_volume_capability](#crash_plugin_node_stage_reads_nil_volume_capability), [dataloss_plugin_node_stage_formats_block_volume](#dataloss_plugin_node_stage_formats_block_volume), [bug_plugin_node_reader_only_volume_staged_read_write](#bug_plugin_node_reader_only_volume_staged_read_write), [bug_plugin_node_device_not_waited_for_after_login](#bug_plugin_node_device_not_waited_for_after_login), [security_plugin_node_debug_log_prints_volume_capability](#security_plugin_node_debug_log_prints_volume_capability) |
-| | NodeUnstageVolume | [bug_plugin_node_unstage_no_logout](#bug_plugin_node_unstage_no_logout) |
-| | NodePublishVolume | [bug_plugin_node_publish_failure_leaves_target_path](#bug_plugin_node_publish_failure_leaves_target_path), [bug_plugin_node_mount_check_errors_ignored](#bug_plugin_node_mount_check_errors_ignored) |
-| | NodeUnpublishVolume | [bug_plugin_node_unpublish_leaves_target_path](#bug_plugin_node_unpublish_leaves_target_path), [bug_plugin_node_errors_not_grpc_status](#bug_plugin_node_errors_not_grpc_status) |
-| | NodeExpandVolume | [bug_plugin_node_expand_volume_answers_success_without_expanding](#bug_plugin_node_expand_volume_answers_success_without_expanding) |
-| | NodeGetCapabilities | [bug_plugin_node_capabilities_list_unknown](#bug_plugin_node_capabilities_list_unknown) |
-| | every node call | [bug_plugin_node_requests_not_validated](#bug_plugin_node_requests_not_validated), [bug_plugin_node_commands_ignore_call_deadline](#bug_plugin_node_commands_ignore_call_deadline), [bug_plugin_node_no_per_volume_lock](#bug_plugin_node_no_per_volume_lock) |
-| REST module, 2 | every request | [bug_plugin_rest_reused_connection_reset_after_slow_request](#bug_plugin_rest_reused_connection_reset_after_slow_request), [bug_plugin_rest_request_timeout_shorter_than_appliance_delete](#bug_plugin_rest_request_timeout_shorter_than_appliance_delete) |
-| deployment, 1 | ControllerPublishVolume, DeleteVolume | [bug_plugin_sidecar_timeout_shorter_than_publish_and_delete](#bug_plugin_sidecar_timeout_shorter_than_publish_and_delete) |
-
-The calls without a row, the identity calls, ControllerUnpublishVolume,
-GetCapacity, ControllerGetCapabilities, NodeGetInfo and the calls that answer
-Unimplemented, have no finding of their own;
-[question 23](#23-td_plugin_ctrl_unpublish_of_missing_volume_answers_ok) still changes what ControllerUnpublishVolume answers.
-
-**Table 10 — Findings by rule** · `tbl_compliance_by_rule`
-
-| Rule | Findings that break it |
-|---|---|
-| [rule_csi_every_call_answers_with_a_status](#rule_csi_every_call_answers_with_a_status) | the six panics of [Crashes](#crashes); the seventh finding there, [crash_plugin_grpc_server_has_no_panic_recovery](#crash_plugin_grpc_server_has_no_panic_recovery), breaks the rule only through a panic, so once the six are fixed it is a fault of operation, which [question 8](#8-td_plugin_panic_recovery_later_record) leaves to a later record |
-| [rule_csi_missing_or_unsupported_field_answers_invalid_argument](#rule_csi_missing_or_unsupported_field_answers_invalid_argument) | [crash_plugin_driver_snapshot_name_empty](#crash_plugin_driver_snapshot_name_empty), [bug_plugin_ctrl_create_volume_access_mode_not_checked](#bug_plugin_ctrl_create_volume_access_mode_not_checked), [bug_plugin_node_requests_not_validated](#bug_plugin_node_requests_not_validated) |
-| [rule_csi_error_status_message_describes_the_failure](#rule_csi_error_status_message_describes_the_failure) | [bug_plugin_ctrl_rest_error_codes_without_csi_answer](#bug_plugin_ctrl_rest_error_codes_without_csi_answer), [bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size](#bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size) |
-| [rule_csi_call_not_completed_answers_an_error](#rule_csi_call_not_completed_answers_an_error) | [bug_plugin_node_iscsi_login_failure_ignored](#bug_plugin_node_iscsi_login_failure_ignored), [bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted](#bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted), [bug_plugin_node_expand_volume_answers_success_without_expanding](#bug_plugin_node_expand_volume_answers_success_without_expanding) |
-| [rule_csi_repeated_call_answers_as_the_first](#rule_csi_repeated_call_answers_as_the_first) | [bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists](#bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists) |
-| [rule_csi_create_snapshot_name_taken_on_other_volume_answers_already_exists](#rule_csi_create_snapshot_name_taken_on_other_volume_answers_already_exists) | [bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok](#bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok) |
-| [rule_csi_delete_of_missing_object_answers_ok](#rule_csi_delete_of_missing_object_answers_ok) | [bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument](#bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument), [bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser](#bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser) |
-| [rule_csi_call_on_missing_object_answers_not_found](#rule_csi_call_on_missing_object_answers_not_found) | [bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument](#bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument), [bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser](#bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser) |
-| [rule_csi_publish_to_missing_node_answers_not_found](#rule_csi_publish_to_missing_node_answers_not_found) | [bug_plugin_ctrl_publish_volume_node_id_never_checked](#bug_plugin_ctrl_publish_volume_node_id_never_checked) |
-| [rule_csi_volume_from_source_reports_its_source](#rule_csi_volume_from_source_reports_its_source) | [bug_plugin_ctrl_create_volume_response_has_no_content_source](#bug_plugin_ctrl_create_volume_response_has_no_content_source) |
-| [rule_csi_validate_confirms_only_supported_capabilities](#rule_csi_validate_confirms_only_supported_capabilities) | [bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability](#bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability) |
-| [rule_csi_create_volume_capacity_range_honoured](#rule_csi_create_volume_capacity_range_honoured) | [bug_plugin_ctrl_create_volume_capacity_range_not_honoured](#bug_plugin_ctrl_create_volume_capacity_range_not_honoured) |
-| [rule_csi_ids_within_size_limit](#rule_csi_ids_within_size_limit) | [bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes](#bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes) |
-| [rule_csi_stage_honours_the_volume_capability](#rule_csi_stage_honours_the_volume_capability) | [dataloss_plugin_node_stage_formats_block_volume](#dataloss_plugin_node_stage_formats_block_volume), [bug_plugin_node_reader_only_volume_staged_read_write](#bug_plugin_node_reader_only_volume_staged_read_write) |
-| [rule_csi_unstage_undoes_stage](#rule_csi_unstage_undoes_stage) | [bug_plugin_node_unstage_no_logout](#bug_plugin_node_unstage_no_logout) |
-| [rule_csi_unpublish_removes_what_publish_created](#rule_csi_unpublish_removes_what_publish_created) | [bug_plugin_node_publish_failure_leaves_target_path](#bug_plugin_node_publish_failure_leaves_target_path), [bug_plugin_node_unpublish_leaves_target_path](#bug_plugin_node_unpublish_leaves_target_path) |
-| [rule_csi_concurrent_calls_on_a_volume_handled](#rule_csi_concurrent_calls_on_a_volume_handled) | [bug_plugin_ctrl_volume_lock_never_taken](#bug_plugin_ctrl_volume_lock_never_taken), [bug_plugin_node_no_per_volume_lock](#bug_plugin_node_no_per_volume_lock) |
-| [rule_csi_list_snapshots_by_missing_id_answers_empty](#rule_csi_list_snapshots_by_missing_id_answers_empty) | [crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot](#crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot), [bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument](#bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument) |
-
-### Crashes
-[Crashes](#crashes)
-
-Panics the code can reach, and the missing recovery that lets each one end the
-process. The gRPC server recovers none
-([crash_plugin_grpc_server_has_no_panic_recovery](#crash_plugin_grpc_server_has_no_panic_recovery)),
-so each crashes the controller or the node, and every call after it fails until
-the process has restarted.
-
-#### crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error
-
-| | |
-|---|---|
-| Where | `pkg/driver/iscsi_driver.go:524`, `DeleteSnapshot` |
-| What happens | the error of the snapshot delete is read with `err.GetCode()` before it is checked, and a successful delete returns no error |
-| Effect | every successful DeleteSnapshot of a zvol snapshot crashes the controller: the snapshot is gone, and the CO gets no reply |
-| Evidence | every live cycle on the current code, in controller B; code reading |
-| Assigned to | this document's stage 1 ([question 16](#16-td_plugin_delete_snapshot_crash_fix_in_first_stage)); What changes, which names its item, is not written yet |
-
-#### crash_plugin_ctrl_list_snapshots_by_id_reads_nil_snapshot
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:833-870`, `ListSnapshots` with `snapshot_id` |
-| What happens | the condition is inverted: the entry is built when the read failed, from a nil snapshot, and a successful read falls through to `return nil, nil`; a snapshot that does not exist is answered InvalidArgument (`:834-835`) |
-| Effect | a snapshot that exists is answered with an empty list; a missing one with InvalidArgument; a failed read of another kind crashes the controller |
-| Evidence | the empty list in cycle `20261123-110200`; the rest by code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### crash_plugin_ctrl_list_volumes_reads_nil_snapshot_of_clone_source
-
-| | |
-|---|---|
-| Where | `pkg/controller/listers.go:193-216`, `:239-262`, `completeListResponseFromVolume`; the inverted check at `:196`, `:242` |
-| What happens | the content source of a clone is built when `NewSnapshotDescFromSDS` failed, from a nil descriptor, and not when it succeeded. In both cases the descriptor is built on the listed volume itself, where the snapshot belongs to the volume of the origin, `v.OriginVolume()`. The branch beside it (`:205-213`, `:251-259`) reads the name of the origin's snapshot as the ID of the source volume, and the intermediate snapshot of a clone carries the clone's own name (`pkg/driver/iscsi_driver.go:160-173`). `VolumeComply` reads both parts of the origin as they are (`pkg/controller/controllerplugin.go:465`, `:474-477`) |
-| Effect | ListVolumes crashes the controller on a clone of a snapshot whose name starts with `s` and is in none of the plugin's forms, such as one made by hand, never reports a snapshot as a volume's source, and reports a clone of a volume as cloned from itself. With the check alone turned round, a volume restored from a snapshot would be listed with a snapshot ID that names the restored volume, not the volume the snapshot was taken of |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### crash_plugin_grpc_server_has_no_panic_recovery
-
-| | |
-|---|---|
-| Where | `pkg/pluginserver/pluginserver.go:70`, `:121-134`, `grpcErrorHandler` |
-| What happens | the one interceptor of the server logs an error and recovers no panic |
-| Effect | any panic in a handler ends the process |
-| Evidence | code reading; every crash of the live cycles |
-| Assigned to | not this document: a later record on panic recovery, kub-testing T15 ([question 8](#8-td_plugin_panic_recovery_later_record)) |
-
-#### crash_plugin_node_stage_reads_nil_volume_capability
-
-| | |
-|---|---|
-| Where | `pkg/node/iscsi_stage.go:112`, `ISCSiStageVolume` |
-| What happens | the capability of the request is read without a check that it is set, after the login |
-| Effect | a NodeStageVolume without a capability crashes the node plugin and leaves the session logged in |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### crash_plugin_driver_snapshot_name_empty
-
-| | |
-|---|---|
-| Where | `pkg/driver/snapid.go:153-172`, `Name`, `SDS` and `CSIID`; `:145`, `NewSnapshotDescFromCSIID`; the lines that read a snapshot's name: `pkg/controller/controllerplugin.go:363` (CreateVolume from a snapshot), `:692`, `:696`, `:709` (CreateSnapshot, which takes the name unchecked at `:680`), `:762`, `:764` (DeleteSnapshot), `:831` (ListSnapshots), and `pkg/driver/iscsi_driver.go:556`, `:566` (DeleteSnapshot) |
-| What happens | the accessors panic when their field is empty, and a descriptor read back from a snapshot ID has no name in three cases: in the hash form, which the plugin gives only to a name longer than the 128 bytes CSI allows; in the legacy form `s_` (`snapid.go:86-88`, [question 27](#27-td_plugin_driver_legacy_prefixes_read_as_own)); and when the snapshot part is in none of the plugin's forms, which `NewSnapshotDescFromCSIID` lets through by dropping the error of `parseSDS`. The lines that name the snapshot in a log line or a message then read the empty name, as an argument Go evaluates at any log level. CreateSnapshot does not check the name of its request: an empty name takes the base32 form, the snapshot `sb_` is made, and the Debug line after the create reads its empty name |
-| Effect | a message or a reply that names a snapshot without a name crashes the controller. DeleteSnapshot of an ID such as `ss_…`, `s_…` or `zz_x_dnBfYQ==` crashes it once the appliance has answered, whether the snapshot exists or not, and goes on doing so after [crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error](#crash_plugin_driver_iscsi_delete_snapshot_reads_code_of_nil_error) is fixed; CreateSnapshot with an empty name leaves `sb_` on the appliance and crashes it |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### crash_plugin_ctrl_main_ignores_setup_error
-
-| | |
-|---|---|
-| Where | `app/joviandssplugin/main.go:124-126`; `pkg/controller/controllerplugin.go:182-200`, `:221`, `SetupControllerPlugin`; `pkg/driver/iscsi_driver.go:430`, `NewJovianDSSCSIISCSiDriver` |
-| What happens | the error of `GetPluginServer` is dropped, and `Run` is called on what it returned; the error of `Run` is dropped too, and `main` then exits with status 0 (`main.go:59`). When the configuration of the iSCSI build has no `iscsi` section, setup makes no driver and returns success where it fails. The error of the REST client's setup is dropped as well, by the driver and by the controller: the REST module keeps it and returns it from every request (`pkg/rest/rest.go:49-66`), and ADR 0002 leaves making the start fail on it to this document |
-| Effect | a setup that fails starts no server: `GetPluginServer` logs the cause at Warn (`pkg/pluginserver/pluginserver.go:58`, `:66`, `:90`, `:98`), and the plugin then ends on a nil pointer, its last words the trace of the panic. A setup without the `iscsi` section crashes the controller on its first call. A REST client that cannot be set up, for an `idletimeout` that is missing or no duration, for no address or for a `cafile` that cannot be read among other faults, starts the plugin, and every call that needs the appliance fails with the setup error |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet; the process ends with the error ([question 12](#12-td_plugin_failed_setup_ends_process)) |
-
-### False success
-[False_success](#false-success)
-
-Calls that answer success for a state that does not exist.
-
-#### bug_plugin_node_iscsi_login_failure_ignored
-
-| | |
-|---|---|
-| Where | `pkg/node/iscsi_stage.go:81-122`, `ISCSiStageVolume` |
-| What happens | every failure of discovery, node record or login moves on to the next address, and the function returns success when none is left |
-| Effect | NodeStageVolume answers success with nothing mounted at the staging path, and the pod's writes land on the node's disk |
-| Evidence | code reading; never run on a real volume ([gap_lab_iscsi_node_stage_with_a_real_volume](#gap_lab_iscsi_node_stage_with_a_real_volume)) |
-| Assigned to | this document's stage 1 ([Decision](#decision)); What changes, which names its item, is not written yet |
-
-#### bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted
-
-| | |
-|---|---|
-| Where | `pkg/node/iscsi_stage.go:101-106`, `:122` |
-| What happens | a login refused because a session exists deletes the node record and moves on, and the function returns success |
-| Effect | a repeated NodeStageVolume answers success without a look at the staging path: with nothing mounted when an earlier call left a session and no mount, as the crash of [crash_plugin_node_stage_reads_nil_volume_capability](#crash_plugin_node_stage_reads_nil_volume_capability) does, or is still staging; after a stage that succeeded, its mount is still in place |
-| Evidence | code reading; the refused login was seen on the node code before the merge (kub-testing F6) |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_expand_volume_answers_success_without_expanding
-
-| | |
-|---|---|
-| Where | `pkg/node/nodeplugin.go:69-74` |
-| What happens | NodeExpandVolume answers success and does nothing; the node does not advertise expansion |
-| Effect | a CO that calls it is told the file system grew |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-### Data loss and corruption
-[Data_loss_and_corruption](#data-loss-and-corruption)
-
-Faults that destroy data, or let it be changed where it should not be.
-
-#### dataloss_plugin_driver_iscsi_delete_snapshot_deletes_clones_named_like_snapshots
-
-| | |
-|---|---|
-| Where | `pkg/driver/iscsi_driver.go:529`, `DeleteSnapshot` |
-| What happens | when the delete of a snapshot is refused for its clones, every clone whose name starts with `s` is deleted: `IsSDS` reads the first letter only |
-| Effect | a volume cloned by hand from the snapshot under such a name, `staging-db` for instance, is deleted |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### dataloss_plugin_node_stage_formats_block_volume
-
-| | |
-|---|---|
-| Where | `pkg/node/host.go:90-125`, `FormatMountVolume`; `pkg/node/iscsi_stage.go:112` |
-| What happens | NodeStageVolume formats and mounts whatever capability it gets; a block capability is refused at node publish only (`pkg/node/publish.go:48-50`) |
-| Effect | staging a volume asked for as a block device puts a file system on it when the device carries none, and what was written to it as a raw device is lost |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_reader_only_volume_staged_read_write
-
-| | |
-|---|---|
-| Where | `pkg/node/host.go:90-125`, `FormatMountVolume` |
-| What happens | the staging mount takes no read-only option for a SINGLE_NODE_READER_ONLY volume |
-| Effect | a read-only volume is staged read-write, and may be formatted or repaired at stage |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_ctrl_create_volume_access_mode_not_checked
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:523-527`, `CreateVolume` |
-| What happens | CreateVolume checks only that capabilities are present, not their access mode or their type; the list of the modes the controller supports is one for both builds (`:80-88`) |
-| Effect | a multi-node writer volume is made, and nothing stops two nodes from attaching its LUN read-write; the example claims ask for ReadWriteMany (`deploy/example/nginx-pvc.yaml:7`) |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet; each build gets a list of its own, and the NFS build's holds the multi-node modes ([question 26](#26-td_plugin_ctrl_nfs_build_accepts_multi_node_access_modes)) |
-
-### CSI answers
-[CSI_answers](#csi-answers)
-
-Calls that answer with a code or a content the specification does not give,
-or answer one case otherwise than the other calls do.
-
-#### bug_plugin_ctrl_id_not_in_plugin_form_answered_invalid_argument
-
-| | |
-|---|---|
-| Where | `pkg/driver/lunid.go:158-163`, `NewVolumeDescFromCSIID`, and the calls that parse an ID through it; DeleteVolume answers the same code from its own path (`pkg/controller/controllerplugin.go:603`, [bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser](#bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser)); for a snapshot ID, `pkg/driver/snapid.go:124-125`, `NewSnapshotDescFromCSIID`, in DeleteSnapshot and ListSnapshots, and `pkg/controller/controllerplugin.go:366`, CreateVolume from a snapshot |
-| What happens | a volume ID that breaks the appliance's name rules, or is in none of the plugin's forms, is answered InvalidArgument (ADR 0002). One with the prefix `vb_` whose base32 does not decode comes back as the decoder's own error (`lunid.go:131-132`), which the calls that return the parser's error pass on, so the CO gets Unknown. A snapshot ID of fewer than three parts, as each one csi-sanity makes up is, is answered InvalidArgument by its parser, and CreateVolume answers InvalidArgument to any snapshot source its parser refuses |
-| Effect | csi-sanity's made-up IDs get InvalidArgument where it expects NotFound, an empty list or, from a delete, success. Four tests of controller A fail on it. Four tests of controller B meet it as well, which the crash has kept from every cycle: CreateVolume from the snapshot `non-existing-snapshot-id`, ListSnapshots by the snapshot `none-exist-id` and by a made-up source volume, and DeleteSnapshot of `reallyfakesnapshotid` |
-| Evidence | both live cycles on the current code, for controller A; for controller B, code reading and csi-test v5.6.0, `pkg/sanity/controller.go:518`, `:1018`, `:1070`, `:1308`, whose tests ran after the crash in cycle `20261123-231354` and were answered Unavailable |
-| Assigned to | not assigned: What changes is not written yet; the calls questions [5](#5-td_plugin_ctrl_delete_volume_unknown_id_answers_ok) and [21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects) list answer an ID the plugin cannot have made as an object that does not exist, after the check of the missing fields; ControllerUnpublishVolume answers OK and CreateSnapshot InvalidArgument ([question 23](#23-td_plugin_ctrl_unpublish_of_missing_volume_answers_ok)) |
-
-#### bug_plugin_ctrl_delete_volume_and_clone_source_ids_skip_csi_id_parser
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:373`, `:584` |
-| What happens | the source volume of CreateVolume and the volume of DeleteVolume go to `NewVolumeDescFromVDS` directly, past the checks of `NewVolumeDescFromCSIID` |
-| Effect | the two calls answer an ID the plugin cannot have made otherwise than the other calls do, until questions [5](#5-td_plugin_ctrl_delete_volume_unknown_id_answers_ok) and [21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects) give every call one reading |
-| Evidence | code reading; both live cycles |
-| Assigned to | not assigned: What changes is not written yet; the calls questions [5](#5-td_plugin_ctrl_delete_volume_unknown_id_answers_ok) and [21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects) list answer an ID the plugin cannot have made as an object that does not exist, after the check of the missing fields; ControllerUnpublishVolume answers OK and CreateSnapshot InvalidArgument ([question 23](#23-td_plugin_ctrl_unpublish_of_missing_volume_answers_ok)) |
-
-#### bug_plugin_ctrl_create_volume_response_has_no_content_source
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:547-549`, `:559-561`, `CreateVolume` |
-| What happens | both return paths set the volume's ID and its capacity only |
-| Effect | a volume made from a snapshot or from a volume is answered without its content source |
-| Evidence | cycle `20261123-231354`; code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_ctrl_validate_volume_capabilities_confirms_no_capability
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:984-1035`, `ValidateVolumeCapabilities` |
-| What happens | `confirmed` holds `cp.vCap`, which nothing sets; the loop that finds an unsupported access mode sets a variable that only an empty `if` reads; the check of the volume context tests the capabilities again |
-| Effect | every call is answered as confirmed with an empty list, for supported and unsupported capabilities alike |
-| Evidence | both live cycles; code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_ctrl_publish_volume_node_id_never_checked
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:884`, `:910`; `pkg/driver/iscsi_driver.go:594`, `PublishVolume`, which takes no node ID |
-| What happens | the node ID of the request is logged and used nowhere: an empty one is not refused either, and the capability is checked only after the volume ID is read (`:888-901`) |
-| Effect | a publish to a node that does not exist succeeds and makes a target. csi-sanity's tests of a publish without a node ID and without a capability pass only because the made-up volume ID they send is refused first |
-| Evidence | both live cycles; code reading; in the controller's log of cycle `20261123-231354` the volume ID's parser refuses a `fake-vol-id-…` four times, two more than the tests of a volume that does not exist account for, which fits the tests of a publish without a node ID and without a capability |
-| Assigned to | the check that the node exists: not this document, later work, kub-testing T17 ([question 20](#20-td_plugin_ctrl_publish_node_not_checked)). The refusal of a request without a node ID or a capability, before the volume ID is read: not assigned, What changes is not written yet ([question 21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects)) |
-
-#### bug_plugin_ctrl_rest_error_codes_without_csi_answer
-
-| | |
-|---|---|
-| Where | the switches of `pkg/controller/controllerplugin.go` (Table 3) |
-| What happens | the eleven codes no call reads reach a call's default: Internal; CreateVolume turns any status of its check but OK, NotFound and AlreadyExists into Unknown (`:553`); ControllerPublishVolume answers "Unknown internal error" without the text of the REST error (`:948`) |
-| Effect | a refused connection, a timeout, a failed login and a missing pool all reach the sidecars alike, so they cannot tell a fault that a retry cures from one that needs an operator; a failed publish says nothing of why |
-| Evidence | code reading; of the three connection resets of cycle `20261123-231354`, the one in a publish reached csi-sanity as "Unknown internal error", and the two in an unpublish as Internal with the text of the REST error; ADR 0002 question 70; kub-testing F32 |
-| Assigned to | not assigned: What changes is not written yet; each switch of the controller holds its answers ([Decision](#decision)), and a failure the specification names no code for is answered Internal with its cause ([question 18](#18-td_plugin_ctrl_rest_failure_without_spec_code_answers_internal)); the mapping by kind of failure is later work, kub-testing T18, and until it is done a sidecar still cannot tell a fault a retry cures from one that needs an operator |
-
-#### bug_plugin_ctrl_create_volume_already_exists_message_prints_requested_size
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:454`, `:458`, `VolumeComply` |
-| What happens | the message gives the requested size where the size of the existing volume belongs |
-| Effect | below the minimum, the message compares the requested size with itself (`:454`); above the limit, it gives the requested size as the existing volume's (`:458`) |
-| Evidence | cycle `20261123-110200` |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_ctrl_create_volume_capacity_range_not_honoured
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:384-396`, `createNewVolume`; `pkg/driver/iscsi_driver.go:72-85`, `CreateVolume` |
-| What happens | both functions check for equal sizes before they apply the minimum. With no capacity range both sizes are 0, so the driver asks the appliance for 0 bytes. A required size above the limit is not refused. A volume made from a source keeps the size 0 it was given |
-| Effect | a request without a range asks for 0 bytes; an impossible range is accepted; a clone or a restore is answered with a capacity of 0 |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_driver_iscsi_clone_retry_after_leftover_snapshot_answers_already_exists
-
-| | |
-|---|---|
-| Where | `pkg/driver/iscsi_driver.go:160-170`, `CreateVolumeFromVolume` |
-| What happens | when the intermediate snapshot of a clone exists already, the function deletes it and returns the "exists" error |
-| Effect | a retried clone is answered AlreadyExists, the code the specification gives for a volume that exists with other properties |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_ctrl_create_snapshot_name_taken_on_other_volume_answers_ok
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:675-712`, `CreateSnapshot`; `pkg/driver/iscsi_driver.go:485-498`, `CreateSnapshot` |
-| What happens | the snapshot's name on JovianDSS comes from the CSI name alone (`controllerplugin.go:680`), and the snapshot is made under the source volume of the request; no snapshot of that name under another volume is looked for. A snapshot of that name under the same volume is read back and answered as the one asked for (`:689-690`, `:701-712`) |
-| Effect | a CreateSnapshot with the name of another volume's snapshot makes a second snapshot and answers OK, where the specification gives AlreadyExists; csi-sanity's "should fail when requesting to create a snapshot with already existing name and different source volume ID" fails on it. Kubernetes gives each snapshot a name of its own, `snapshot-<UUID>` ([question 24](#24-td_plugin_driver_snapshot_id_within_128_bytes)), so the request comes from csi-sanity or another CO |
-| Evidence | code reading; csi-test v5.6.0, `pkg/sanity/controller.go:1388`, whose test ran after the crash in cycle `20261123-231354` and was answered Unavailable |
-| Assigned to | not assigned: What changes is not written yet; CreateSnapshot checks the exact name against the pool's snapshots before it makes one ([question 28](#28-td_plugin_ctrl_create_snapshot_name_checked_on_pool)) |
-
-### Names and IDs
-[Names_and_IDs](#names-and-ids)
-
-Faults in how the plugin builds a name or an ID and reads it back.
-
-#### bug_plugin_driver_snapshot_csi_id_can_exceed_128_bytes
-
-| | |
-|---|---|
-| Where | `pkg/driver/snapid.go:30-61`, `NewSnapshotDescFromName` |
-| What happens | the snapshot ID is the snapshot's name, `_`, and the base64 of its volume's name; a snapshot's name on JovianDSS has up to 243 characters and a volume's up to 128, so the ID reaches 416 characters, and 384 from names within the 128 bytes CSI allows a CO to send |
-| Effect | a snapshot of a long name, or of a volume with a long name, is answered with an ID longer than the 128 bytes CSI allows; the names Kubernetes generates give 113, a `snapshot-<UUID>` snapshot of a `pvc-ns-<UUID>` volume, from the prefixes the manifests set (`deploy/joviandss/iscsi/joviandss-csi-controller.yaml:150`) and the snapshotter's default |
-| Evidence | code reading; ADR 0002 lowered the thresholds of a volume's name to 125 and left the snapshot's |
-| Assigned to | not assigned: What changes is not written yet; a snapshot ID never longer than 128 bytes ([question 24](#24-td_plugin_driver_snapshot_id_within_128_bytes)) |
-
-#### bug_plugin_driver_snapshot_name_length_unchecked_against_appliance_limit
-
-| | |
-|---|---|
-| Where | `pkg/driver/snapid.go:37-55`, `NewSnapshotDescFromName`; `pkg/driver/lunid.go:177-187`, `checkApplianceName` |
-| What happens | a snapshot takes the plain form up to 239 characters and the base32 form up to 240, so its name on JovianDSS reaches 242 or 243, and 211 from a name within the 128 bytes CSI allows, while the plugin holds a volume name to 131, one less than the 132 JovianDSS takes |
-| Effect | a CreateSnapshot of a long name may be refused by JovianDSS, where the hash form would fit |
-| Evidence | code reading; the limit of a snapshot name is not recorded ([gap_jdss_rest_snapshot_name_length_limit](#gap_jdss_rest_snapshot_name_length_limit)) |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_driver_plain_name_read_back_drops_underscores
-
-| | |
-|---|---|
-| Where | `pkg/driver/lunid.go:117`, `:126-128`, `NewVolumeDescFromVDS`; `pkg/driver/snapid.go:65`, `:75-77`, `parseSDS` |
-| What happens | a plain name is split at every `_`, and the parts after the prefix are joined with nothing between them, for a volume's `vp_` and a snapshot's `sp_` alike |
-| Effect | `vp_my_volume` is read back with the name `myvolume`, and `sp_my_snap` with `mysnap`; the names are used in messages only (`pkg/driver/iscsi_driver.go:292`, `pkg/driver/nfs_driver.go:364`), and every request to JovianDSS keeps the full name |
-| Evidence | code reading; review D9 (`review/2026-10-02-code-review.md`) |
-| Assigned to | not assigned: What changes is not written yet |
-
-### Leftovers and concurrent calls
-[Leftovers_and_concurrent_calls](#leftovers-and-concurrent-calls)
-
-Objects a call leaves behind on the appliance or on the node, and calls on one
-volume that run at once.
-
-#### bug_plugin_driver_iscsi_publish_cleanup_deletes_target_by_hash_not_iqn
-
-| | |
-|---|---|
-| Where | `pkg/driver/iscsi_driver.go:648-649`, `PublishVolume` |
-| What happens | when the attach fails because the volume does not exist, the cleanup deletes the target by its bare hash, while it was made under the full IQN |
-| Effect | the empty target stays on the appliance |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_unstage_no_logout
-
-| | |
-|---|---|
-| Where | `pkg/node/nodeplugin.go:156`; `pkg/node/stage.go:50-66`; `pkg/node/iscsi_stage.go:126-194` |
-| What happens | NodeUnstageVolume only unmounts; the function that would log out is called by nothing, and cannot be called from there as it is: it takes a stage request and reads the target from the publish context, which an unstage request does not carry (`iscsi_stage.go:126`, `:143-177`) |
-| Effect | one session and one device are left per volume unstaged, and after the target is deleted the session tries to recover for ever |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_publish_failure_leaves_target_path
-
-| | |
-|---|---|
-| Where | `pkg/node/nodeplugin.go:194-205`, `NodePublishVolume` |
-| What happens | the target path is created before the request is checked and before the bind mount; a failure after that leaves the path |
-| Effect | a NodePublishVolume without a capability leaves `…/mount/target` in csi-sanity's directory, which csi-sanity then cannot remove or create again: 22 tests of the node preset fail on it |
-| Evidence | cycle `20261123-231354`, the node preset's log |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_unpublish_leaves_target_path
-
-| | |
-|---|---|
-| Where | `pkg/node/publish.go:60-75`, `UnpublishVolume` |
-| What happens | NodeUnpublishVolume unmounts the target path and leaves it |
-| Effect | the path that NodePublishVolume created stays on the node |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_ctrl_volume_lock_never_taken
-
-| | |
-|---|---|
-| Where | `pkg/controller/controllerplugin.go:228-260`, `lockVolume` and `unlockVolume` |
-| What happens | the lock per volume is defined and never taken; the map it keeps the volumes in (`:97`) is never made, so the first `lockVolume` would panic on a write to a nil map (`:236`) |
-| Effect | two calls on one volume run at once |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet; the lock is taken ([question 9](#9-td_plugin_lock_per_volume_taken)) |
-
-#### bug_plugin_node_no_per_volume_lock
-
-| | |
-|---|---|
-| Where | `pkg/node/nodeplugin.go:99-232`, the node calls |
-| What happens | the node takes no lock per volume |
-| Effect | a retried stage runs beside the first; with [bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted](#bug_plugin_node_iscsi_stage_retry_with_live_session_reports_success_unmounted) it answers success with nothing mounted |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-### Node
-[Node](#node)
-
-The faults of the node path that the catalogues above do not hold.
-
-#### bug_plugin_node_requests_not_validated
-
-| | |
-|---|---|
-| Where | `pkg/node/nodeplugin.go:99-232` |
-| What happens | no node call checks its volume ID, its paths or its capability before it acts |
-| Effect | a request without its volume ID or its path is answered Internal from `mkdir`, or success from an unmount |
-| Evidence | the node preset of both live cycles; code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_capabilities_list_unknown
-
-| | |
-|---|---|
-| Where | `pkg/node/nodeplugin.go:37` |
-| What happens | the node advertises the capability UNKNOWN, the empty value of the type, beside STAGE_UNSTAGE_VOLUME |
-| Effect | the CO reads a capability that means nothing |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_device_not_waited_for_after_login
-
-| | |
-|---|---|
-| Where | `pkg/node/iscsi_stage.go:111-112` |
-| What happens | the device path is formatted and mounted right after the login, without a wait for it to appear |
-| Effect | a stage fails now and then, when the device appears late |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_mount_check_errors_ignored
-
-| | |
-|---|---|
-| Where | `pkg/node/host.go:217`; `pkg/node/publish.go:52` |
-| What happens | the error of `IsMountPoint` is ignored, so a mount that cannot be read counts as no mount |
-| Effect | a stale mount is left in place by an unpublish, or bound over by a node publish |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_errors_not_grpc_status
-
-| | |
-|---|---|
-| Where | `pkg/node/host.go:220` |
-| What happens | an unmount failure is returned as a plain error |
-| Effect | the CO gets Unknown |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_node_commands_ignore_call_deadline
-
-| | |
-|---|---|
-| Where | `pkg/node/iscsi_stage.go:85-114` |
-| What happens | `iscsiadm` and the format run without the call's context and without a timeout |
-| Effect | a command that hangs outlives its call and runs beside the CO's retry |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-### Connections and time
-[Connections_and_time](#connections-and-time)
-
-Faults of the REST module, the driver and the deployment against the
-appliance's own times.
-
-#### bug_plugin_driver_iscsi_publish_target_wait_does_not_wait
-
-| | |
-|---|---|
-| Where | `pkg/driver/iscsi_driver.go:664-680`, `PublishVolume` |
-| What happens | the wait for the new target sleeps only on ResourceDNE, and a missing target is ResourceDNETarget in the REST module's catalogue; a target that is not yet active is read again at once |
-| Effect | the three reads follow each other at once, and a target that becomes readable a moment later fails the publish with a timeout |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-#### bug_plugin_rest_reused_connection_reset_after_slow_request
-
-| | |
-|---|---|
-| Where | `pkg/rest/rproxy.go:222`, the transport; `:94-104`, `Send` |
-| What happens | the REST module keeps connections alive; three requests soon after a slow publish were reset, two DELETEs of a target and one POST of a LUN, a reused connection being the likely cause, not shown ([gap_jdss_rest_connection_reset_cause](#gap_jdss_rest_connection_reset_cause)); Go's client does not send a DELETE or a POST again on a new connection |
-| Effect | the request fails with `connection reset by peer`, and csi-sanity's lifecycle tests fail on it |
-| Evidence | three resets in cycle `20261123-231354`; Go's `net/http` documentation |
-| Assigned to | not this document: later work, kub-testing T19; here connections stay kept alive, and a cycle at Debug records the cause (questions [10](#10-td_plugin_rest_connections_kept_alive_reset_fix_later) and [17](#17-td_lab_debug_cycle_allowed)) |
-
-#### bug_plugin_rest_request_timeout_shorter_than_appliance_delete
-
-| | |
-|---|---|
-| Where | `pkg/rest/rproxy.go:223`, the timeout from `idletimeout` |
-| What happens | one timeout serves every request, 30 s in the configuration example, and a volume delete in a pool of a hundred volumes or more can take longer |
-| Effect | DeleteVolume ends in a timeout while the appliance goes on deleting |
-| Evidence | the hurl recordings ([Measurements](#measurements)) |
-| Assigned to | not assigned: What changes is not written yet; a default of 120 s for `idletimeout` ([question 11](#11-td_plugin_timeouts_config_key_and_sidecar_flags)) |
-
-#### bug_plugin_sidecar_timeout_shorter_than_publish_and_delete
-
-| | |
-|---|---|
-| Where | `deploy/joviandss/iscsi/joviandss-csi-controller.yaml:146-175`, the provisioner and attacher containers |
-| What happens | the manifests set no `--timeout`, so each call gets the sidecars' default of 15 s; a publish takes about 25 s at the median times, and a volume delete over 15 s is common in a large pool |
-| Effect | the first ControllerPublishVolume of a volume times out at the attacher, which sends it again after a backoff; the second runs beside the first, which goes on, since the plugin takes no lock and its requests carry no deadline |
-| Evidence | the sidecars' READMEs; Table 12; not seen live |
-| Assigned to | not assigned: What changes is not written yet; the manifests set `--timeout` to 60 s for the attacher and 150 s for the provisioner ([question 11](#11-td_plugin_timeouts_config_key_and_sidecar_flags)), as `docs/configuration.md` describes |
-
-### Security findings
-[Security_findings](#security-findings)
-
-What the iSCSI build exposes.
-
-#### security_plugin_ctrl_iscsi_target_admits_any_initiator
-
-| | |
-|---|---|
-| Where | `pkg/driver/iscsi_driver.go:614-619`, `PublishVolume`, the target create |
-| What happens | the target is made with its name and `active` only; the recorded reply of a target made so has no CHAP user and empty allow and deny lists |
-| Effect | as far as the recordings show, any initiator that reaches the appliance may log in to a published volume ([gap_jdss_rest_target_empty_allow_list_meaning](#gap_jdss_rest_target_empty_allow_list_meaning)) |
-| Evidence | code reading; the recorded target replies |
-| Assigned to | not this document: a later record on target access, CHAP per node and one target per node, kub-testing T14 ([question 7](#7-td_plugin_target_access_per_node_later_record)) |
-
-#### security_plugin_node_debug_log_prints_volume_capability
-
-| | |
-|---|---|
-| Where | `pkg/node/nodeplugin.go:113`; `deploy/joviandss/iscsi/joviandss-csi-node.yaml:102` |
-| What happens | the node logs the whole volume capability at Debug, with its mount flags, and the node's manifest in `deploy/` sets the log level to Debug, while the lab runs the controller at Info |
-| Effect | a mount flag that holds a secret reaches the node's log |
-| Evidence | code reading |
-| Assigned to | not assigned: What changes is not written yet |
-
-### Dead code
-[Dead_code](#dead-code)
-
-What nothing in the current code uses; the work removes or uses each.
-
-- **Files:** `pkg/node/targetapi.go` and `pkg/node/target.go`, 590 lines: the
-  type `Target` and its eleven functions, which nothing outside the two files
-  uses. The two files also hold what the live code reads, and that has to
-  move before they go: the constant `deviceIPPath` (`targetapi.go:43`, read at
-  `pkg/node/iscsi_stage.go:111`) and the types `statFunc` and `globFunc`
-  (`targetapi.go:565-566`, read at `pkg/node/host.go:58`).
-- **Functions:** `lockVolume` and `unlockVolume`
-  (`pkg/controller/controllerplugin.go:228-260`), `getStandardID` (`:262`),
-  `getRandomName` (`:275`) and `getRandomPassword` (`:290`), `parseOrigin`
-  with its type `origin` (`:115-140`) and `GetVolumeCapability`
-  (`:1095-1107`); `cloneLUN` (`pkg/driver/iscsi_driver.go:39-70`) and
-  `nameToID` (`pkg/driver/lunid.go:38-48`); `ISCSiUnStageVolume`
-  (`pkg/node/iscsi_stage.go:126-194`), whose one call is commented out
-  (`pkg/node/stage.go:64`), `UnStageVolume` (`pkg/node/stage.go:50-66`), which
-  holds that call and is called by nothing, `UMountDevice`
-  (`pkg/node/host.go:163-185`), which only `ISCSiUnStageVolume` calls, and
-  `waitForPathToExist` with `waitForPathToExistInternal`
-  (`pkg/node/host.go:54-87`), which only `targetapi.go:519` calls.
-- **Fields and variables:** the field `vCap`
-  (`pkg/controller/controllerplugin.go:112`), read at `:1031` and never set;
-  the variable `supported` of ValidateVolumeCapabilities (`:984`), read only by
-  an empty `if` (`:1021`); the fields `re`, set up at `:221` and never read,
-  `capabilities`, `snapReg`, `nfsd` and `iscsid` of `ControllerPlugin`
-  (`:95-111`), and `volumesInProcess` (`:97`), which only the unused lock
-  reads; the field `isIntermidiateSnapshot` (`pkg/driver/snapid.go:23`); the
-  constant `MaxVolumeNameLength` (`pkg/driver/lunid.go:32`); the check of a
-  target name longer than 255 characters
-  (`pkg/driver/iscsi_driver.go:610-612`), which a name of 64 hex digits never
-  meets.
-- **Keys:** `namelen` and `passlen` of the `iscsi` section
-  (`pkg/common/common.go:83-84`), which nothing reads.
-
-### Measurements
-[Measurements](#measurements)
-
-**Lines of Go outside the tests, per package, on `03fc012`:**
-
-**Table 11 — Size of the packages** · `tbl_package_sizes`
-
-| Package | Lines | Files | Of which |
-|---|---|---|---|
-| `pkg/controller` | 1,412 | 2 | |
-| `pkg/node` | 1,622 | 9 | the NFS stage and publish, 205; the two unused files of [Dead code](#dead-code), 590 |
-| `pkg/driver` | 2,586 | 12 | the NFS driver, 782 |
-| `pkg/pluginserver` | 134 | 1 | |
-| `pkg/rest` | 3,837 | 20 | |
-
-**Request times of the successful requests of JovianDSS 1 `1.0up33.65410` on
-API v4, over all hurl runs in `jdss-rest-api-spec/empirical/hurl/out/` (the
-repository at `434c9cd`):**
-
-**Table 12 — Request times of the appliance** · `tbl_appliance_request_times`
-
-| Request | Median | 90th percentile | Longest | Count |
-|---|---|---|---|---|
-| `POST pools/<p>/san/iscsi/targets` | 10.5 s | 11.7 s | 12.1 s | 323 |
-| `POST .../targets/<t>/luns` | 14.3 s | 16.0 s | 18.2 s | 182 |
-| `GET .../targets/<t>` | 0.5 s | 0.9 s | 1.2 s | 263 |
-| `DELETE .../targets/<t>/luns/<v>` | 4.8 s | 5.3 s | 5.7 s | 131 |
-| `DELETE .../targets/<t>` | 4.8 s | 5.3 s | 5.8 s | 318 |
-| `DELETE pools/<p>/volumes/<v>` | 6.1 s | 52.9 s | 111.9 s | 1722 |
-
-Of the 1722 volume deletes, 346 took longer than 30 s, all in pools that held
-100 to 500 volumes. A new connection had its TLS handshake done after about
-2 ms at the median, over 12,509 connections.
-
-### ID sources
-[ID_sources](#id-sources)
-
-**Table 13 — Where the names and IDs come from** · `tbl_id_sources`
-
-| Names and IDs | Meaning | Source |
-|---|---|---|
-| `crash_`, `bug_`, `dataloss_`, `security_`, `gap_` and `rule_` names | the findings, gaps and rules of this document, each mapped to the older IDs of the reviews and the tracker, and the names of other records' findings that it cites: ADR 0002's, and the NFS build's in Future work | the registry of names, `kub-testing/issues/` |
-| `aopt_` names | the options of this document | this document |
-| `td_` names | the tactical decisions of this document, numbered as the questions were | this document; the registry of names does not hold them |
-| the presets identity, controller A, controller B, controller capacity and node | csi-sanity runs of kub-testing | `kub-testing/tests/csi-sanity/` |
-| T8, T10, T14 to T19, F6, F32, TOOL10 | rows of the kub-testing tracker | `kub-testing/ISSUES.md` |
-| D9 | a finding of the code review of 2026-10-02 | `review/2026-10-02-code-review.md` |
-| items 58 to 74 | items of the plugin's backlog | `review/backlog.md` |
-| D1 to D7 | the items of the earlier document that this one reworks | `docs/design/0003-controller-crash-fixes-design.md` |
-| question 70 of ADR 0002 | a decided question of that record | ADR 0002, its Decisions table |
-
-### Terms
-[Terms](#terms)
-
-**Table 14 — Terms** · `tbl_terms`
-
-| Term | Meaning |
-|---|---|
-| access mode | how a volume may be used: SINGLE_NODE_WRITER, which Kubernetes asks for as ReadWriteOnce; SINGLE_NODE_READER_ONLY; a multi-node writer, asked for as ReadWriteMany, which is not in the controller's list of supported modes today, and which the NFS build goes on accepting ([question 26](#26-td_plugin_ctrl_nfs_build_accepts_multi_node_access_modes)) |
-| allow list | the initiators a target admits; what an empty one admits is a gap ([gap_jdss_rest_target_empty_allow_list_meaning](#gap_jdss_rest_target_empty_allow_list_meaning)) |
-| alpha, GA | a feature of CSI that may still change, and one that is final |
-| build | the plugin's binary and image made for one protocol, iSCSI or NFS, chosen at compile time, with the manifests of that protocol |
-| CHAP | the iSCSI login with a user name and a secret |
-| CO | the container orchestrator, here Kubernetes and its sidecars, which call the plugin |
-| compatibility with CSI v1.9.0 | the second thing the Problem statement asks for: csi-sanity's presets passing, the end-to-end storage tests of Kubernetes passing, and a user's operation showing no issue; the rules of What "compliant" means are what they check of each call |
-| compliant | meeting the rules of What "compliant" means; compatibility with CSI v1.9.0 is what the tests show |
-| content source | the snapshot or volume a new volume is made from |
-| crash | a panic that ends the controller or the node process |
-| CRD | a CustomResourceDefinition, such as those of volume snapshots |
-| CSI | the Container Storage Interface: the specification of the calls between a CO and a storage plugin, at v1.9.0 here |
-| CSI ID | the ID the plugin answers for a volume or a snapshot, which the CO passes to every later call |
-| CSI name | the name the CO gives in CreateVolume or CreateSnapshot |
-| csi-sanity | the conformance test suite of Kubernetes CSI, csi-test v5.6.0 here |
-| cycle | one build, deploy and run of every preset on the lab, kept under its timestamp |
-| discovery | the `iscsiadm` step that asks an address for the targets it offers |
-| DNE | "does not exist", in the names of REST codes |
-| end-to-end storage tests of Kubernetes | the storage tests of Kubernetes' end-to-end suite, which test a CSI driver deployed in a cluster, through its sidecars ([functional testing](https://kubernetes-csi.github.io/docs/functional-testing.html)) |
-| external-attacher | the repository of Kubernetes' attacher sidecar, csi-attacher |
-| fault of operation | a finding that breaks no rule of the specification but the operation of the plugin: the open target, the timeouts, the objects left behind |
-| gRPC | the remote procedure call protocol CSI calls are made in; its status codes are the answers of a call |
-| hurl | the HTTP test tool whose runs recorded the appliance's replies |
-| ID the plugin cannot have made | an ID in none of the plugin's forms (Table 1), such as csi-sanity's made-up IDs; an ID that the appliance's name rules refuse is one of them ([question 21](#21-td_plugin_ctrl_unknown_ids_answered_as_missing_objects)), an ID in a legacy form is not ([question 27](#27-td_plugin_driver_legacy_prefixes_read_as_own)) || initiator | the iSCSI client of a node, known by its initiator name |
-| interceptor | code of the gRPC server that every call passes through |
-| intermediate snapshot | the snapshot of a source volume that the plugin makes to clone it, named like the new volume |
-| IQN | the iSCSI qualified name of a target or an initiator |
-| jdss-rest-api-spec | the sibling repository of the appliance's REST API, with the hurl recordings of what it serves; read only |
-| JovianDSS 1 | the first generation of the appliance's software, the one the plugin and the lab use |
-| kept alive | of a connection: left open after its request, for the next request to use |
-| kub-spec | a local clone of the CSI specification's repository at v1.14.0 |
-| kub-testing | the sibling repository of the lab's tests, tracker and registry of names |
-| lab | the Kubernetes cluster and the appliances that kub-testing runs the plugin on |
-| later record | an ADR of its own that takes a subject this document leaves: target access (kub-testing T14) and panic recovery (T15) |
-| later work | what this document leaves to kub-testing's tracker: the later records, the move to `csi-lib-iscsi` (T16), the check of the node in a publish (T17), the mapping of REST codes (T18) and the fix of the connection reset (T19) |
-| legacy form | a form of a name that the plugin reads and no code writes, `v_` for a volume and `s_` for a snapshot (Table 1, [question 27](#27-td_plugin_driver_legacy_prefixes_read_as_own)) |
-| LUN | the logical unit of a target, here the zvol |
-| multipath | several sessions of a node to one target, over different addresses, used as one device |
-| NAS volume, NAS snapshot | the file system and its snapshot behind an NFS volume |
-| node ID | the ID NodeGetInfo answers for a node, which ControllerPublishVolume gets back |
-| node record | the entry `iscsiadm` keeps on a node for a target and an address, which a login uses |
-| open target | a published iSCSI target that admits any initiator ([security_plugin_ctrl_iscsi_target_admits_any_initiator](#security_plugin_ctrl_iscsi_target_admits_any_initiator)) |
-| operational stage | the first thing the Problem statement asks for, as Options considered reads it: a PVC living its whole life in a real pod on the lab, with the shipped sidecars or the ones that replace them |
-| PersistentVolume | the Kubernetes object that stands for one volume, and that a PVC is bound to |
-| the plugin's form of an ID | an ID in one of the forms of Table 1, the legacy ones included |
-| preset | a set of csi-sanity tests that kub-testing runs together: controller A holds the tests of volumes and publish, controller B those of snapshots |
-| publish | ControllerPublishVolume, which makes the target and attaches the LUN; NodePublishVolume is called a node publish |
-| publish context | the map ControllerPublishVolume answers and NodeStageVolume gets: here the target's IQN, its addresses and the LUN |
-| PVC | a PersistentVolumeClaim, a pod's request for a volume |
-| RBAC | the Kubernetes rules of what a sidecar may read and change |
-| repair | the work this document decides: each call of the iSCSI build fixed where it fails, in its own handler, with the structure of the calls kept ([aopt_plugin_iscsi_repair_each_call_in_place](#aopt_plugin_iscsi_repair_each_call_in_place), [question 4](#4-td_plugin_option_repair_each_call_in_place)); it takes every finding of the Appendix but the four left to later work ([question 2](#2-td_plugin_scope_every_finding_but_later_work)) |
-| REST code | the code of a `RestError` that says what the failure means for the call (ADR 0002) |
-| REST module | `pkg/rest`, the plugin's client of the appliance's REST API (ADR 0002) |
-| session | an iSCSI login of a node to a target, through which the node sees the target's LUNs |
-| sidecar | a container that Kubernetes CSI ships beside a plugin to call it: provisioner, attacher, snapshotter, node driver registrar, livenessprobe, resizer |
-| SP | the storage plugin, in the specification's words: here the JovianDSS plugin |
-| stage | a group of commits of the work, in What changes, written stage 1 and so on, and not the operational stage; said of a node, the work of NodeStageVolume, which attaches and mounts a volume |
-| staging path | the node path where NodeStageVolume mounts a volume once per node |
-| static volume | a PersistentVolume made by hand, whose volume handle a person types |
-| status code | the code of a gRPC answer, written as Go's gRPC package names it, InvalidArgument; the specification writes INVALID_ARGUMENT |
-| target | the iSCSI target on the appliance, made per volume at publish |
-| target path | the path of one pod where NodePublishVolume bind mounts the staged volume |
-| test | one test of csi-sanity; the lifecycle tests are those that create, publish, unpublish and delete one volume |
-| VDS, SDS, descriptor | the volume's and the snapshot's name on the appliance, and the plugin's object that holds a name with its forms (`pkg/driver/lunid.go`, `snapid.go`) |
-| volume context | the map CreateVolume answers, passed to the later calls of the volume |
-| volume handle | the volume ID a PersistentVolume holds, which the CO passes to every call on the volume |
-| VolumeAttachment | the Kubernetes object that records a volume attached to a node; the attacher acts on it |
-| zvol | a ZFS volume on the appliance: the block device behind an iSCSI volume |

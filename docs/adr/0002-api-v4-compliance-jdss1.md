@@ -93,12 +93,13 @@ Driver: Andrei Perepiolkin
 Approver: andrei.perepiolkin
 Code: commit `a3800e4`, called "the current code" below; line numbers refer to it
 Implementation: the [What changes](#what-changes) section, one series of commits delivered and tested in one go
+Accepted: 2026-11-24
 Formerly: `docs/design/0002-rest-api-compliance-design.md`, merged into this document on 2026-11-10
 
 ## Status
 [Status](#status)
 
-Proposed
+Accepted
 
 ## Problem statement
 [Problem_statement](#problem-statement)
@@ -3036,6 +3037,9 @@ list already rests on the recordings, through the OpenAPI, but for `is_clone`, o
   cleanup on `volume has children` (question 17), `FailedPrecondition` for a
   volume that has snapshots, the target delete after a LUN is reported as
   not attached, and the check of an existing share (question 57).
+- User decision (2026-11-24): this document is accepted, its series being
+  implemented in `03fc012`; the fix of the DeleteSnapshot crash that
+  controller B waits on goes into ADR 0003 (its question 16).
 - Check on the lab machine (2026-11-23): a plain `go vet ./pkg/rest/...`
   reported nothing on the current code, and `go vet ./...` 26 reports where
   the run of 2026-11-14 had 34. With an empty build cache, and with `-a`,

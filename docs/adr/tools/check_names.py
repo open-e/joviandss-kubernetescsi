@@ -13,6 +13,7 @@ Read only; prints findings, nothing is edited. Sections:
      with "superseded" registers an old name; the row above it holds the current one)
   D. current registered names the record never mentions (information)
   E. impl headings of the record against the current rows of design-items.md
+     whose "Defined in" names the record (ADR NNNN, from its file name)
   F. areas used by the names against the README's list
   G. kinds in the README's table against the kinds used
   H. superseded names still written in the record
@@ -79,6 +80,7 @@ if not ISSUES.is_dir():
     print(f"  registry not found: {ISSUES}")
     sys.exit(2)
 current, superseded, by_file = set(), {}, defaultdict(set)
+defined_in = {}
 for f in sorted(ISSUES.glob("*.md")):
     if f.name == "README.md":
         continue
@@ -92,6 +94,7 @@ for f in sorted(ISSUES.glob("*.md")):
         else:
             current.add(name)
             by_file[f.name].add(name)
+            defined_in[name] = cells[3]
 registered = current | set(superseded)
 all_names = set(mentions) | set(named_headings)
 unreg = sorted(n for n in all_names if n not in registered)
@@ -104,8 +107,11 @@ print("\nD. current names registered that the record never mentions (information
 for n in sorted(current - all_names):
     print(f"  {n}")
 
-print("\nE. impl names: record headings vs the current rows of design-items.md:")
-di_names = {n for n in by_file["design-items.md"] if n.startswith("impl_")}
+# the record's own rows: design-items.md holds the items of every record
+own = m.group(1) if (m := re.match(r"(\d{4})-", ADR.name)) else None
+print(f"\nE. impl names: record headings vs the current rows of design-items.md defined in ADR {own}:")
+di_names = {n for n in by_file["design-items.md"]
+            if n.startswith("impl_") and (own is None or f"ADR {own}" in defined_in.get(n, ""))}
 rec_impl = {h for h in named_headings if h.startswith("impl_")}
 print(f"  record impl headings: {len(rec_impl)}; design-items.md impl names: {len(di_names)}")
 print("  in record only:", sorted(rec_impl - di_names))
@@ -113,9 +119,15 @@ print("  in design-items only:", sorted(di_names - rec_impl))
 
 print("\nF. areas used by names vs the README's list:")
 readme = README.read_text()
-# the list item itself, not a mention of it elsewhere in the README
-m = re.search(r"^\s*- \*\*The areas:\*\*\s*(.*?`build`)", readme, re.S | re.M)
-readme_areas = set(a for a in re.findall(r"`([a-z_]+)`", m.group(0))) if m else set()
+# the list itself, not a mention of it elsewhere in the README: the README
+# keeps its rules as yaml entries, the areas in the "areas: |" block of
+# rule_adr_names_area_second_and_character_set; an older README had them in
+# a "- **The areas:**" list item
+m = (re.search(r"^[ \t]*areas:[ \t]*\|[ \t]*\n((?:[ \t]+\S.*\n)+)", readme, re.M)
+     or re.search(r"^\s*- \*\*The areas:\*\*\s*(.*?`build`)", readme, re.S | re.M))
+readme_areas = set(a for a in re.findall(r"`([a-z_]+)`", m.group(1))) if m else set()
+if not readme_areas:
+    print("  README areas not found: the check below cannot tell an area from a slug")
 used_areas = Counter()
 for n in all_names:
     rest = n.split("_", 1)[1]
@@ -129,7 +141,14 @@ print("  README areas:", sorted(readme_areas))
 print("  used:", dict(used_areas))
 
 print("\nG. kinds in the README table vs kinds used:")
-readme_kinds = set(re.findall(r"^\s*\| `([a-z]+)` \|", readme, re.M))
+# the keys of the "mapping:" of rule_adr_names_kind_comes_first; an older
+# README had a table with one "| `kind` |" row per kind
+m = re.search(r"^- name: rule_adr_names_kind_comes_first\n(.*?)(?=^- name: |^```)", readme, re.S | re.M)
+mapping = re.search(r"^  mapping:\n(.*?)(?=^  \S)", m.group(1), re.S | re.M) if m else None
+readme_kinds = (set(re.findall(r"^    ([a-z]+):[ \t]*$", mapping.group(1), re.M)) if mapping
+                else set(re.findall(r"^\s*\| `([a-z]+)` \|", readme, re.M)))
+if not readme_kinds:
+    print("  README kinds not found")
 print("  README kinds:", sorted(readme_kinds), " used:", sorted({n.split('_', 1)[0] for n in all_names}))
 
 print("\nH. superseded names still written in the record (should be none):")

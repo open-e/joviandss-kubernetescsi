@@ -13,7 +13,8 @@ have no duplicates and no overlap with the Decisions table; no forbidden
 phrasing ("this design", "this record", "design NNNN", ...); every linked
 name has a #### heading; relative file links exist; no horizontal rules; no
 sentence longer than 60 characters appears twice outside tables; no link to
-the section it sits in.
+the section it sits in; no table row split over two lines, which ends the
+table where it breaks.
 
 Exit status 1 when a check fails. The lines printed before PROBLEMS are
 information, not failures: the numbered lists found, the decided questions,
@@ -98,11 +99,18 @@ def numbered(section, stop):
             if (m := re.match(r"^(?:(\d+)\. |- \*\*(\d+)\. )", l))]
 
 
+# two layouts: the old one, "Open questions" with a "Decisions" table; the
+# new one (README, 2026-11-25), "Tactical concerns" holding "Open questions"
+# and "Tactical decisions", one "#### N `td_<name>`" heading per answer
+new_layout = any(h == "Tactical decisions" for _, _, h in headings)
+DEC = "Tactical decisions" if new_layout else "Decisions"
+TESTING_STOP = "Tactical concerns" if new_layout else "Open questions"
+
 for sec, stop, contiguous in (("Risks", "Affected systems and files", True),
                               ("Priorities", "Options considered", True),
                               ("Key observations", "Priorities", True),
-                              ("Testing", "Open questions", True),
-                              ("Open questions", "Decisions", False)):
+                              ("Testing", TESTING_STOP, True),
+                              ("Open questions", DEC, False)):
     ns = numbered(sec, stop)
     if contiguous and ns != list(range(1, len(ns) + 1)):
         problems.append(f"{sec}: numbering {ns}")
@@ -116,14 +124,15 @@ if stages != list(range(1, len(stages) + 1)):
     problems.append(f"Stages: numbering {stages}")
 print(f"Stages: 1..{len(stages)}")
 
-# decisions table numbers
-dec_s = next(i for i, _, h in headings if h == "Decisions")
+# decided question numbers: table rows (old layout) or td_ headings (new)
+dec_s = next(i for i, _, h in headings if h == DEC)
 dec_e = next(i for i, _, h in headings if h == "Relationship to other designs")
-dec = [int(m.group(1)) for l in lines[dec_s:dec_e] if (m := re.match(r"^\| (\d+) \|", l))]
+row = r"^#### (\d+) `td_[a-z0-9_]+`$" if new_layout else r"^\| (\d+) \|"
+dec = [int(m.group(1)) for l in lines[dec_s:dec_e] if (m := re.match(row, l))]
 if len(dec) != len(set(dec)):
     problems.append(f"Decisions: duplicate rows {sorted({n for n in dec if dec.count(n) > 1})}")
 print(f"Decisions: {dec}")
-openq = numbered("Open questions", "Decisions")
+openq = numbered("Open questions", DEC)
 if set(dec) & set(openq):
     problems.append(f"questions both open and decided: {set(dec) & set(openq)}")
 
@@ -200,8 +209,16 @@ for i, l in enumerate(lines, 1):
     if re.match(r"^\[[^\]]+\]\(#" + (re.escape(cur) if cur else "x") + r"\)$", l):
         continue  # the self-anchor line itself
     for m in re.finditer(r"\]\(#([^)]+)\)", l):
-        if m.group(1) == cur and cur not in ("risks", "open-questions", "testing", "appendix", "what-changes", "decisions", "evidence-gaps", "key-observations"):
+        if m.group(1) == cur and cur not in ("risks", "open-questions", "testing", "appendix", "what-changes", "decisions", "tactical-decisions", "evidence-gaps", "key-observations"):
             problems.append(f"line {i}: links to its own section #{cur}")
+
+# table rows: a row that a line break splits renders as two broken rows
+in_code = False
+for i, l in enumerate(lines, 1):
+    if l.startswith("```"):
+        in_code = not in_code
+    if not in_code and l.startswith("|") and not l.rstrip().endswith("|"):
+        problems.append(f"line {i}: table row not closed on its line (a line break splits it)")
 
 print(f"lines: {len(lines)}, headings: {len(headings)}, tables: {len(caps)}")
 if problems:
