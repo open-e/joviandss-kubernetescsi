@@ -52,6 +52,9 @@ Line numbers refer to `master` at that time.
 20. `RestEndpointCfg`/`ISCSIEndpointCfg` have only `json` tags but are read
     with `yaml.v3`; they work only because yaml.v3 lowercases field names.
     Add `yaml` tags.
+    Items 19 and 20 are done on `master` since `4c03c7d` (2026-11-23, ADR
+    0002): both guides and `deploy/cfg/cfg.yaml` describe the keys the code
+    reads, every key has a `yaml` tag, and a test reads the guides' examples.
 21. `PluginName` is hard-coded to `iscsi.csi.joviandss.open-e.com`; NFS
     config section (`nfs:`) is not parsed on `master`.
 
@@ -258,3 +261,97 @@ Line numbers refer to the record and the README as of the working tree on
     what the hedge "or with a different v4" describes. The four Low items
     were applied on 2026-11-12 (the review's Outcome); the carried-over
     items stay with 55 and 56.
+
+## Found by the branch review and the live cycles on `03fc012` (2026-11-24)
+
+All in `review/2026-11-24-master-review-and-live-cycles.md`, with lines on
+`03fc012` and the evidence for each; IDs in brackets are those of the
+earlier reviews and of the tracker. Nothing here is implemented yet. The
+four important findings of the same branch review are fixed (`aa7d075`,
+`9a7dfab`).
+
+58. `pkg/driver/iscsi_driver.go:524`: `err.GetCode()` on the nil error of a
+    successful DeleteSnapshot ends the controller (C1, F4). Seen in every
+    live cycle; it cuts the second controller preset short. This is the
+    crash item 16 says was fixed once and lost. First thing to fix.
+59. `pkg/controller/controllerplugin.go:833`, `:870`: ListSnapshots by
+    `snapshot_id` has its condition inverted: an empty list for a snapshot
+    that exists, a nil dereference on a failed read (C8).
+60. `pkg/controller/listers.go:196`, `:242`: ListVolumes reads a nil
+    snapshot descriptor for a clone of a snapshot made by hand (C9).
+61. `pkg/driver/nfs_driver.go:589`: NFS DeleteSnapshot deletes the snapshot
+    without reading its clones, and the appliance deletes the clones with
+    it: restored volumes are destroyed (D15).
+62. `pkg/driver/iscsi_driver.go:529`, `pkg/driver/nfs_driver.go:605`: when
+    a snapshot delete is refused for its clones, DeleteSnapshot deletes
+    every clone whose name starts with `s`, by the first letter alone. New.
+63. `pkg/controller/controllerplugin.go:547`, `:559`: CreateVolume returns
+    no `content_source` for a volume made from a snapshot or a volume. New,
+    from cycle `20261123-231354`.
+64. An ID that is not in the plugin's format is answered `InvalidArgument`;
+    csi-sanity expects `NotFound`, and success for DeleteVolume
+    (`controllerplugin.go:373`, `:584`, and `NewVolumeDescFromCSIID`). Four
+    specs. Changing it reverses a part of ADR 0002: a decision.
+65. `pkg/controller/controllerplugin.go:1030`: ValidateVolumeCapabilities
+    confirms an empty list of capabilities; `vCap` (`:112`) is never set.
+66. ControllerPublishVolume never checks the node ID
+    (`controllerplugin.go:884` only logs it): publishing to a node that
+    does not exist succeeds.
+67. `pkg/controller/controllerplugin.go:948`: the publish error answers
+    `Unknown internal error` and drops the cause; `:553`: CreateVolume
+    turns any other status of `VolumeComply` into `Unknown`; `:454`: the
+    AlreadyExists message prints the requested size where the size of the
+    existing volume belongs.
+68. The appliance resets a connection the plugin reuses
+    (`read: connection reset by peer` on a DELETE of a target and on a POST
+    of a LUN, three times in cycle `20261123-231354`, about 32 s after each
+    publish began). Cause open. Go does not send a DELETE or a POST again.
+    To settle: a cycle at Debug with the duration, the local port and the
+    reuse of the connection in the request line. Remedy either way: no
+    kept-alive connections (`pkg/rest/rproxy.go:222`).
+69. The request timeout (`idletimeout`, 30 s in the lab) is shorter than a
+    volume delete on a pool with 100 volumes or more (346 of 1722 recorded
+    deletes); a publish takes about 25 s by the appliance's own time
+    (target create 10.5 s, LUN attach 14.3 s at the medians).
+70. `pkg/rest/types_methods.go:350`, `pkg/controller/controllerplugin.go:453`:
+    a NAS volume without a quota reads as size 0, so a repeated NFS
+    CreateVolume without `limit_bytes` ends in AlreadyExists (D10).
+71. Smaller, in `pkg/rest` and `pkg/driver`: requests and the pause before
+    a GET is sent again ignore a cancelled context (`rproxy.go:94`, `:170`);
+    a list read never ends on an appliance that returns a full page for
+    every page number (`common.go:56`); a `maxreplysize` of the largest
+    64-bit number overflows (`rproxy.go:116`, `:195`); the wait for a new
+    target in PublishVolume does not sleep on the target-not-found code
+    (`iscsi_driver.go:665-676`); the creation time of a snapshot read by
+    name may be off by the appliance's offset from UTC
+    (`types_methods.go:195`, to check on the lab).
+72. `pkg/node/nodeplugin.go:113`: the node plugin prints the whole volume
+    capability at Debug, with the mount flags, which can hold a password.
+    The controller's lines of that kind are gone since ADR 0002.
+
+## Found by the review of ADR 0003 against csi-test v5.6.0 (2026-11-25)
+
+Code reading on `03fc012` and csi-test v5.6.0's `pkg/sanity/controller.go`.
+Both lie behind the crash of item 58: their csi-sanity specs run after it
+and were answered Unavailable in every cycle. ADR 0003 takes both
+(`docs/adr/0003-iscsi-csi-operational-compliance.md`).
+
+73. `pkg/controller/controllerplugin.go:675-712`,
+    `pkg/driver/iscsi_driver.go:485-498`: CreateSnapshot with the name of
+    another volume's snapshot makes a second snapshot and answers OK; CSI
+    gives `AlreadyExists`. The name on the appliance comes from the CSI name
+    alone, and ZFS keeps a snapshot's name within its volume, so nothing
+    stops it. One spec: "should fail when requesting to create a snapshot
+    with already existing name and different source volume ID"
+    (`controller.go:1388`). To find the name the plugin would have to read
+    the snapshots of the whole pool on every create (ADR 0003 risk 12).
+    Kubernetes names each snapshot `snapshot-<UUID>` and never sends it.
+74. The snapshot side of item 64: `pkg/driver/snapid.go:124-125` answers
+    `InvalidArgument` to a snapshot ID of fewer than three parts, as every
+    one csi-sanity makes up is, and `controllerplugin.go:366` answers
+    `InvalidArgument` to any snapshot source of CreateVolume its parser
+    refuses. Four more specs, where csi-sanity expects `NotFound`, an empty
+    list or success: CreateVolume from `non-existing-snapshot-id`,
+    ListSnapshots by `none-exist-id` and by a made-up source volume (the
+    volume side, as 64), DeleteSnapshot of `reallyfakesnapshotid`. ADR 0003
+    question 21 decides the answers.
