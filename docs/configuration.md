@@ -51,7 +51,7 @@ iscsi:
     - `cafile` path of a file with one or more PEM certificates that the plugin trusts beside the certificates of the system: the certificate of the storage itself, or of the CA that signed it. See [Certificate of the storage](#certificate-of-the-storage).
     - `insecure` set it to `true` to turn the check of the storage's certificate off. Not set, the certificate is checked.
     - `prot` is no longer needed: the plugin always uses `https`. Any other value is refused.
-    - `idletimeout` time to wait for one REST request to complete before considering it as failed, such as `30s`.
+    - `idletimeout` time to wait for one REST request to complete before considering it as failed, such as `30s`. The key has no default: without it the plugin starts, and every request to the storage fails with an error that names `idletimeout`. A volume delete in a pool of a hundred volumes or more can take up to about two minutes, so `120s` is safer than `30s`. Keep it below the `--timeout` of the provisioner (see [Timeouts of the sidecars](#timeouts-of-the-sidecars)).
     - `tries` how many times a `GET` request that the storage answers without data (status 204) is sent in all: `3` means the first request and two more, `1` means no second request. `3` when the key is not set. No other request is sent again: not a `DELETE` answered 204, which is a success, and not a request that failed.
     - `retrydelay` the pause before such a `GET` is sent again, written like `idletimeout`. `1s` when the key is not set.
     - `maxreplysize` the largest reply of the storage that the plugin reads, in bytes. A larger reply makes its request fail with an error that names the limit. `1048576` (1 MiB) when the key is not set, about five times the largest reply the plugin asks for.
@@ -61,6 +61,56 @@ iscsi:
     - `port` iscsi port provided by JovianDSS storage
 
 Keys that the plugin does not read, such as `name` in the `endpoint` section, are ignored.
+
+## Timeouts of the sidecars
+
+The controller pod runs the plugin beside Kubernetes' sidecars, among them
+`csi-provisioner`, which creates and deletes volumes, and `csi-attacher`, which
+attaches them to nodes. Each sidecar calls the plugin and gives every call a
+time limit, its `--timeout` flag. That flag is an argument of the sidecar's
+container in the controller manifest
+(`deploy/joviandss/iscsi/joviandss-csi-controller.yaml`, and
+`deploy/joviandss/nfs/joviandss-csi-controller.yaml` for NFS), not a key of the
+plugin's config file. When the flag is not set, both sidecars wait 15 seconds.
+
+JovianDSS often needs longer than that:
+
+- **Attaching an iSCSI volume** takes about 25 seconds: about 10 to create its
+  target, and about 14 to attach the volume to the target.
+- **Deleting a volume** in a pool of a hundred volumes or more can take up to
+  about two minutes.
+
+With 15 seconds, the sidecar gives up while the plugin is still working, and
+sends the call again later. The volume is attached or deleted in the end, but
+only after a few retries, slower, and with errors such as a deadline exceeded
+in the events of the volume.
+
+Set a longer `--timeout` in the controller manifest:
+
+```yaml
+        - name: csi-provisioner
+          args:
+            - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
+            - --volume-name-prefix=pvc-ns
+            - --timeout=150s
+        - name: csi-attacher
+          args:
+            - --v=3
+            - --csi-address=/var/lib/csi/sockets/pluginproxy/csi.sock
+            - --timeout=60s
+```
+
+- `--timeout=60s` for `csi-attacher` covers an attach, with room to spare.
+- `--timeout=150s` for `csi-provisioner` covers the slowest delete recorded,
+  112 seconds.
+- Keep the plugin's `idletimeout` below the provisioner's `--timeout`, for
+  instance `120s` against `150s`, so that a request the storage does not
+  finish fails in the plugin, with its own error, before the provisioner gives
+  up on the call.
+
+The manifests shipped with the plugin do not set `--timeout` yet; add it when
+you deploy. `csi-snapshotter` waits one minute by default, which needs no
+change.
 
 ## Certificate of the storage
 

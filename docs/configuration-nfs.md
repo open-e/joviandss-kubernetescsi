@@ -30,7 +30,7 @@ nfs:
     - 192.168.0.100
 ```
 
-Read about top level configuration options, `pool` among them, and `endpoint` section in [configuration guide](configuration.md).
+Read about top level configuration options, `pool` among them, and `endpoint` section in [configuration guide](configuration.md). The same guide explains the [timeouts of the sidecars](configuration.md#timeouts-of-the-sidecars), which apply to the NFS build too.
 
 - `nfs` is a section of config file containing information on how to connect to JovianDSS nfs resources.
     - `addrs` list of addresses that would be used to connect shares
